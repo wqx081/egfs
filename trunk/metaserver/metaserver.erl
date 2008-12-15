@@ -48,7 +48,7 @@ do_allocate_chunk(FileID, ClientID)->
     Modes = look_up_filesession(FileID, ClientID),
     % allocate data chunk
     case Modes of
-        w-> get_first_chunk(FileID);
+        w-> get_last_chunk(FileID);
         a-> get_last_chunk(FileID)
     end.
     
@@ -56,7 +56,8 @@ look_up_filesession(FileID, ClientID)->
     % mock return
     {w}.
 
-get_first_chunk(FileID)->
+% unused function
+ get_first_chunk(FileID)->
     % mock return
     {ok, <<16#ff00ff00ff00ff00:64>>, [nodeip1, nodeip2, nodeip3]}.
     
@@ -77,7 +78,7 @@ do_close(FileID, ClientID)->
 
 % read step 1: open file == wirte step1
 % read step 2: get chunk for further reading
-do_get_chunk(FileID, FileOffset)->
+do_get_chunk(FileID, ChunkIdx)->
     % mock return
 {ok,  <<16#ff00ff00ff00ff00:64>>, [nodeip1, nodeip2, nodeip3]}.
 
