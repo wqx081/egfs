@@ -11,13 +11,13 @@
 do_this_once() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
-    mnesia:create_table(filemeta, [{attributes, record_info(fields, filemeta)}]),
-    mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmapping)}]),
+    mnesia:create_table(filemeta, [{attributes, record_info(fields, filemetaTable)}]),
+    mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmappingTalbe)}]),
     mnesia:stop().
 
 start_mnesia()->
     mnesia:start(),
-    mnesia:wait_for_tables([filemeta, chunkmapping], 20000).
+    mnesia:wait_for_tables([filemetaTable, chunkmappingTalbe], 20000).
 
 %"model" methods
 % write step 1: open file
