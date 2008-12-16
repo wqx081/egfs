@@ -1,0 +1,2 @@
+-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
+-record(chunkmapping, {chunkid, chunklocations}).
