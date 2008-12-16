@@ -6,6 +6,8 @@ test() ->
     Read_req = {read, 2000, 0, 1024},
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
 
+    process_flag(trap_exit, true),
+
     receive
 	{tcp, Socket, Bin} ->
 	    Response = binary_to_term(Bin),
