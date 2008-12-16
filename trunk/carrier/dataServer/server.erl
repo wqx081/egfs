@@ -13,9 +13,11 @@ par_connect(Listen) ->
     %% io:format("new listen process:<<~p>>~n", self()),
     {ok, Socket} = gen_tcp:accept(Listen),
     spawn(fun() -> par_connect(Listen) end),
-    loop(Socket).
+    handle_client_req(Socket).
 
-loop(Socket) ->
+handle_client_req(Socket) ->
+    process_flag(trap_exit, true),
+
     receive
 	{tcp, Socket, Bin} ->
 	    Req = binary_to_term(Bin),
@@ -23,16 +25,18 @@ loop(Socket) ->
 
 	    case Req of
 		{read, ChunkID, Begin, Size} ->
-		    read_response(Socket, ChunkID, Begin, Size),
-		    io:format("read response over!~n");
+		    read_response(Socket, ChunkID, Begin, Size);
 		{write, ChunkID} ->
 		    write_response(Socket, ChunkID);
+		%% {stop, Why} ->
+		%%    Child ! {stop, Why},
+		%%    io:format("receive stop request from client, and transfer will be terminated~n");
 		_Any ->
 		    io:format("Server Unkown req:~p~n", [Req])
 	    end;
 	{tcp_close, Socket} ->
-	    io:format("Read Req finish~n");
-	{ _, _} ->
+	    io:format("Control Socket was closed by Client~n");
+	_Unknown ->
 	    io:format("something unknown to server~n")
     end.
 
@@ -43,7 +47,8 @@ read_response(Socket, _ChunkID, Begin, Size) ->
 
     {ok, SocketData} = gen_tcp:accept(ListenData),
     {ok, Hdl} = file:open("send.dat", [raw, read, binary]),
-    send_it(SocketData, Hdl, Begin, Size).
+    send_it(SocketData, Hdl, Begin, Size),
+    gen_tcp:close(SocketData).
 
 send_it(SocketData, Hdl, Begin, Size) ->
     {ok, Binary} = file:pread(Hdl, Begin, Size),
