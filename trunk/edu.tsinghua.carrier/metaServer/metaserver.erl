@@ -56,7 +56,9 @@ look_up_filesession(FileID, ClientID)->
     % mock return
     {w}.
 
-% unused function
+
+
+% unused function  a
  get_first_chunk(FileID)->
     % mock return
     {ok, <<16#ff00ff00ff00ff00:64>>, [nodeip1, nodeip2, nodeip3]}.
