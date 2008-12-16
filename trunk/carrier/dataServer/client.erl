@@ -3,7 +3,7 @@
 
 test() ->
     {ok, Socket} = gen_tcp:connect(localhost, 9999, [binary, {packet, 2}, {active, true}]),
-    Read_req = {read, 2000, 0, 256},
+    Read_req = {read, 2000, 0, 1024},
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
 
     receive
@@ -13,7 +13,7 @@ test() ->
 
 	    case Response of
 		{ok, Port} ->
-		    Child = spawn_link(receive_data(localhost, Port));
+		    _Child = spawn_link(fun() -> receive_data(localhost, Port) end);
 		{error, _Why} ->
 		    io:format("Read Req can't be satisfied~n")
 	    end
@@ -30,7 +30,8 @@ loop(DataSocket) ->
 	    loop(DataSocket);
 	{tcp_closed, DataSocket} ->
 	    io:format("read chunk over!~n");
-	{client_close} ->
+	{client_close, _Why} ->
+	    io:format("client close the datasocket~n"),
 	    gen_tcp:close(DataSocket)
     end.
 
