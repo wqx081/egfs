@@ -1,0 +1,44 @@
+#labels Phase-Design
+read函数的时序图，大家可以到http://www.websequencediagrams.com/去用以下代码出图。
+=======================================================================
+
+
+Client->MetadataServer: {open, FileName, Mode}
+
+activate MetadataServer
+
+note right of MetadataServer: getFileHandle
+
+MetadataServer->Client: {ok,FileID} | {error,Reason}
+
+deactivate MetadataServer
+
+loop read_chunks 
+
+Client->MetadataServer: {locatechunk, FileID, ChunkIndex}
+
+activate MetadataServer
+
+note right of MetadataServer: locatechunk
+
+MetadataServer->Client: {ok, ChunkID, NodeList} | {error, Reason}
+
+deactivate MetadataServer 
+
+Client->DataServer: {readchunk, ChunkID, NodeID, Byterange}
+
+activate DataServer
+
+DataServer->Client: gen_tcp:connect
+
+DataServer->Client: gen_tcp:send
+
+DataServer->Client: {tcp, Socket, Binary}
+
+DataServer->Client: {tcp_closed, Socket}
+
+deactivate DataServer
+
+end 
+
+Client->MetadataServer: {close, FileName}
