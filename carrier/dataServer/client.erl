@@ -24,7 +24,9 @@ test() ->
 
 receive_data(Host, Port) ->
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    loop(DataSocket).
+    io:format("Transfer begin: ~p~n", [erlang:time()]),
+    loop(DataSocket),
+    io:format("Transfer end: ~p~n", [erlang:time()]).
 
 loop(DataSocket) ->
     receive
