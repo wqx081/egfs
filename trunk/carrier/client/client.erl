@@ -41,7 +41,7 @@ handle_call({open,FileName,X}, _From, Tab) ->
 handle_call({write,FileName,X}, _From, Tab) ->
     Reply = case ets:lookup(Tab, FileName) of
 		[]  -> please_open_the_file;
-		[{FileName,Balance}] ->
+		[{FileName,_Balance}] ->
 		    %%NewBalance = Balance + X,
 		    ets:insert(Tab, {FileName, X}),
 		    {thanks, FileName, you_write_to_the_file, X}	
@@ -53,7 +53,7 @@ handle_call({read,FileName}, _From, Tab) ->
 		[{FileName,Balance}] ->
 		    %%NewBalance = Balance + X,
 		    %%ets:insert(Tab, {FileName, NewBalance}),
-                    readchunk(),  %%2000, {0, 1024}
+                    readchunk(2000, {0, 1024}), 
 		    {thanks, FileName, the_file_content_is, Balance}	
 	    end,
     {reply, Reply, Tab};
@@ -71,7 +71,6 @@ handle_call({del,FileName}, _From, Tab) ->
     {reply, Reply, Tab};
 handle_call(stop, _From, Tab) ->
     {stop, normal, closed, Tab}.
-    
 
 handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Info, State) -> {noreply, State}.
@@ -79,10 +78,9 @@ terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
-readchunk() ->
-    {ok, Socket} = gen_tcp:connect(localhost, 9999, [binary, {packet, 2}, {active, true}]),
-    Read_req = {read, 2000, 0, 1024},     %%2000 is chunkID, 0 is headaddr, 1024 is endaddr
-    %%chunkID, head_addr, end_addr  chunkID, {head_addr, end_addr}
+readchunk(FileID,{Start_addr, End_addr}) ->
+    {ok, Socket} = gen_tcp:connect("192.168.0.111", 9999, [binary, {packet, 2}, {active, true}]),
+    Read_req = {read, FileID, Start_addr, End_addr},%%2000, 0, 1024 * 1024 * 1024
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
 
     process_flag(trap_exit, true),
@@ -94,21 +92,25 @@ readchunk() ->
 
 	    case Response of
 		{ok, Port} ->
-		    _Child = spawn_link(fun() -> receive_data(localhost, Port) end);
+		    _Child = spawn_link(fun() -> receive_data("192.168.0.111", Port) end);
 		{error, _Why} ->
 		    io:format("Read Req can't be satisfied~n")
 	    end
     end.
 
 receive_data(Host, Port) ->
-    {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    loop(DataSocket).
+    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
 
-loop(DataSocket) ->
+    {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    io:format("Transfer begin: ~p~n", [erlang:time()]),
+    loop(DataSocket, Hdl),
+    io:format("Transfer end: ~p~n", [erlang:time()]).
+
+loop(DataSocket, Hdl) ->
     receive
 	{tcp, DataSocket, Data} ->
-	    write(Data),
-	    loop(DataSocket);
+	    write_data(Data, Hdl),
+	    loop(DataSocket, Hdl);
 	{tcp_closed, DataSocket} ->
 	    io:format("read chunk over!~n");
 	{client_close, _Why} ->
@@ -116,16 +118,13 @@ loop(DataSocket) ->
 	    gen_tcp:close(DataSocket)
     end.
 
-write(Data) ->
-    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
-    file:write(Hdl, Data),
-    file:close(Hdl).
+write_data(Data, Hdl) ->
+    %% {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
+    file:write(Hdl, Data).
+    %% file:close(Hdl).
 
 test_write() ->
     {ok, Hdl} = file:open("send.dat", [raw, read, binary]),
     {ok, Binary} = file:pread(Hdl, 5, 4),
-    %%{ok, Binary} = file:read_file("send.dat"),
-    write(Binary).
-
-
-    
+    {ok, Hdlw} = file:open("recv.dat", [raw, append, binary]),
+    write(Binary, Hdlw).
