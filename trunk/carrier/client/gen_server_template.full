@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
 %%% File    : gen_server_template.full
-%%% Author  : xuchuncong <xuchuncong@gmail.com>
+%%% Author  : 
 %%% Description : the template for load and dispose
 %%%
-%%% Created :  17 dec 2008 by xuchuncong 
+%%% Created :  
 %%%-------------------------------------------------------------------
 -module().
 

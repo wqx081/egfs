@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
 %%% File    : client.erl
-%%% Author  : xuchuncong <xuchuncong@gmail.com>
+%%% Author  : 
 %%% Description : the client template:offer open/write/read/del function
 %%%
-%%% Created :  17 dec 2008 by xuchuncong 
+%%% Created :  
 %%%-------------------------------------------------------------------
 -module(client).
 
@@ -19,7 +19,7 @@
 start() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 close()  -> gen_server:call(?MODULE, stop).
 
-open(FileName)          -> gen_server:call(?MODULE, {open, FileName}).
+open(FileName,Mode)     -> gen_server:call(?MODULE, {open, FileName,Mode}).
 
 write(FileName, Amount) -> gen_server:call(?MODULE, {write, FileName, Amount}).
 
@@ -31,10 +31,10 @@ del(FileName)           -> gen_server:call(?MODULE, {del,FileName}).
 
 init([]) -> {ok, ets:new(?MODULE,[])}.
 
-handle_call({open,FileName}, _From, Tab) ->
+handle_call({open,FileName,X}, _From, Tab) ->
     Reply = case ets:lookup(Tab, FileName) of
 		[]  -> ets:insert(Tab, {FileName,0}), 
-		       {you_have_openned_a_file, FileName};
+		       {you_have_openned_a_file, FileName, X};
 		[_] -> {FileName, the_file_have_been_openned}
 	    end,
     {reply, Reply, Tab};    
@@ -53,7 +53,7 @@ handle_call({read,FileName}, _From, Tab) ->
 		[{FileName,Balance}] ->
 		    %%NewBalance = Balance + X,
 		    %%ets:insert(Tab, {FileName, NewBalance}),
-                    readChunk(),
+                    readchunk(),  %%2000, {0, 1024}
 		    {thanks, FileName, the_file_content_is, Balance}	
 	    end,
     {reply, Reply, Tab};
@@ -79,9 +79,10 @@ terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
-readChunk() ->
+readchunk() ->
     {ok, Socket} = gen_tcp:connect(localhost, 9999, [binary, {packet, 2}, {active, true}]),
-    Read_req = {read, 2000, 0, 1024},
+    Read_req = {read, 2000, 0, 1024},     %%2000 is chunkID, 0 is headaddr, 1024 is endaddr
+    %%chunkID, head_addr, end_addr  chunkID, {head_addr, end_addr}
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
 
     process_flag(trap_exit, true),
