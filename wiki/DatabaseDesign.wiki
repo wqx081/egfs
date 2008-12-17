@@ -1,4 +1,6 @@
+#summary eGFS 数据库设计
 #labels Phase-Design
+
 ===(1)Metadata Format Table===
 
 || *FILEID* || *FILENAME* || *FILESIZE* || *CHUNKS* || *CREATETIME* || *MODIFYTIME* || *ACL* ||
