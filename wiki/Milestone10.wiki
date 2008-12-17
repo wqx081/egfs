@@ -13,7 +13,7 @@
 
 == open ==
 
- * 支持 read, write（即create）,append 三种模式打开文件。
+ * 支持 read, write（即create）两种模式打开文件。append 暂时不考虑。
  * Writer 写的数据只有在 sync 后，Reader 才能够 read 出来数据。
 
 == write ==
