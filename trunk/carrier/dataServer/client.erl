@@ -44,8 +44,8 @@ loop(DataSocket, Hdl) ->
 
 write(Data, Hdl) ->
     %% {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
-    file:write(Hdl, Data),
-    file:close(Hdl).
+    file:write(Hdl, Data).
+    %% file:close(Hdl).
 
 test_write() ->
     {ok, Hdl} = file:open("send.dat", [raw, read, binary]),
