@@ -23,16 +23,18 @@ test() ->
     end.
 
 receive_data(Host, Port) ->
+    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
+
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     io:format("Transfer begin: ~p~n", [erlang:time()]),
-    loop(DataSocket),
+    loop(DataSocket, Hdl),
     io:format("Transfer end: ~p~n", [erlang:time()]).
 
-loop(DataSocket) ->
+loop(DataSocket, Hdl) ->
     receive
 	{tcp, DataSocket, Data} ->
-	    write(Data),
-	    loop(DataSocket);
+	    write(Data, Hdl),
+	    loop(DataSocket, Hdl);
 	{tcp_closed, DataSocket} ->
 	    io:format("read chunk over!~n");
 	{client_close, _Why} ->
@@ -40,14 +42,14 @@ loop(DataSocket) ->
 	    gen_tcp:close(DataSocket)
     end.
 
-write(Data) ->
-    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
+write(Data, Hdl) ->
+    %% {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
     file:write(Hdl, Data),
     file:close(Hdl).
 
 test_write() ->
     {ok, Hdl} = file:open("send.dat", [raw, read, binary]),
     {ok, Binary} = file:pread(Hdl, 5, 4),
-    %%{ok, Binary} = file:read_file("send.dat"),
-    write(Binary).
+    {ok, Hdlw} = file:open("recv.dat", [raw, append, binary]),
+    write(Binary, Hdlw).
 
