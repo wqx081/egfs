@@ -33,6 +33,14 @@ write(FileHandle, Data) -> ok | {error, Reason}
 
  * 注意：函数规格倒没什么可推敲的，但是是否支持多个客户同时写，这对实现上来说是关键。
 
+== sync ==
+
+{{{
+sync(FileHandle) -> ok | {error, Reason}
+}}}
+
+ * 注意：在多个客户同时写的时候，sync语言如何，需要确认。
+
 == read ==
 
 {{{
