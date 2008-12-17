@@ -25,7 +25,7 @@ write(FileName, Amount) -> gen_server:call(?MODULE, {write, FileName, Amount}).
 
 read(FileName)          -> gen_server:call(?MODULE, {read, FileName}).
 
-del(FileName)           -> gen_server:call(?MODULE, {del,FileName}).
+delete(FileName)           -> gen_server:call(?MODULE, {del,FileName}).
 
 
 
