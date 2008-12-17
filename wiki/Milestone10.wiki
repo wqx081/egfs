@@ -9,7 +9,7 @@
 
 == 客户端api ==
 
-客户端api只支持erlang api，没有其他语言的binding。详细规格参阅：[Specification]。
+ * 客户端api只支持erlang api，没有其他语言的binding。详细规格参阅：[Specification]。
 
 == open ==
 
