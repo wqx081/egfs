@@ -11,7 +11,7 @@
 create(FileName) -> {ok, FileHandle} | {error, Reason}
 }}}
 
- * 用create打开的文件是独占的，也就是说不允许多个Client一起写。如果希望支持多个Client写，那么应该调用open(FileName, [append])。
+ * 注意：用create打开的文件是独占的，也就是说不允许多个Client一起写。如果希望支持多个Client写，那么应该调用`open(FileName, [append])`。
 
 == open ==
 
