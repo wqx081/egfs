@@ -3,16 +3,16 @@
 
 || *FILEID* || *FILENAME* || *FILESIZE* || *CHUNKS* || *CREATETIME* || *MODIFYTIME* || *ACL* ||
 ||0ef4(64bit) ||	  /foo/bar	||  2097152	 || [ChunkID1, ChunkID5, ChunkID30]	||08年12月14日09时04分||	08年12月14日09时04分||......||
-||0de2	||/foo/tmp || 1024 || [ChunkID7] ||08年12月14日09时04分||	08年12月14日09时04分||......||
+||0de2	||/foo/tmp || 1024 || [ChunkID7]||08年12月14日09时04分||	08年12月14日09时04分||......||
 		
 
 ===(2)Chunk Mapping Table===					
 
 || *CHUNKID* || *CHUNKLOCATION* ||				
 ||ChunkID1	||[node1,node2,node3] ||				
-||ChunkID5	||[node4] ||	
+||ChunkID5	||[node4]||	
 ||ChunkID7	||[node5,node6]||		
-||ChunkID30	||[node7]  ||
+||ChunkID30	||[node7]||
 
 
 ===(3)Host Info===
