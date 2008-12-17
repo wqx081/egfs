@@ -1,5 +1,5 @@
 #summary eGFS 数据库设计
-#labels Phase-Design
+#labels Phase-Design,Featured
 
 ===(1)Metadata Format Table===
 
