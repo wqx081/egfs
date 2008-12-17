@@ -12,19 +12,20 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+
 -compile(export_all).
 
 
 start() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 close()  -> gen_server:call(?MODULE, stop).
 
-open(FileName)      -> gen_server:call(?MODULE, {open, FileName}).
+open(FileName)          -> gen_server:call(?MODULE, {open, FileName}).
 
-write(FileName, Amount)  -> gen_server:call(?MODULE, {write, FileName, Amount}).
+write(FileName, Amount) -> gen_server:call(?MODULE, {write, FileName, Amount}).
 
-read(FileName)  -> gen_server:call(?MODULE, {read, FileName}).
+read(FileName)          -> gen_server:call(?MODULE, {read, FileName}).
 
-del(FileName) -> gen_server:call(?MODULE, {del,FileName}).
+del(FileName)           -> gen_server:call(?MODULE, {del,FileName}).
 
 
 
@@ -52,6 +53,7 @@ handle_call({read,FileName}, _From, Tab) ->
 		[{FileName,Balance}] ->
 		    %%NewBalance = Balance + X,
 		    %%ets:insert(Tab, {FileName, NewBalance}),
+                    readChunk(),
 		    {thanks, FileName, the_file_content_is, Balance}	
 	    end,
     {reply, Reply, Tab};
@@ -75,6 +77,54 @@ handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Info, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
+
+
+readChunk() ->
+    {ok, Socket} = gen_tcp:connect(localhost, 9999, [binary, {packet, 2}, {active, true}]),
+    Read_req = {read, 2000, 0, 1024},
+    ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
+
+    process_flag(trap_exit, true),
+
+    receive
+	{tcp, Socket, Bin} ->
+	    Response = binary_to_term(Bin),
+	    io:format("Response:~p~n", [Response]),
+
+	    case Response of
+		{ok, Port} ->
+		    _Child = spawn_link(fun() -> receive_data(localhost, Port) end);
+		{error, _Why} ->
+		    io:format("Read Req can't be satisfied~n")
+	    end
+    end.
+
+receive_data(Host, Port) ->
+    {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    loop(DataSocket).
+
+loop(DataSocket) ->
+    receive
+	{tcp, DataSocket, Data} ->
+	    write(Data),
+	    loop(DataSocket);
+	{tcp_closed, DataSocket} ->
+	    io:format("read chunk over!~n");
+	{client_close, _Why} ->
+	    io:format("client close the datasocket~n"),
+	    gen_tcp:close(DataSocket)
+    end.
+
+write(Data) ->
+    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
+    file:write(Hdl, Data),
+    file:close(Hdl).
+
+test_write() ->
+    {ok, Hdl} = file:open("send.dat", [raw, read, binary]),
+    {ok, Binary} = file:pread(Hdl, 5, 4),
+    %%{ok, Binary} = file:read_file("send.dat"),
+    write(Binary).
 
 
     
