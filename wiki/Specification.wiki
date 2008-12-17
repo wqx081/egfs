@@ -1,7 +1,7 @@
-#summary eGFS 函数规格
+#summary eGFS 函数规格(Client API)
 #labels Featured,api,egfs,dfs,Phase-Design
 
-= 函数规格 =
+= 函数规格(Client API) =
 
 总体设计原则是和erlang的[http://www.erlang.org/doc/man/file.html file模块]接口保持兼容，基本上可以认为是其子集。
 
