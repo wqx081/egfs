@@ -5,46 +5,64 @@
 
 == create ==
 
+{{{
 create(FileName) -> {ok, FileHandle} | {error, Reason}
+}}}
 
 == open ==
 
+{{{
 open(FileName, [Mode]) -> {ok, FileHandle} | {error, Reason}, 其中：Mode = read | append
+}}}
 
 == close ==
 
+{{{
 close(FileHandle) -> ok
+}}}
 
 == write == 
 
+{{{
 write(FileHandle, Data) -> ok | {error, Reason}
+}}}
 
- * 注意：函数规格倒没什么可推敲的，但是是否支持多个客户同时写，这是关键。
+ * 注意：函数规格倒没什么可推敲的，但是是否支持多个客户同时写，这对实现上来说是关键。
 
 == read ==
 
+{{{
 read(FileHandle, Size) -> {ok, Data} | eof | {error, Reason}
+}}}
 
 == position ==
 
+{{{
 position(FileHandle, Offset) -> {ok, Offset}, {error, Reason}
+}}}
 
  * 注意：对于写模式打开的文件，调用position函数必然失败（因为我们只支持append数据，不能移动写指针）。
 
 == pread ==
 
+{{{
 pread(FileHandle, Offset, Size) -> {ok, Data} | {error, Reason}
+}}}
 
  * 注意：调用pread后，文件当前位置指针是未定义的。
 
 == delete ==
 
+{{{
 delete(FileName) -> ok | {error, Reason}
+}}}
 
  * 注意：如果当前有人打开文件，那么delete会怎么样应该明确定义。
 
 == rename ==
 
+{{{
 rename(FileName, NewFileName) -> ok | {error, Reason}
+}}}
 
  * 注意点同上。
