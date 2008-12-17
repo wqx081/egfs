@@ -1,66 +1,80 @@
+%%%-------------------------------------------------------------------
+%%% File    : client.erl
+%%% Author  : xuchuncong <xuchuncong@gmail.com>
+%%% Description : the client template:offer open/write/read/del function
+%%%
+%%% Created :  17 dec 2008 by xuchuncong 
+%%%-------------------------------------------------------------------
 -module(client).
--import(server1,[rpc/2]).
+
+-behaviour(gen_server).
+-export([start/0]).
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+	 terminate/2, code_change/3]).
 -compile(export_all).
 
 
-% write step 1: open file
-open(Filename, Mode) ->
-    % Modes
-%Pid = spawn(fun() -> loop(Name, Mod, Mod:init()) end),
-    case Mode of
-        r-> read_open(Filename, Mode, Pid);
-        w-> write_open(Filename, Mode, Pid);
-        a-> append_open(Filename, Mode, Pid);
-        _-> {error, "unkown open mode"}
-    end.
+start() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+close()  -> gen_server:call(?MODULE, stop).
 
+open(FileName)      -> gen_server:call(?MODULE, {open, FileName}).
 
-read_open(Filename, Mode, Pid)->
-    % mock return
-    [{ok,FileID}|{error,reason}].
+write(FileName, Amount)  -> gen_server:call(?MODULE, {write, FileName, Amount}).
 
-write_open(Filename, Mode, Pid)->
-    % mock return
-    [{ok,FileID}|{error,reason}].
+read(FileName)  -> gen_server:call(?MODULE, {read, FileName}).
 
-append_open(Filename, Mode, Pid)->
-    % mock return
-    [{ok,FileID}|{error,reason}].
-
-write(Filename)->
-    %add open file code here
-    [{ok,FileID}|{error,reason}].
-
-read(Filename,File_start,File_end)->
-    %add open file code here
-    [{ok,FileID}|{error,reason}].
+del(FileName) -> gen_server:call(?MODULE, {del,FileName}).
 
 
 
-% write step 2: allocate chunk
-allocate_chunk(FileID, Pid)->
-    % look up "filesession" for client open Modes
-    [{ok, ChunkID,NodeList}|{error,reason}].
+init([]) -> {ok, ets:new(?MODULE,[])}.
+
+handle_call({open,FileName}, _From, Tab) ->
+    Reply = case ets:lookup(Tab, FileName) of
+		[]  -> ets:insert(Tab, {FileName,0}), 
+		       {you_have_openned_a_file, FileName};
+		[_] -> {FileName, the_file_have_been_openned}
+	    end,
+    {reply, Reply, Tab};    
+handle_call({write,FileName,X}, _From, Tab) ->
+    Reply = case ets:lookup(Tab, FileName) of
+		[]  -> please_open_the_file;
+		[{FileName,Balance}] ->
+		    %%NewBalance = Balance + X,
+		    ets:insert(Tab, {FileName, X}),
+		    {thanks, FileName, you_write_to_the_file, X}	
+	    end,
+    {reply, Reply, Tab};
+handle_call({read,FileName}, _From, Tab) ->
+    Reply = case ets:lookup(Tab, FileName) of
+		[]  -> please_open_the_file;
+		[{FileName,Balance}] ->
+		    %%NewBalance = Balance + X,
+		    %%ets:insert(Tab, {FileName, NewBalance}),
+		    {thanks, FileName, the_file_content_is, Balance}	
+	    end,
+    {reply, Reply, Tab};
+handle_call({del,FileName}, _From, Tab) ->
+    Reply = case ets:lookup(Tab, FileName) of
+		[]  -> please_open_the_file;
+		[{FileName,Balance}] ->
+                    %%when X =< Balance ->
+		    %%NewBalance = Balance - X,
+		    ets:delete(Tab,FileName),
+		    {thanks, FileName, your_have_deleted_the_file, Balance}	
+		%%[{FileName,Balance}] ->
+		%%    {sorry,FileName,you_only_have,Balance,in_the_bank}
+	    end,
+    {reply, Reply, Tab};
+handle_call(stop, _From, Tab) ->
+    {stop, normal, closed, Tab}.
+    
+
+handle_cast(_Msg, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 
-% write step 3: write chunk
-write_chunk(FileID, FileID, ChunkID, NodeList, Pid)->
-    % look up "filesession" for client open Modes
-    [{ok, state}|{error,reason}].
-
-% write/read step 4: close file
-close(FileID, Pid)->
-    % delete client from filesession table
-    {}.
-
-
-% read step 2: locate chunk
-locate_chunk(FileID, Pid, ChunkIndex)->
-    % look up "filesession" for client open Modes
-    [{ok, ChunkID,NodeList}|{error,reason}].
-
-
-% read step 3: read chunk
-read_chunk(FileID, ChunkID, NodeList, Byterange, Pid)->
-    % look up "filesession" for client open Modes
-    [{ok, state}|{error,reason}].
+    
