@@ -3,7 +3,7 @@
 
 = 函数规格 =
 
-总体设计原则是和erlang的file模块接口保持兼容（http://www.erlang.org/doc/man/file.html），基本上可以认为是其子集。
+总体设计原则是和erlang的[http://www.erlang.org/doc/man/file.html file模块]接口保持兼容，基本上可以认为是其子集。
 
 == create ==
 
