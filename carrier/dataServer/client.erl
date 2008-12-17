@@ -1,9 +1,10 @@
 -module(client).
 -export([test/0, test_write/0]).
+-define(HOST, "192.168.0.111").
 
 test() ->
-    {ok, Socket} = gen_tcp:connect(localhost, 9999, [binary, {packet, 2}, {active, true}]),
-    Read_req = {read, 2000, 0, 1024},
+    {ok, Socket} = gen_tcp:connect(?HOST, 9999, [binary, {packet, 2}, {active, true}]),
+    Read_req = {read, 2000, 0, 1024 * 1024 *256},
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
 
     process_flag(trap_exit, true),
@@ -15,7 +16,7 @@ test() ->
 
 	    case Response of
 		{ok, Port} ->
-		    _Child = spawn_link(fun() -> receive_data(localhost, Port) end);
+		    _Child = spawn_link(fun() -> receive_data(?HOST, Port) end);
 		{error, _Why} ->
 		    io:format("Read Req can't be satisfied~n")
 	    end
