@@ -96,8 +96,8 @@ readchunk(FileID,{Start_addr, End_addr}) ->
     Read_req = {read, FileID, Start_addr, End_addr},%%2000, 0, 1024 * 1024 * 1024
     ok = gen_tcp:send(Socket, term_to_binary(Read_req)),
     process_flag(trap_exit, true),
-    receive
-	{tcp, Socket, Bin} ->               %%从dataserver的socket接收到的信息
+    receive                         %%receive info from socket of dataserver
+	{tcp, Socket, Bin} ->               
 	    Response = binary_to_term(Bin),
 	    io:format("Response:~p~n", [Response]),
 
@@ -149,7 +149,7 @@ writechunk() ->
     {ok, Socket} = gen_tcp:connect(?LocalServer, 9999, [binary, {packet, 2}, {active, true}]),
     Write_req = {write, 2000},%%2000, 0, 1024 * 1024 * 1024
     ok = gen_tcp:send(Socket, term_to_binary(Write_req)),
-    process_flag(trap_exit, true),      %%什么意思啊？
+    process_flag(trap_exit, true),      %%do what?
     receive
 	{tcp, Socket, Bin} ->
 	    Response = binary_to_term(Bin),
