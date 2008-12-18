@@ -15,81 +15,58 @@
 -compile(export_all).
 
 %%----------------------------------------------------------------------
-%% client_api
+%% client_api,can be used for application progamming
 
 %%----------------------------------------------------------------------
 start() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-open(FileName,Mode)     -> gen_server:call(?MODULE, {open, FileName,Mode}).
+open(FileName,Mode) -> gen_server:call(?MODULE, {open, FileName,Mode}).
 
 write(FileName, Amount) -> gen_server:call(?MODULE, {write, FileName, Amount}).
 
-read(FileName)          -> gen_server:call(?MODULE, {read, FileName}).
+read(FileName)      -> gen_server:call(?MODULE, {read, FileName}).
 
-delete(FileName)        -> gen_server:call(?MODULE, {del,FileName}).
+delete(FileName)    -> gen_server:call(?MODULE, {del, FileName}).
 
-close(FileName)         -> gen_server:call(?MODULE, {close,FileName}).
+close(FileName)     -> gen_server:call(?MODULE, {close, FileName}).
 
-%%----------------------------------------------------------------------
-%% to creat a new ets
-
-%%----------------------------------------------------------------------
-init([]) -> {ok, ets:new(?MODULE,[])}.
+init([]) -> {ok, {}}.
 
 %%----------------------------------------------------------------------
 %% handle_call functions
 
 %%----------------------------------------------------------------------
 handle_call({open,FileName,X}, _From, Tab) ->
-    Reply = case ets:lookup(Tab, FileName) of
-		[]  -> ets:insert(Tab, {FileName,0}), 
-		       {you_have_openned_a_file, FileName, X};
-		[_] -> {FileName, the_file_have_been_openned}
+    %%TODO: add "send the open_info to metaserver" code here
+    Reply = case X of
+		r  -> {you_have_openned_a_file, FileName, X};
+		w  -> {you_have_openned_a_file, FileName, X}
 	    end,
-    {reply, Reply, Tab};    
+    {reply, Reply, Tab};
 handle_call({write,FileName,X}, _From, Tab) ->
-    Reply = case ets:lookup(Tab, FileName) of
-		[]  -> please_open_the_file;
-		[{FileName,_Balance}] ->
-		    %%NewBalance = Balance + X,
-		    ets:insert(Tab, {FileName, X}),
-                    writechunk(), 
-		    {thanks, FileName, you_write_to_the_file, X}	
-	    end,
+    %%TODO: add "send the write_info to metaserver" code here
+    writechunk(),
+    Reply = {thanks, FileName, you_write_to_the_file, X},
     {reply, Reply, Tab};
 handle_call({read,FileName}, _From, Tab) ->
-    Reply = case ets:lookup(Tab, FileName) of
-		[]  -> please_open_the_file;
-		[{FileName,Balance}] ->
-		    %%NewBalance = Balance + X,
-		    %%ets:insert(Tab, {FileName, NewBalance}),
-                    readchunk(2000, {0, 1024}), 
-		    {thanks, FileName, the_file_content_is, Balance}	
-	    end,
+    %%TODO: add "send the read_info to metaserver" code here
+    readchunk(2000, {0, 1024}), 
+    Reply ={you_have_read_a_file, FileName, 2000},
     {reply, Reply, Tab};
 handle_call({del,FileName}, _From, Tab) ->
-    Reply = case ets:lookup(Tab, FileName) of
-		[]  -> please_open_the_file;
-		[{FileName,Balance}] ->
-                    %%when X =< Balance ->
-		    %%NewBalance = Balance - X,
-		    ets:delete(Tab,FileName),
-		    {thanks, FileName, your_have_deleted_the_file, Balance}	
-		%%[{FileName,Balance}] ->
-		%%    {sorry,FileName,you_only_have,Balance,in_the_bank}
-	    end,
+    %%TODO: add "send the del_info to metaserver" code here
+    Reply ={you_have_read_a_file, FileName, 2000},
     {reply, Reply, Tab};
 handle_call({close,_FileName}, _From, Tab) ->
     {stop, normal, closed, Tab}.
 
-handle_cast(_Msg, State) -> {noreply, State}.
-handle_info(_Info, State) -> {noreply, State}.
-terminate(_Reason, _State) -> ok.
+handle_cast(_Msg, State)    -> {noreply, State}.
+handle_info(_Info, State)   -> {noreply, State}.
+terminate(_Reason, _State)  -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %%----------------------------------------------------------------------
-%% to read chunk_data form dataserver
-
+%% read chunk_data form dataserver
 %%----------------------------------------------------------------------
 readchunk(FileID,{Start_addr, End_addr}) ->
     {ok, Socket} = gen_tcp:connect(?DataServer, 9999, [binary, {packet, 2}, {active, true}]),
@@ -142,7 +119,7 @@ test_write() ->
 
 
 %%----------------------------------------------------------------------
-%% to write chunk_data to dataserver
+%% write chunk_data to dataserver
 
 %%----------------------------------------------------------------------
 writechunk() ->
