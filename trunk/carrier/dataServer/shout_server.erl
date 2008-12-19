@@ -1,8 +1,9 @@
 -module(shout_server).
 -include_lib("kernel/include/file.hrl").
+-include("../include/egfs.hrl").
 -export([start/0]).
 
--define(STRIP_SIZE, 4096).
+-define(STRIP_SIZE, 8192).
 -define(DEF_PORT, 9999).
 -define(TO_SEND, "hello.rmvb").
 
@@ -29,8 +30,9 @@ par_connect(Listen) ->
 get_request(Socket) ->
     receive
 	{tcp, Socket, Bin} ->
+	    %%TODO: verify that we have receive the full Req first.
 	    Req = binary_to_term(Bin),
-	    io:format("[shoutServer]: receive req ~p~n", [Req]),
+	    ?DEBUG("[shoutServer]: receive req ~p~n", [Req]),
 
 	    case Req of
 		{read, ChunkID, Begin, Size} ->
@@ -38,13 +40,13 @@ get_request(Socket) ->
 		{write, ChunkID} ->
 		    write_response(Socket, ChunkID);
 		_Any ->
-		    io:format("[shoutServer]: unkown req~n")
+		    ?DEBUG("[shoutServer]: unkown req ~p~n", [Req])
 	    end;
 
 	{tcp_close, Socket} ->
-	    io:format("[shoutServer]: control connect closed by client~n");
+	    ?DEBUG("[shoutServer]: control connect closed by client~n", []);
 	_Unkown ->
-	    io:format("[shoutServer]: something unkown to me~n")
+	    ?DEBUG("[shoutServer]: something unkown to me~n", [])
     end.
 
 read_response(Socket, _ChunkID, Begin, Size) ->
@@ -53,7 +55,7 @@ read_response(Socket, _ChunkID, Begin, Size) ->
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
 	    gen_tcp:send(Socket, term_to_binary({error, "invalid read boundary"})),
-	    io:format("[shoutServer]: read bundary invalid~n");
+	    ?DEBUG("[shoutServer]: read bundary invalid ~p~n", [Begin]);
 	true ->
 	    if 
 		Begin + Size > FileSize ->
@@ -90,5 +92,5 @@ get_file_size(File) ->
 
 
 write_response(_Socket, _ChunkID) ->
-    io:format("[shoutServer]: response for write~n"),
-    io:format("[shoutServer]: response for write has not been implemented yet.~n").
+    ?DEBUG("[shoutServer]: response for write~n", []),
+    ?DEBUG("[shoutServer]: response for write has not been implemented yet.~n", []).
