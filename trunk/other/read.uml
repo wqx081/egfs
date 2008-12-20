@@ -1,0 +1,24 @@
+
+Client->Metadata Server: getReadLocation (FileID,FileOffset)
+activate Metadata Server
+Metadata Server->Client: {ok,ChunkLocation,Offset} / {error,Reason}
+deactivate Metadata Server
+
+loop read_chunks
+
+Client->Data Server: read (ChunkLocation,Offset,Length)
+activate Data Server
+Data Server->Client: DATA
+Client->Data Server: ACK
+Data Server->Client: DATA
+Client->Data Server: ACK
+Data Server->Client: DATA
+Client->Data Server: ACK
+Data Server->Client: DATA,CHUNKE_FIN
+Client->Data Server: ACK,CHUNKE_FINISHED
+deactivate Data Server
+end
+
+Client->Metadata Server: FILE_CLOSE
+Metadata Server->Client: ok
+
