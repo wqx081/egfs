@@ -3,25 +3,23 @@
 %% Description: TODO: Add description to metaDB
 
 -module(metaDB).
+-import(lists, [foreach/2]).
 
 %%
 %% Include files
 %%
 -include("metaformat.hrl").
-
+-include_lib("stdlib/include/qlc.hrl").
 %%
 %% Exported Functions
 %%
 %-export([]).
 -compile(export_all).
-%-export([do_this_once/0, start_start_mnesia/0]).
 
-
-%tables.
+%tables  record to create table.
 -record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
 -record(chunkmappingTable, {chunkid, chunklocations}).
-%record current active client-metaserver sesseions
--record(clientinfoTable, {clientid, modes}).   % maybe fileid?
+-record(clientinfo, {clientid, modes}).   % maybe fileid?
 -record(filesessionTable, {fileid, client}).
 
 
@@ -41,9 +39,9 @@ do_this_once() ->
     mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmappingTable)},
                                        {disc_copies,[node()]}
                                       ]),
-    mnesia:create_table(clientinfo, [{attributes, record_info(fields, clientinfoTable)},
-                                     {disc_copies,[node()]}
-                                    ]),
+%%     mnesia:create_table(clientinfo, [{attributes, record_info(fields, clientinfoTable)},
+%%                                      {disc_copies,[node()]}
+%%                                     ]),
     mnesia:create_table(filesession, [{attributes, record_info(fields, filesessionTable)},
                                       {disc_copies,[node()]}
                                      ]),
@@ -51,7 +49,7 @@ do_this_once() ->
 
 start_mnesia()->
     mnesia:start(),
-    mnesia:wait_for_tables([filemeta, chunkmapping,clientinfo,filesession], 20000).
+    mnesia:wait_for_tables([filemeta, chunkmapping,filesession], 30000).
 
 
 %%
@@ -78,16 +76,21 @@ demo(select_filesession) ->
 %%  SELECT item, quantity FROM shop;
 
 demo(select_some) ->
-    do(qlc:q([{X#filemeta.fileid, X#filemeta.filename} || X <- mnesia:table(filemeta)]));
+    do(qlc:q([{X#filemeta.fileid, X#filemeta.filename} || X <- mnesia:table(filemeta)])).
+
+do(Q) ->
+    F = fun() -> qlc:e(Q) end,
+    {atomic, Val} = mnesia:transaction(F),
+    Val.
 
 %% SQL equivalent
 %%   SELECT shop.item FROM shop
 %%   WHERE  shop.quantity < 250;
 
-demo(reorder) ->
-    do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
-			     X#filemeta.fileid < 250
-				]));
+%% demo(reorder) ->
+%%     do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
+%% 			     X#filemeta.fileid < 250
+%% 				]));
 
 %-record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
 %-record(chunkmappingTable, {chunkid, chunklocations}).
@@ -104,15 +107,21 @@ example_tables() ->
     ].
 
 example_table_filemeta(X)->
-    {filemeta, X,   "egfs://e:/copy/test.txt",3,[X],"today,Dec,12","yestoday,Dec,11","acl"}.
+%    {filemeta, X,   "e:/copy/test",3,[X],"today,Dec,12","yestoday,Dec,11","acl"}.
+#filemetaTable{fileid=X,filename=["e:/copy/test",X],filesize=3,chunklist=[X],createT="today,Dec,12",modifyT="yestoday,Dec,11",acl="acl"}.
+
+clear_tables()->
+    mnesia:clear_table(filemeta),
+    mnesia:clear_table(filesession),
+    mnesia:clear_table(chunkmapping).
 
 
-add_shop_item(Name, Quantity, Cost) ->
-    Row = #shop{item=Name, quantity=Quantity, cost=Cost},
-    F = fun() ->
-		mnesia:write(Row)
-	end,
-    mnesia:transaction(F).
+%% add_shop_item(Name, Quantity, Cost) ->
+%%     Row = #shop{item=Name, quantity=Quantity, cost=Cost},
+%%     F = fun() ->
+%% 		mnesia:write(Row)
+%% 	end,
+%%     mnesia:transaction(F).
 
 reset_tables() ->
     mnesia:clear_table(filemeta),
@@ -124,13 +133,15 @@ reset_tables() ->
 
 insert_ten_thousand()->
     mnesia:clear_table(filemeta),
-    F=fun()->
-              for(1,10000)
+    F=fun()->              
+              util:for(1,10,fun(I)->mnesia:write(example_table_filemeta(I))end)
+    end.      
+        
 
 %filesession    {fileid	client}
 %add item
 add_filesession_item(Fileid, Client) ->
-    Row = #filesession{fileid=Fileid, client=Client},
+    Row = #filesessionTable{fileid=Fileid, client=Client},
     F = fun() ->
 		mnesia:write(Row)
 	end,
@@ -147,28 +158,14 @@ remove_filesession_item(Fileid) ->
 
 %look up.
 select_allfrom_filesession() ->
-    do(qlc:q([X || X <- mnesia:table(filesession)]));   %result [L]
+    do(qlc:q([X || X <- mnesia:table(filesession)])).   %result [L]
 
+%look up.
+select_allfrom_chunkmapping() ->
+    do(qlc:q([X || X <- mnesia:table(chunkmapping)])).   %result [L]
 
-%clientinfo    {clientid	modes}
-
-add_clientinfo_item(Clientid, Modes) ->
-    Row = #clientinfo{clientid=Clientid, modes=Modes},
-    F = fun() ->
-		mnesia:write(Row)
-	end,
-    mnesia:transaction(F).
-
-%while remove . we shall use primary key(first element in mnesia.)
-remove_clientinfo_item(Clientid) ->
-    Oid = {clientinfo, Clientid},
-    F = fun() ->
-		mnesia:delete(Oid)
-	end,
-    mnesia:transaction(F).
-
-%look up clientinfo
-select_allfrom_clientinfo() ->
-    do(qlc:q([X || X <- mnesia:table(clientinfo)]));   %result [L]
+%look up.
+select_allfrom_filemeta() ->
+    do(qlc:q([X || X <- mnesia:table(filemeta)])).   %result [L]
 
 
