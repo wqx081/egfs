@@ -1,17 +1,28 @@
 -module(shout_server).
 -include_lib("kernel/include/file.hrl").
 -include("../include/egfs.hrl").
--export([start/0]).
+-export([start/0, stop/0]).
 
 -define(STRIP_SIZE, 8192).
 -define(DEF_PORT, 9999).
 -define(TO_SEND, "hello.rmvb").
+-define(TO_WRITE, "to_write.dat").
 
 start() ->
     spawn(fun() -> 
 		start_parallel_server(?DEF_PORT),
 		lib_misc:sleep(infinity)
 		end).
+
+stop() ->
+    case whereis(shout_server) of
+	undefined ->
+	    not_started;
+	Pid ->
+	    exit(Pid, kill),
+	    (catch unregister(shout_server)),
+	    stopped
+    end.
 
 start_parallel_server(Port) ->
     {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 2}, 
@@ -92,8 +103,8 @@ get_file_size(File) ->
 
 
 write_response(Socket, _ChunkID) ->
-    {ok, ListenData} = gen_tcp:listen(0, [binary, {packet, 2}, {active, once}]),
-    Reply = inet:port(LinstenData),
+    {ok, ListenData} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
+    Reply = inet:port(ListenData),
     gen_tcp:send(Socket, term_to_binary(Reply)),
 
     {ok, SocketData} = gen_tcp:accept(ListenData),
@@ -118,7 +129,14 @@ loop_receive_control(Child, Socket) ->
 		    ?DEBUG("[shoutServer]: unkown notify from client :~p~n", Term)
 	    end;
 	{tcp_close, Socket} ->
-	    ?DEBUG("[shoutServer]: client has closed the controll socket")
+	    ?DEBUG("[shoutServer]: client has closed the controll socket", []);
+	{finish, Child, ChunkID, Hdl, Len} ->
+	    case check_it(Socket, ChunkID, Len) of
+		{ok, _} ->
+		    report_to_metaServer(ChunkID, Len);
+		{error, _Why} ->
+		    file:delete(Hdl)
+	    end
     end.
 
 receive_data(Parent, SocketData, Hdl, Len) ->
@@ -131,5 +149,12 @@ receive_data(Parent, SocketData, Hdl, Len) ->
 	    file:delete(?TO_WRITE),
 	    ?DEBUG("[shoutServer]: client close socket.~n", []);
 	{stop, Parent} ->
-	    ?DEBUG("[shoutServer]: stop signal from parent~n", []);
+	    ?DEBUG("[shoutServer]: stop signal from parent~n", [])
     end.
+
+check_it(Socket, ChunkID, Len) ->
+    ?DEBUG("[shoutServer]: check the chunk, not implemented yet~n", []),
+    {ok, "Good"}.
+
+report_to_metaServer(ChunkID, Len) ->
+    ?DEBUG("[shoutServer]: report to the metaServer~n", []).
