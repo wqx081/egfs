@@ -4,6 +4,7 @@
 
 -module(metaDB).
 -import(lists, [foreach/2]).
+-import(util,[for/3]).
 
 %%
 %% Include files
@@ -136,7 +137,22 @@ insert_ten_thousand()->
     F=fun()->              
               util:for(1,10,fun(I)->mnesia:write(example_table_filemeta(I))end)
     end.      
-        
+
+
+for_test() ->
+   
+    
+    util:for(1,10,fun(I)->I*I end ).
+
+%filemeta    {fileid	client}
+%add item
+add_filemeta_item(Fileid, FileName) ->
+    Row = #filemetaTable{fileid=Fileid, filename=FileName, filesize=0, chunklist=[], 
+                         createT=term_to_binary(erlang:localtime(), modifyT=term_to_binary(erlang:localtime(), "acl"},
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F).
 
 %filesession    {fileid	client}
 %add item
@@ -157,6 +173,12 @@ remove_filesession_item(Fileid) ->
 
 
 %look up.
+select_from_filesession(Fileid) ->    %result [L]
+    do(qlc:q([
+              X||X<-mnesia:table(filesession),X#filesession.fileid =:= Fileid
+              ])).
+
+
 select_allfrom_filesession() ->
     do(qlc:q([X || X <- mnesia:table(filesession)])).   %result [L]
 
@@ -165,7 +187,38 @@ select_allfrom_chunkmapping() ->
     do(qlc:q([X || X <- mnesia:table(chunkmapping)])).   %result [L]
 
 %look up.
-select_allfrom_filemeta() ->
+select_allfrom_filemeta() ->    
     do(qlc:q([X || X <- mnesia:table(filemeta)])).   %result [L]
+
+select_from_filemeta(S) ->    %result [L]
+    do(qlc:q([
+              X||X<-mnesia:table(filemeta),X#filemeta.fileid =:= S
+              ])).
+
+%FileName - > fileid
+select_fileid_from_filemeta(FileName) ->
+    do(qlc:q([X#filemeta.fileid || X <- mnesia:table(filemeta),
+                                   X#filemeta.filename =:= FileName
+                                   
+                                   ])).   %result [L]
+
+%clear chunks from filemeta
+reset_file_from_filemeta(Fileid) ->
+    [{filemeta, FileID, FileName, _, _, TimeCreated, _, ACL }] =
+    do(qlc:q([X || X <- mnesia:table(filemeta),
+                                   X#filemeta.fileid =:= Fileid                                   
+                                   ])),
+
+	Row = {filemeta, FileID, FileName, 0, [], TimeCreated, term_to_binary(erlang:localtime()), ACL },
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F).
+
+
+%% demo(reorder) ->
+%%     do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
+%% 			     X#filemeta.fileid < 250
+%% 				]));
 
 

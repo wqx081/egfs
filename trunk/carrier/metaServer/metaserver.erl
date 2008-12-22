@@ -1,5 +1,6 @@
 -module(metaserver).
 -compile(export_all).
+-import(metaDB).
 
 start_parallel_server() ->
     {ok, Listen} = gen_tcp:listen(9999, [binary, 
@@ -56,14 +57,64 @@ do_open(Filename, Modes, ClientID)->
  
 do_read_open(Filename, ClientID)->
     % mock return
+    % get fileid from filemetaTable
+    case select_fileid_from_filemeta(Filename) of
+        [] -> {error, "no filename"};
+        % get fileid sucessfull
+        [FileID] -> 
+            %register in filesessionTable
+            case select_from_filesession(FileID) of
+                % no active filesession
+                [] -> add_filesession_item(FileID, #clientinfo{clientid=ClientID, modes=r}),
+                      	{ok, <<FileID:64>>};
+                % read open OK
+                [clientinfo, [{ClientInfoHead#clientinfo.modes =  r}|ClientInfoTail]] -> 
+                    add_filesession_item(FileID, [ClientInfoHead, 
+                                                  #clientinfo{clientid=ClientID, modes=r, ClientInfoTail]),
+						{ok, <<FileID:64>>};
+				% read open FAILED
+				[_] -> {error, "opened by write"};
+			end;
+    end.
+    
     %TODO: Table: clientinfo  ,     
     % insert a record
-    {ok, <<16#ff00ff00ff00ff00:64>>}.
+    %{ok, <<16#ff00ff00ff00ff00:64>>}.
 
 do_write_open(Filename, ClientID)->
-    % mock return
-    %TODO: Table: clientinfo  ,
+    % mock return    
     %TODO: Table: filesession {fileid, client} ,mode =w
+	% get fileid from filemetaTable
+    case select_fileid_from_filemeta(Filename) of
+		% create file id 
+        [] -> {_, HighTime, LowTime}=now(),
+					FileID = <<HighTime:32, LowTime:32>>,
+					% insert into filemetaTable
+					add_filemeta_item(FileID, Filename),
+					% insert into filesessionTable 
+					add_filesession_item(FileID, #clientinfo{clientid=ClientID, modes=r});
+        % get fileid sucessfull
+        [FileID] -> 
+			% check whether fileid in filesessionTable
+			case select_from_filesession(Fileid) of
+				% file doesn't opened, so open operation is permitted.
+				[] -> 
+            % reset file in filemeta
+			reset_file_from_filemeta(Fileid),
+            case select_from_filesession(FileID) of
+                % no active filesession
+				% Create file id from current time now().
+                [] -> {_, HighTime, LowTime}=now(),
+					FileID = <<HighTime:32, LowTime:32>>,
+					% insert into filemetaTable
+					add_filemeta_item(FileID, Filename),
+					% insert into filesessionTable 
+					add_filesession_item(FileID, #clientinfo{clientid=ClientID, modes=r});
+                [clientinfo, ClientInfo] -> 
+                    add_filesession_item(FileID, [ClientInfo, #clientinfo{clientid=ClientID, modes=r]);
+			end,
+            {ok, <<16#FileID:64>>};
+    end.
     % insert a record
     {ok, <<16#ff00ff00ff00ff00:64>>}.
 
