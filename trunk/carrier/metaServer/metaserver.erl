@@ -1,23 +1,47 @@
 -module(metaserver).
 -compile(export_all).
 
-%-export([do_this_once/0, start_start_mnesia/0]).
--record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
--record(chunkmappingTalbe, {chunkid, chunklocations}).
-%record current active client-metaserver sesseions
--record(clientinfo, {clientid, modes}).
--record(filesessionTable, {fileid, clientlist}).
+start_parallel_server() ->
+    {ok, Listen} = gen_tcp:listen(9999, [binary, 
+					 {packet, 2}, 
+					 {active, true},
+					 {reuseaddr, true}]),
+   % register(?MODULE, self()),
+    spawn(fun() -> par_connect(Listen) end).
 
-do_this_once() ->
-    mnesia:create_schema([node()]),
-    mnesia:start(),
-    mnesia:create_table(filemeta, [{attributes, record_info(fields, filemetaTable)}]),
-    mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmappingTalbe)}]),
-    mnesia:stop().
 
-start_mnesia()->
-    mnesia:start(),
-    mnesia:wait_for_tables([filemetaTable, chunkmappingTalbe], 20000).
+par_connect(Listen) ->
+    %% io:format("new listen process:<<~p>>~n", self()),
+    {ok, Socket} = gen_tcp:accept(Listen),
+    spawn(fun() -> par_connect(Listen) end),
+    loop(Socket).  %handle socket
+    % handle_client_req(Socket).
+
+loop(Socket) ->
+    % process_flag(trap_exit, true),
+
+    receive
+	{tcp, Socket, Bin} ->
+	    Req = binary_to_term(Bin),
+	    io:format("Server received req:~p~n", [Req]),
+
+	    case Req of
+		{open, FileName, _Mode} ->
+		    open_response(Socket, FileName);
+		{allocate, FileID} ->
+		    allocate_response(Socket, FileID);
+		{locate, FileID, ChunkIndex} ->
+		    locate_response(Socket, FileID, ChunkIndex);
+		_Any ->
+		    io:format("Server Unkown req:~p~n", [Req])
+	    end;
+	{tcp_close, Socket} ->
+	    io:format("Control Socket was closed by Client~n");
+	_Unknown ->
+	    io:format("something unknown to server~n")
+    end.
+
+
 
 %"model" methods
 % write step 1: open file
