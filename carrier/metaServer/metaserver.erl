@@ -83,7 +83,8 @@ do_allocate_chunk(FileID, ClientID)->
         w-> get_last_chunk(FileID);
         a-> get_last_chunk(FileID)
     end.
-aa
+
+
 
 
 % unused function  a 
