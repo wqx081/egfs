@@ -32,10 +32,21 @@
 do_this_once() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
-    mnesia:create_table(filemeta, [{attributes, record_info(fields, filemetaTable)}]),
-    mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmappingTable)}]),
-    mnesia:create_table(clientinfo, [{attributes, record_info(fields, clientinfoTable)}]),
-    mnesia:create_table(filesession, [{attributes, record_info(fields, filesessionTable)}]),
+    mnesia:create_table(filemeta, 	%table name 
+                        [			
+                         {attributes, record_info(fields, filemetaTable)},%table content
+                         {disc_copies,[node()]}                         
+                        ]
+                       ),
+    mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmappingTable)},
+                                       {disc_copies,[node()]}
+                                      ]),
+    mnesia:create_table(clientinfo, [{attributes, record_info(fields, clientinfoTable)},
+                                     {disc_copies,[node()]}
+                                    ]),
+    mnesia:create_table(filesession, [{attributes, record_info(fields, filesessionTable)},
+                                      {disc_copies,[node()]}
+                                     ]),
     mnesia:stop().
 
 start_mnesia()->
@@ -92,6 +103,9 @@ example_tables() ->
      {chunkmapping,1,[localhost]}
     ].
 
+example_table_filemeta(X)->
+    {filemeta, X,   "egfs://e:/copy/test.txt",3,[X],"today,Dec,12","yestoday,Dec,11","acl"}.
+
 
 add_shop_item(Name, Quantity, Cost) ->
     Row = #shop{item=Name, quantity=Quantity, cost=Cost},
@@ -108,6 +122,10 @@ reset_tables() ->
 	end,
     mnesia:transaction(F).
 
+insert_ten_thousand()->
+    mnesia:clear_table(filemeta),
+    F=fun()->
+              for(1,10000)
 
 %filesession    {fileid	client}
 %add item
