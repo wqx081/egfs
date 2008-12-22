@@ -14,10 +14,10 @@
 %%
 %-export([]).
 -compile(export_all).
-
-
-
 %-export([do_this_once/0, start_start_mnesia/0]).
+
+
+%tables.
 -record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
 -record(chunkmappingTable, {chunkid, chunklocations}).
 %record current active client-metaserver sesseions
@@ -77,6 +77,36 @@ demo(reorder) ->
     do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
 			     X#filemeta.fileid < 250
 				]));
+
+%-record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
+%-record(chunkmappingTable, {chunkid, chunklocations}).
+
+example_tables() ->
+    [%% The filemeta table
+     %			fileid,  filename, 			filesize, chunklist, createT, modifyT, acl
+     {filemeta, 0,   "egfs://e:/copy/test.txt",3,[0],"today,Dec,12","yestoday,Dec,11","acl"},
+     {filemeta, 1,   "egfs://e:/copy/test.txt",3,[1],"today,Dec,12","yestoday,Dec,11","acl"},
+     
+     %% The chunkmapping table
+     {chunkmapping,0,[localhost]},
+     {chunkmapping,1,[localhost]}
+    ].
+
+
+add_shop_item(Name, Quantity, Cost) ->
+    Row = #shop{item=Name, quantity=Quantity, cost=Cost},
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F).
+
+reset_tables() ->
+    mnesia:clear_table(filemeta),
+    mnesia:clear_table(chunkmapping),
+    F = fun() ->
+		foreach(fun mnesia:write/1, example_tables())
+	end,
+    mnesia:transaction(F).
 
 
 
