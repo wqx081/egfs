@@ -1,6 +1,9 @@
 -module(client).
--export([test_r/0, test_naive/0, test_write/0]).
+-include_lib("kernel/include/file.hrl").
+-include("../include/egfs.hrl").
+-export([test_r/0, test_w/0, test_naive/0, test_write/0]).
 -define(HOST, "192.168.0.111").
+-define(STRIP_SIZE, 8192).
 
 test_r() ->
     %%{ok, Host, Port} = gen_server:call({global, data_server}, {read, 2000, 0, 1024*1024*256}).
@@ -10,6 +13,12 @@ test_r() ->
     %% ok, Host, Port} = data_server ! {read, 2000, 0, 1024*1024*256},
     {ok, Host, Port} = Result,
     receive_control(Host, Port).
+
+test_w() ->
+    Result = gen_server:call({global, data_server}, {write, {chunkID, 2000}}),
+    io:format("Result ~p~n", [Result]),
+    {ok, Host, Port} = Result,
+    send_control(Host, Port).
 
 test_naive() ->
     {ok, Socket} = gen_tcp:connect(?HOST, 9999, [binary, {packet, 2}, {active, true}]),
@@ -31,6 +40,38 @@ test_naive() ->
 	    end
     end.
 
+%% send data to data server
+send_control(Host, Port) ->
+    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    process_flag(trap_exit, true),
+    receive
+	{tcp, Socket, Binary} ->
+	    {ok, Data_Port} = binary_to_term(Binary),
+	    %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
+	    send_data(Host, Data_Port);
+	{tcp_close, Socket} ->
+	    void
+    end.
+
+send_data(Host, Port) ->
+    {ok, Hdl} = file:open("send.dat", [binary, raw, read]),
+    {ok, FileSize} = get_file_size("send.dat"),
+
+    {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    io:format("Transfer begin: ~p~n", [erlang:time()]),
+    loop_send(DataSocket, Hdl, 0, FileSize),
+    io:format("Transfer end: ~p~n", [erlang:time()]).
+
+loop_send(DataSocket, Hdl, Begin, End) when Begin < End ->
+    {ok, Binary} = file:pread(Hdl, Begin, ?STRIP_SIZE),
+    gen_tcp:send(DataSocket, Binary),
+    Begin1 = Begin + ?STRIP_SIZE,
+    loop_send(DataSocket, Hdl, Begin1, End);
+loop_send(_, _, _, _) ->
+    void.
+
+    
+%% receive data from data server
 receive_control(Host, Port) ->
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     process_flag(trap_exit, true),
@@ -77,3 +118,10 @@ test_write() ->
     write(Binary, Hdlw),
     write(Binary, Hdlw).
 
+get_file_size(FileName) ->
+    case file:read_file_info(FileName) of
+	{ok, Facts} ->
+	    {ok, Facts#file_info.size};
+	_ ->
+	    error
+    end.

@@ -42,7 +42,9 @@ handle_call({read, ChkID, Begin, Size}, _From, N) ->
     {reply, Reply, N};
 handle_call({write, {chunkID, ChkID}}, _From, N) ->
     {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
-    Reply = inet:sockname(Listen),
+    {ok, Host} = inet:getaddr(lt, inet),
+    {ok, Port} = inet:port(Listen),
+    Reply = {ok, Host, Port},
     spawn(fun() -> write_process(Listen, ChkID) end),
     {reply, Reply, N};
 handle_call(Msg, _From, N) ->
