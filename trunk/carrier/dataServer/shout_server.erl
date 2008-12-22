@@ -120,8 +120,6 @@ loop_receive_control(Child, Socket) ->
 	{tcp, Socket, Binary} ->
 	    Term = binary_to_term(Binary),
 	    case Term of
-		{finish, Size} ->
-		    ?DEBUG("[shoutServer]: notify from client that the receive porcess finished, size = ~p~n", Size);
 		{stop, _Why} ->
 		    ?DEBUG("[shoutServer]: notify from client that the receive process should be stopped~n", []),
 		    Child ! {stop, _Why};
@@ -143,7 +141,7 @@ receive_data(Parent, SocketData, Hdl, Len) ->
     receive
 	{tcp, SocketData, Binary} ->
 	    Len2 = Len + size(Binary),
-	    write_file(Hdl, Binary),
+	    file:write(Hdl, Binary),
 	    receive_data(SocketData, Hdl, Len2);
 	{tcp_close, _Why} ->
 	    file:delete(?TO_WRITE),
