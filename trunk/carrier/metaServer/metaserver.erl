@@ -53,7 +53,7 @@ do_open(Filename, Modes, ClientID)->
         a-> do_append_open(Filename, ClientID);
         _-> {error, "unkown open mode"}
     end.
-
+ 
 do_read_open(Filename, ClientID)->
     % mock return
     %TODO: Table: clientinfo  ,     
