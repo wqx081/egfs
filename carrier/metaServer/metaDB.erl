@@ -110,14 +110,15 @@ reset_tables() ->
 
 
 %filesession    {fileid	client}
+%add item
 add_filesession_item(Fileid, Client) ->
-    Row = #shop{fileid=Fileid, client=Client},
+    Row = #filesession{fileid=Fileid, client=Client},
     F = fun() ->
 		mnesia:write(Row)
 	end,
     mnesia:transaction(F).
 
-%while remove . we shall use primary key(first element in mnesia.)
+%remove   while remove . we shall use primary key(first element in mnesia.)
 remove_filesession_item(Fileid) ->
     Oid = {filesession, Fileid},
     F = fun() ->
@@ -126,7 +127,30 @@ remove_filesession_item(Fileid) ->
     mnesia:transaction(F).
 
 
+%look up.
+select_allfrom_filesession() ->
+    do(qlc:q([X || X <- mnesia:table(filesession)]));   %result [L]
 
 
+%clientinfo    {clientid	modes}
+
+add_clientinfo_item(Clientid, Modes) ->
+    Row = #clientinfo{clientid=Clientid, modes=Modes},
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F).
+
+%while remove . we shall use primary key(first element in mnesia.)
+remove_clientinfo_item(Clientid) ->
+    Oid = {clientinfo, Clientid},
+    F = fun() ->
+		mnesia:delete(Oid)
+	end,
+    mnesia:transaction(F).
+
+%look up clientinfo
+select_allfrom_clientinfo() ->
+    do(qlc:q([X || X <- mnesia:table(clientinfo)]));   %result [L]
 
 
