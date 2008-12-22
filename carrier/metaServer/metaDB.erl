@@ -21,8 +21,8 @@
 -record(filemetaTable, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
 -record(chunkmappingTable, {chunkid, chunklocations}).
 %record current active client-metaserver sesseions
--record(clientinfoTable, {clientid, modes}).
--record(filesessionTable, {fileid, clientlist}).
+-record(clientinfoTable, {clientid, modes}).   % maybe fileid?
+-record(filesessionTable, {fileid, client}).
 
 
 %%
@@ -107,6 +107,26 @@ reset_tables() ->
 		foreach(fun mnesia:write/1, example_tables())
 	end,
     mnesia:transaction(F).
+
+
+%filesession    {fileid	client}
+add_filesession_item(Fileid, Client) ->
+    Row = #shop{fileid=Fileid, client=Client},
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F).
+
+%while remove . we shall use primary key(first element in mnesia.)
+remove_filesession_item(Fileid) ->
+    Oid = {filesession, Fileid},
+    F = fun() ->
+		mnesia:delete(Oid)
+	end,
+    mnesia:transaction(F).
+
+
+
 
 
 
