@@ -23,7 +23,12 @@
 %% Local Functions
 %%
 
+
+
 start() ->
+    
+	Test = 10000,
+    
     {ok, Listen} = gen_tcp:listen(9999, [binary, 
 					 {packet, 2}, 
 					 {active, true},

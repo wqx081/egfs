@@ -27,9 +27,9 @@ loop(Socket) ->
 
 	    case Req of
 		{open, FileName, _Mode} ->
-		    open_response(Socket, FileName);
+		    do_open( FileName,Mode,Socket);
 		{allocate, FileID} ->
-		    allocate_response(Socket, FileID);
+		    do_allocate_chunk(FileID,Socket);
 		{locate, FileID, ChunkIndex} ->
 		    locate_response(Socket, FileID, ChunkIndex);
 		_Any ->
@@ -56,29 +56,33 @@ do_open(Filename, Modes, ClientID)->
 
 do_read_open(Filename, ClientID)->
     % mock return
+    %TODO: Table: clientinfo  ,     
+    % insert a record
     {ok, <<16#ff00ff00ff00ff00:64>>}.
 
 do_write_open(Filename, ClientID)->
     % mock return
+    %TODO: Table: clientinfo  ,
+    %TODO: Table: filesession {fileid, client} ,mode =w
+    % insert a record
     {ok, <<16#ff00ff00ff00ff00:64>>}.
 
 do_append_open(Filename, ClientID)->
     % mock return
+    %TODO: Table: clientinfo  ,
+    %TODO: Table: filesession {fileid, client} ,mode =w
+    % insert a record
     {ok, <<16#ff00ff00ff00ff00:64>>}.
 
 % write step 2: allocate chunk
 do_allocate_chunk(FileID, ClientID)->
     % look up "filesession" for client open Modes
-    Modes = look_up_filesession(FileID, ClientID),
+    Modes = look_up_filesession(FileID, ClientID), %do it inside mnesia
     % allocate data chunk
     case Modes of
         w-> get_last_chunk(FileID);
         a-> get_last_chunk(FileID)
     end.
-    
-look_up_filesession(FileID, ClientID)->
-    % mock return
-    {w}.
 
 
 
