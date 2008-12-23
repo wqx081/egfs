@@ -25,15 +25,13 @@ open(FileName, [Mode]) -> {ok, FileHandle} | {error, Reason}, 其中：Mode = re
 close(FileHandle) -> ok
 }}}
 
-== write/append == 
+== append ==
 
 {{{
-write(FileHandle, Data) -> ok | {error, Reason}
-append(FileHandle, Data) -> {ok, Offset} | {error, Reason}
+append(FileHandle, [Record]) -> {ok, [Offset]} | {error, Reason}
 }}}
 
- * append与write的功能是一样的，仅仅是返回值上append函数返回了Offset。而write为了和[http://www.erlang.org/doc/man/file.html file模块]兼容，只是返回ok。
- * 注意：是否支持多个客户同时写，这对实现上来说是关键。
+ * append的数据是record，它有边界。记录并不能够跨chunk保存，因此最大的记录为ChunkSize大小。如果当前chunk大小不足时，会将多余的字节以Padding填充，然后从下一个chunk继续写record。
 
 == sync ==
 
