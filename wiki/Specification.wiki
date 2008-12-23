@@ -31,7 +31,7 @@ close(FileHandle) -> ok
 append(FileHandle, [Record]) -> {ok, [Offset]} | {error, Reason}
 }}}
 
- * append的数据是record，它有边界。记录并不能够跨chunk保存，因此最大的记录为ChunkSize大小。如果当前chunk大小不足时，会将多余的字节以Padding填充，然后从下一个chunk继续写record。
+ * append的数据是record，它有边界。记录并不能够跨chunk保存，因此最大的记录为`ChunkSize`大小。如果当前chunk大小不足时，会将多余的字节以Padding填充，然后从下一个chunk继续写record。
 
 == sync ==
 
