@@ -111,7 +111,6 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	    file:write(Hdl, Binary),
 	    loop_receive(Parent, SocketData, Hdl, Len2);
 	{tcp_closed, SocketData} ->
-	    ?DEBUG("loop_receive/4 tcp_closed, len=~p~n", [Len]),
 	    Parent ! {finish, self(), Len},
 	    file:close(Hdl);
 	Any ->
@@ -158,7 +157,8 @@ loop_send(SocketData, Hdl, Begin, End) when Begin < End ->
     gen_tcp:send(SocketData, Binary),
     Begin2 = Begin + ?STRIP_SIZE,
     loop_send(SocketData, Hdl, Begin2, End);
-loop_send(_, _, _, _) ->
+loop_send(SocketData, _, _, _) ->
+    gen_tcp:close(SocketData),
     void.
 
 %% utilites
