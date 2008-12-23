@@ -85,7 +85,6 @@ loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End) when End_ChunkIn
     {ok, ChunkID,NodeList} = gen_server:call({global,metaserver}, {locatechunk, FileID, ChunkIndex}),
     _NodeID=hd(NodeList),
     %{ok,DataServer}=inet:getaddr(NodeID,inet4),
-   
     Result = gen_server:call({global,data_server}, {readchunk, ChunkID, Start, Size}),
     {ok, Host, Port} = Result,
     ?DEBUG("{ok, Host, Port} is: ~p~n", [Result]),
@@ -141,9 +140,22 @@ write_data(Data, Hdl) ->
 %% write chunk_data to dataserver
 %%----------------------------------------------------------------------
 writechunks(FileName, FileID)->
+    {ok, FileLength} = get_file_size(FileName),
+    ?DEBUG(" filesize is: ~p~n", [FileLength]),
+    case FileLength rem ?ChunkSize of
+        0 -> ChunkNum = FileLength div ?ChunkSize;
+        _Any -> ChunkNum = FileLength div ?ChunkSize + 1
+    end,
+    ChunkIndex = 0,
+    {ok, Hdl} = file:open(FileName, [raw, read, binary]),
+    loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl),
+    file:close(Hdl).
+
+
+loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl) when ChunkNum > 0 ->
+    ?DEBUG(" ChunkNum is: ~p~n", [ChunkNum]),
     {ok, ChunkID,NodeList} = gen_server:call({global,metaserver}, {allocatechunk, FileID}),
     ?DEBUG("you have get them,ChunkID:~p and NodeList:~p~n",[ChunkID,NodeList]),
-    ChunkIndex = 0,
     Result = gen_server:call({global,data_server}, {writechunk, FileID, ChunkIndex, ChunkID, NodeList}),    
     {ok, Host, Port} = Result,
     ?DEBUG("you have get them,Host:~p and Port:~p~n",[Host, Port]),
@@ -155,26 +167,32 @@ writechunks(FileName, FileID)->
     receive
         {tcp, Socket, Binary} ->
             {ok, Data_Port} = binary_to_term(Binary),
-            %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
-            send_data(Host, Data_Port, FileName);
+            send_data(Host, Data_Port, ChunkIndex,Hdl),
+            ChunkNum1 = ChunkNum - 1,
+            ChunkIndex1 = ChunkIndex + 1,
+            loop_write_chunk(FileName, FileID, ChunkNum1,ChunkIndex1,Hdl);
         {tcp_close, Socket} ->
             ?DEBUG("write file closed~n",[]),
             void
-    end.
+    end;
+loop_write_chunk(_, _, _, _,_) ->
+    void.
 
 
-send_data(Host, Port, FileName) ->
-    {ok, Hdl} = file:open(FileName, [raw, read, binary]),
-    {ok, FileLength} = get_file_size(FileName),
+send_data(Host, Port, ChunkIndex,Hdl) ->
+    
+    %{ok, FileLength} = get_file_size(FileName),
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     ?DEBUG("Transfer data begin: ~p~n", [erlang:time()]),
-    loop_send(DataSocket, Hdl, 0, FileLength),
+    Begin = ChunkIndex*?ChunkSize,
+    End = ChunkIndex*?ChunkSize+?ChunkSize,
+    loop_send(DataSocket, Hdl, Begin, End),
     gen_tcp:close(DataSocket),
-    ?DEBUG("Transfer data end: ~p~n", [erlang:time()]),
-    file:close(Hdl).
+    ?DEBUG("Transfer data end: ~p~n", [erlang:time()]).
 
 
 loop_send(DataSocket, Hdl, Begin, End) when Begin < End ->
+    ?DEBUG("begin and end: ~p ~p~n", [Begin, End]),
     {ok, Binary} = file:pread(Hdl, Begin, ?STRIP_SIZE),
     gen_tcp:send(DataSocket, Binary),
     Begin1 = Begin + ?STRIP_SIZE,
