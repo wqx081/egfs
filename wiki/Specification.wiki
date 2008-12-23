@@ -25,13 +25,15 @@ open(FileName, [Mode]) -> {ok, FileHandle} | {error, Reason}, 其中：Mode = re
 close(FileHandle) -> ok
 }}}
 
-== write == 
+== write/append == 
 
 {{{
 write(FileHandle, Data) -> ok | {error, Reason}
+append(FileHandle, Data) -> {ok, Offset} | {error, Reason}
 }}}
 
- * 注意：函数规格倒没什么可推敲的，但是是否支持多个客户同时写，这对实现上来说是关键。
+ * append与write的功能是一样的，仅仅是返回值上append函数返回了Offset。而write为了和[http://www.erlang.org/doc/man/file.html file模块]兼容，只是返回ok。
+ * 注意：是否支持多个客户同时写，这对实现上来说是关键。
 
 == sync ==
 
@@ -51,7 +53,7 @@ read(FileHandle, Size) -> {ok, Data} | eof | {error, Reason}
 == position ==
 
 {{{
-position(FileHandle, Offset) -> {ok, Offset}, {error, Reason}
+position(FileHandle, Offset) -> {ok, Offset} | {error, Reason}
 }}}
 
  * 注意：对于写模式打开的文件，调用position函数必然失败（因为我们只支持append数据，不能移动写指针）。
