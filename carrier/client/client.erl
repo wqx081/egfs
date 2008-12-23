@@ -8,11 +8,12 @@
 -module(client).
 -include_lib("kernel/include/file.hrl").
 -include("../include/egfs.hrl").
--define(ChunkSize, 1024).%64*1024*
+-define(ChunkSize, 4194304).%64*1024*
 -define(STRIP_SIZE, 8192).
 
 
 %-behaviour(gen_server).
+
 -export([start/0]).
 %-define(DataServer,"192.168.0.111").
 -export([init/1, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -24,7 +25,7 @@
 start() -> gen_server:start_link({global,?MODULE}, ?MODULE, [], []).
 
 open(FileName, Mode) ->
-    case    gen_server:call({global,metaserver}, {open, FileName, Mode}) of
+    case    gen_server:call({global,metagenserver}, {open, FileName, Mode}) of
         {ok, FileID} ->
             ?DEBUG("Open file ok!FileName is:~p and FileID is:~p~n",[FileName,FileID]),
             {ok, FileID};
@@ -44,14 +45,14 @@ read(FileName,{Start_addr, End_addr}) ->
     close(FileID).
 
 delete(FileName)    -> 
-    case    gen_server:call({global,metaserver}, {delete, FileName})    of
-        {ok} -> ?DEBUG("Delete file ok!~n",[]);
+    case    gen_server:call({global,metagenserver}, {delete, FileName})    of
+        {ok,_} -> ?DEBUG("Delete file ok!~n",[]);
         {error, Why} -> ?DEBUG("Delete file error~p~n",[Why])
     end.
 
 close(FileID)     ->
-    case     gen_server:call({global,metaserver}, {close, FileID})    of
-        { ok } -> ?DEBUG("Close file ok!~n",[]);
+    case     gen_server:call({global,metagenserver}, {close, FileID})    of
+        {ok,[]} -> ?DEBUG("Close file ok!~n",[]);
         {error, Why} -> ?DEBUG("Close file error~p~n",[Why])
     end.
 init([]) -> {ok, {}}.
@@ -82,8 +83,9 @@ loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End) when End_ChunkIn
     end,
     ?DEBUG("Size is ok:~p~n", [Size]),
     ?DEBUG("ChunkIndex,End_ChunkIndex,Start,End ~p-~p-~p-~p~n", [ChunkIndex,End_ChunkIndex,Start,End]),
-    {ok, ChunkID,NodeList} = gen_server:call({global,metaserver}, {locatechunk, FileID, ChunkIndex}),
-    _NodeID=hd(NodeList),
+    {ok, ChunkID,NodeList} = gen_server:call({global,metagenserver}, {locatechunk, FileID, ChunkIndex}),
+   %NodeID=hd(NodeList),
+   %NodeID=hd(NodeList),
     %{ok,DataServer}=inet:getaddr(NodeID,inet4),
     Result = gen_server:call({global,data_server}, {readchunk, ChunkID, Start, Size}),
     {ok, Host, Port} = Result,
@@ -148,18 +150,18 @@ writechunks(FileName, FileID)->
     end,
     ChunkIndex = 0,
     {ok, Hdl} = file:open(FileName, [raw, read, binary]),
-    loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl),
+    loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl,FileLength),
     file:close(Hdl).
 
 
-loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl) when ChunkNum > 0 ->
+loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl, FileLength) when ChunkNum > 0 ->
     ?DEBUG(" ChunkNum is: ~p~n", [ChunkNum]),
-    {ok, ChunkID,NodeList} = gen_server:call({global,metaserver}, {allocatechunk, FileID}),
+    {ok, ChunkID,NodeList} = gen_server:call({global,metagenserver}, {allocatechunk, FileID}),
     ?DEBUG("you have get them,ChunkID:~p and NodeList:~p~n",[ChunkID,NodeList]),
     Result = gen_server:call({global,data_server}, {writechunk, FileID, ChunkIndex, ChunkID, NodeList}),    
     {ok, Host, Port} = Result,
     ?DEBUG("you have get them,Host:~p and Port:~p~n",[Host, Port]),
-    _NodeID = hd(NodeList),
+    %_NodeID = hd(NodeList),
     %{ok,DataServer}=inet:getaddr(NodeID,inet4),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     ?DEBUG("you have get them,Socket is:~p ~n",[Socket]),
@@ -167,25 +169,38 @@ loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl) when ChunkNum > 0 -
     receive
         {tcp, Socket, Binary} ->
             {ok, Data_Port} = binary_to_term(Binary),
-            send_data(Host, Data_Port, ChunkIndex,Hdl),
+            send_data(Host, Data_Port, ChunkIndex,Hdl,FileLength),
             ChunkNum1 = ChunkNum - 1,
             ChunkIndex1 = ChunkIndex + 1,
-            loop_write_chunk(FileName, FileID, ChunkNum1,ChunkIndex1,Hdl);
+            loop_write_chunk(FileName, FileID, ChunkNum1,ChunkIndex1,Hdl,FileLength);
         {tcp_close, Socket} ->
             ?DEBUG("write file closed~n",[]),
             void
     end;
-loop_write_chunk(_, _, _, _,_) ->
+loop_write_chunk(_, _, _, _,_,_) ->
     void.
 
 
-send_data(Host, Port, ChunkIndex,Hdl) ->
+send_data(Host, Port, ChunkIndex,Hdl,FileLength) ->
     
     %{ok, FileLength} = get_file_size(FileName),
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     ?DEBUG("Transfer data begin: ~p~n", [erlang:time()]),
     Begin = ChunkIndex*?ChunkSize,
     End = ChunkIndex*?ChunkSize+?ChunkSize,
+    ?DEBUG("before the if::begin and end: ~p ~p~n", [Begin, End]),
+    if
+	(Begin >= FileLength) orelse (End =< 0) ->
+	    ?DEBUG("[shoutServer]: read boundary invalid ~p~n", [Begin]),
+	    Reply = {error, "invalid read boundary"};
+	true ->
+        if End > FileLength ->
+		    End = FileLength;
+         true ->
+             ok
+	    end
+    end,
+    ?DEBUG("on the if::begin and end: ~p ~p~n", [Begin, End]),
     loop_send(DataSocket, Hdl, Begin, End),
     gen_tcp:close(DataSocket),
     ?DEBUG("Transfer data end: ~p~n", [erlang:time()]).
