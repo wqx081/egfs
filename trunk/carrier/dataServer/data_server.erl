@@ -17,14 +17,14 @@ start_link() -> gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 init([]) -> 
     {ok, server_has_startup}.
 
-handle_call({read, ChkID, Begin, Size}, _From, N) ->
+handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
     io:format("[data_server]: read request from client~n"),
     {ok, FileSize} = get_file_size(?TO_SEND),
 
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
-	    ?DEBUG("[shoutServer]: read bundary invalid ~p~n", [Begin]),
-	    Reply = {error, "invalid read bundary"};
+	    ?DEBUG("[shoutServer]: read boundary invalid ~p~n", [Begin]),
+	    Reply = {error, "invalid read boundary"};
 	true ->
 	    if 
 		Begin + Size > FileSize ->
@@ -40,19 +40,21 @@ handle_call({read, ChkID, Begin, Size}, _From, N) ->
 	    spawn(fun() -> read_process(Listen, ChkID, Begin, End) end)
     end,
     {reply, Reply, N};
-handle_call({write, {chunkID, ChkID}}, _From, N) ->
+handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
+    io:format("[data_server]: write request from client~n"),
+
     {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
     {ok, Host} = inet:getaddr(lt, inet),
     {ok, Port} = inet:port(Listen),
     Reply = {ok, Host, Port},
-    spawn(fun() -> write_process(Listen, ChkID) end),
+    spawn(fun() -> write_process(FileID, ChunkIndex, Listen, ChunkID) end),
     {reply, Reply, N};
 handle_call(Msg, _From, N) ->
     ?DEBUG("[data_server]: unknown request ~p~n", [Msg]),
     {noreply, N}.
     
 %% a write process    
-write_process(Listen, ChunkID) ->
+write_process(FileID, ChunkIndex, Listen, ChunkID) ->
     {ok, Socket} = gen_tcp:accept(Listen),
     {ok, ListenData} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
     Reply = inet:port(ListenData),
@@ -60,16 +62,21 @@ write_process(Listen, ChunkID) ->
 
     {ok, Hdl} = get_file_handle(write, ChunkID),
     process_flag(trap_exit, true),
-    Child = spawn_link(fun() -> receive_it(self(), ListenData, Hdl) end),
+    Parent = self(),
+    Child = spawn_link(fun() -> receive_it(Parent, ListenData, Hdl) end),
 
-    loop_write_control(Socket, Child, ChunkID, 0).
+    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, 0),
 
-loop_write_control(Socket, Child, ChunkID, _State) ->
+    ?DEBUG("write control process finished !~n", []).
+
+loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State) ->
     receive
 	{finish, Child, Len} ->
 	    %% {ok, _Info} = check_it(Socket, ChunkID, Len),
-	    {ok, _Info} = report_metaServer(ChunkID, Len);
+	    ?DEBUG("[data_server]: write transfer finish, ~pBytes~n", [Len]),
+	    {ok, _Info} = report_metaServer(FileID, ChunkIndex, ChunkID, Len);
 	{tcp, Socket, Binary} ->
+	    ?DEBUG("[data_server]: tcp, socket, binary~n", []),
 	    Term = binary_to_term(Binary),
 	    case Term of 
 		{stop, _Why} ->
@@ -77,16 +84,18 @@ loop_write_control(Socket, Child, ChunkID, _State) ->
 		    exit(Child, kill),
 		    rm_pending_chunk(ChunkID);
 		_Any ->
-		    loop_write_control(Socket, Child, ChunkID, _State)
+		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State)
 	    end;
-	{tcp_close, Socket} ->
-	    exit(Child, kill),
+	{tcp_closed, Socket} ->
+	    ?DEBUG("[data_server]: control tcp_closed~n", []),
+	    %% exit(Child, kill),
 	    rm_pending_chunk(ChunkID);
 	{error, Child, Why} ->
 	    ?DEBUG("[data_server]: data transfer socket error~p~n", [Why]),
 	    rm_pending_chunk(ChunkID);
 	Any ->
-	    ?DEBUG("[data_server]: unkown msg ~p~n", [Any])
+	    ?DEBUG("[data_server]: unkown msg ~p~n", [Any]),
+	    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State)
     end.
 
 receive_it(Parent, ListenData, ChkID) ->
@@ -101,9 +110,12 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	    Len2 = Len + size(Binary),
 	    file:write(Hdl, Binary),
 	    loop_receive(Parent, SocketData, Hdl, Len2);
-	{tcp_close, SocketData} ->
-	    file:close(Hdl),
-	    Parent ! {finish, self(), Len}
+	{tcp_closed, SocketData} ->
+	    ?DEBUG("loop_receive/4 tcp_closed, len=~p~n", [Len]),
+	    Parent ! {finish, self(), Len},
+	    file:close(Hdl);
+	Any ->
+	    io:format("loop Any:~p~n", [Any])
     end.
 	    
 %% a read process
@@ -130,7 +142,7 @@ loop_read_control(Socket, Child, State) ->
 		_Any ->
 		    loop_read_control(Socket, Child, State)
 	    end;
-	{tcp_close, Socket} ->
+	{tcp_closed, Socket} ->
 	    %% if the child is still alive, then it shuld be killed
 	    void
     end.
@@ -169,8 +181,8 @@ rm_pending_chunk(ChunkID) ->
     io:format("[dataserver]: has removed ~p~n", ChunkID),
     {ok, "has removed it"}.
 
-report_metaServer(ChunkID, Len) ->
-    io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", ChunkID, Len),
+report_metaServer(_FileID, _ChunkIndex, ChunkID, Len) ->
+    io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", [ChunkID, Len]),
     {ok, "has reported it"}.
 
 %% 
