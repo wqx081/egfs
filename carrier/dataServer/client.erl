@@ -7,7 +7,7 @@
 
 test_r() ->
     %%{ok, Host, Port} = gen_server:call({global, data_server}, {read, 2000, 0, 1024*1024*256}).
-    Result = gen_server:call({global, data_server}, {read, 2000, 0, 268435456}),
+    Result = gen_server:call({global, data_server}, {readchunk, 2000, 0, 268435456}),
     io:format("Result ~p~n", [Result]),
     %% ok, Host, Port} = global:send(data_server, {read, 2000, 0, 1024*1024*256}),
     %% ok, Host, Port} = data_server ! {read, 2000, 0, 1024*1024*256},
@@ -15,7 +15,11 @@ test_r() ->
     receive_control(Host, Port).
 
 test_w() ->
-    Result = gen_server:call({global, data_server}, {write, {chunkID, 2000}}),
+    FileID = 2000,
+    ChunkIndex = 0,
+    ChunkID = 2008,
+    Nodelist = [],
+    Result = gen_server:call({global, data_server}, {writechunk, FileID, ChunkIndex, ChunkID, Nodelist}),
     io:format("Result ~p~n", [Result]),
     {ok, Host, Port} = Result,
     send_control(Host, Port).
@@ -49,17 +53,18 @@ send_control(Host, Port) ->
 	    {ok, Data_Port} = binary_to_term(Binary),
 	    %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
 	    send_data(Host, Data_Port);
-	{tcp_close, Socket} ->
+	{tcp_closed, Socket} ->
 	    void
     end.
 
 send_data(Host, Port) ->
-    {ok, Hdl} = file:open("send.dat", [binary, raw, read]),
-    {ok, FileSize} = get_file_size("send.dat"),
+    {ok, Hdl} = file:open("hello_1.rmvb", [binary, raw, read]),
+    {ok, FileSize} = get_file_size("hello_1.rmvb"),
 
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     io:format("Transfer begin: ~p~n", [erlang:time()]),
     loop_send(DataSocket, Hdl, 0, FileSize),
+    gen_tcp:close(DataSocket),
     io:format("Transfer end: ~p~n", [erlang:time()]).
 
 loop_send(DataSocket, Hdl, Begin, End) when Begin < End ->
@@ -80,7 +85,7 @@ receive_control(Host, Port) ->
 	    {ok, Data_Port} = binary_to_term(Binary),
 	    %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
 	    receive_data(Host, Data_Port);
-	{tcp_close, Socket} ->
+	{tcp_closed, Socket} ->
 	    void
     end.
 
