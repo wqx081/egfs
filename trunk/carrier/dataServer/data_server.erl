@@ -12,14 +12,21 @@
 -define(TO_SEND, "send.dat").
 -define(TO_WRITE, "to_write.dat").
 
+%% -record(chunk_info, {chunkID, location, fileID, index}).
+-define(TABLE, "chunk_table").
+
 start_link() -> gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
 init([]) -> 
+    {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
+    ok = check_dirs(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
-    io:format("[data_server]: read request from client~n"),
-    {ok, FileSize} = get_file_size(?TO_SEND),
+    io:format("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
+    {ok, Name} = get_file_name(ChkID),
+    {ok, FileSize} = get_file_size(Name),
+    %% {ok, FileSize} = get_file_size(?TO_SEND),
 
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
@@ -41,7 +48,7 @@ handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
     end,
     {reply, Reply, N};
 handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
-    io:format("[data_server]: write request from client~n"),
+    io:format("[data_server]: write request from client, chkID(~p)~n", [ChunkID]),
 
     {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
     {ok, Host} = inet:getaddr(lt, inet),
@@ -60,10 +67,9 @@ write_process(FileID, ChunkIndex, Listen, ChunkID) ->
     Reply = inet:port(ListenData),
     gen_tcp:send(Socket, term_to_binary(Reply)),
 
-    {ok, Hdl} = get_file_handle(write, ChunkID),
     process_flag(trap_exit, true),
     Parent = self(),
-    Child = spawn_link(fun() -> receive_it(Parent, ListenData, Hdl) end),
+    Child = spawn_link(fun() -> receive_it(Parent, ListenData, ChunkID) end),
 
     loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, 0),
 
@@ -162,35 +168,68 @@ loop_send(SocketData, _, _, _) ->
     void.
 
 %% utilites
-get_file_handle(read, _ChunkID) ->
-    {ok, _Hdl} = file:open(?TO_SEND, [binary, raw, read, read_ahead]);
-get_file_handle(write, _ChunkID) ->
-    {ok, Hdl} = file:open(?TO_WRITE, [binary, raw, append]),
+get_file_handle(read, ChunkID) ->
+    {ok, Name} = get_file_name(ChunkID),
+    {ok, _Hdl} = file:open(Name, [binary, raw, read, read_ahead]);
+get_file_handle(write, ChunkID) ->
+    {ok, Name} = get_file_name(ChunkID),
+    {ok, Hdl} = file:open(Name, [binary, raw, append]),
     file:truncate(Hdl),
     {ok, Hdl}.
+
+get_file_name(ChunkID) when is_binary(ChunkID) ->
+    <<D:32, Fn:32>> = ChunkID,
+    Dir = integer_to_list(D rem 10),
+    Result = {ok, lists:append(["./data/", Dir, "/", integer_to_list(Fn)])},
+    Result;
+get_file_name(_) ->
+    {error, "invalid ChunkID to convert to name"}.
+
+temp(ChunkID) ->
+    <<D1:4, D2:4, D3:4, D4:4, _Fn:48>> = ChunkID,
+    generate_dirs("./data", [D1, D2, D3, D4]).
+
+
+generate_dirs(Cur, [H|T]) ->
+    Cur2 = lists:append([Cur, "/", [H]]),
+    Bool = filelib:is_dir(Cur2),
+    if
+	not(Bool) ->
+	    file:make_dir(Cur2);
+	true ->
+	    void
+    end,
+    generate_dirs(Cur2, [T]);
+generate_dirs(Cur, []) ->
+    Cur2 = lists:append([Cur, "/"]).
 
 get_file_size(FileName) ->
     case file:read_file_info(FileName) of
 	{ok, Facts} ->
 	    {ok, Facts#file_info.size};
-	_ ->
-	    error
+	Other ->
+	    Other
     end.
 
 rm_pending_chunk(ChunkID) ->
     io:format("[dataserver]: has removed ~p~n", ChunkID),
     {ok, "has removed it"}.
 
-report_metaServer(_FileID, _ChunkIndex, ChunkID, Len) ->
+report_metaServer(FileID, _ChunkIndex, ChunkID, Len) ->
     io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", [ChunkID, Len]),
+    gen_server:call({global, metagenserver}, {registerchunk, FileID, ChunkID, Len, []}),
     {ok, "has reported it"}.
 
+%%
+check_dirs() ->
+    ok.
 %% 
 handle_cast(_Msg, N) -> {noreply, N}.
 handle_info(_Info, N) -> {noreply, N}.
 
 terminate(_Reason, _N) ->
     ?DEBUG("~p is stopping~n", [?MODULE]),
+    dets:close(?TABLE),
     ok.
 
 code_change(_OldVsn, N, _Extra) -> {ok, N}.
