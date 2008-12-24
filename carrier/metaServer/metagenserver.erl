@@ -1,6 +1,7 @@
 -module(metagenserver).
 -behaviour(gen_server).
--import(metaserver).
+-import(metaserver, [do_open/3, do_allocate_chunk/2, do_register_chunk/4, do_get_chunk/2, do_close/2]).
+
 -export([start/0,stop/0,terminate/2]).
 -export([init/1, handle_call/3, handle_cast/2,handle_info/2]).
 -export([open/2,writeAllocate/1,locateChunk/2,registerChunk/4,close/1]).
@@ -27,20 +28,25 @@ terminate(Reason, State) ->
 %"metaserver" methods
 % write step 1: open file
 handle_call({open, FileName, Mode}, {From, _}, State) ->
-    do_open(FileName, Mode, From).
+    Reply = do_open(FileName, Mode, From),
+    {reply, Reply, State};
 
 handle_call({allocatechunk, FileID}, {From, _}, State) ->
-    do_allocate_chunk(FileID, From).
+    Reply = do_allocate_chunk(FileID, From),
+    {reply, Reply, State};
 
 handle_call({registerchunk, FileID, ChunkID, ChunkUsedSize, NodeList},
             From, State) ->
-    do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList).
+    Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
+    {reply, Reply, State};
 
 handle_call({locatechunk, FileID, ChunkIndex}, From, State) ->
-    do_get_chunk(FileID, ChunkIndex).
+    Reply = do_get_chunk(FileID, ChunkIndex),
+    {reply, Reply, State};
 
 handle_call({close, FileID}, {From, _}, State)->
-do_close(FileID, From).
+	Reply = do_close(FileID, From),
+    {reply, Reply, State}.
 
 handle_cast(stop, State) ->
     io:format("meta server stopping~n"),
@@ -64,6 +70,10 @@ handle_info(Info, State) ->
 open(FileName,Mode) ->
     gen_server:call(?GM, {open, FileName,Mode}).
 
+
+open2(FileName,Mode) ->
+    gen_server:call(?GM,{open2,FileName,Mode}).
+
 writeAllocate(FileID) ->
     gen_server:call(?GM, {allocatechunk, FileID}).
 
@@ -75,3 +85,4 @@ registerChunk(FileID, ChunkID, ChunkUsedSize, NodeList)->
 
 close(FileID)->
     gen_server:call(?GM, {close, FileID}).
+
