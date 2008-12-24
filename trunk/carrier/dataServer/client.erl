@@ -5,10 +5,11 @@
 -define(HOST, "192.168.0.111").
 -define(STRIP_SIZE, 8192).
 -define(CHKID, <<0,0,172,10,0,9,103,237>>).
+-define(DATA_SERVER, data_gen_server).
 
 test_r() ->
     %%{ok, Host, Port} = gen_server:call({global, data_server}, {read, 2000, 0, 1024*1024*256}).
-    Result = gen_server:call({global, data_server}, {readchunk, ?CHKID, 0, 2684354560}),
+    Result = gen_server:call({global, ?DATA_SERVER}, {readchunk, ?CHKID, 0, 2684354560}),
     io:format("Result ~p~n", [Result]),
     %% ok, Host, Port} = global:send(data_server, {read, 2000, 0, 1024*1024*256}),
     %% ok, Host, Port} = data_server ! {read, 2000, 0, 1024*1024*256},
@@ -19,7 +20,7 @@ test_w() ->
     FileID = 2000,
     ChunkIndex = 0,
     Nodelist = [],
-    Result = gen_server:call({global, data_server}, {writechunk, FileID, ChunkIndex, ?CHKID, Nodelist}),
+    Result = gen_server:call({global, ?DATA_SERVER}, {writechunk, FileID, ChunkIndex, ?CHKID, Nodelist}),
     io:format("Result ~p~n", [Result]),
     {ok, Host, Port} = Result,
     send_control(Host, Port).

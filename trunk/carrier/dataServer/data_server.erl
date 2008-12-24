@@ -19,7 +19,6 @@ start_link() -> gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
 init([]) -> 
     {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
-    ok = check_dirs(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
@@ -170,7 +169,8 @@ loop_send(SocketData, _, _, _) ->
 %% utilites
 get_file_handle(read, ChunkID) ->
     {ok, Name} = get_file_name(ChunkID),
-    {ok, _Hdl} = file:open(Name, [binary, raw, read, read_ahead]);
+    {ok, Hdl} = file:open(Name, [binary, raw, read, read_ahead]),
+    {ok, Hdl};
 get_file_handle(write, ChunkID) ->
     {ok, Name} = get_file_name(ChunkID),
     {ok, Hdl} = file:open(Name, [binary, raw, append]),
@@ -199,7 +199,7 @@ generate_dirs(Cur, [H|T]) ->
 	true ->
 	    void
     end,
-    generate_dirs(Cur2, [T]);
+    generate_dirs(Cur2, T);
 generate_dirs(Cur, []) ->
     Cur2 = lists:append([Cur, "/"]).
 
