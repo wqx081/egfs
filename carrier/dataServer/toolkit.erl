@@ -45,7 +45,6 @@ generate_dirs(Cur, [H|T]) ->
     Bool = filelib:is_dir(Cur2),
     if
 	not(Bool) ->
-	    io:format("create Dir: ~p~n", [Cur2]),
 	    file:make_dir(Cur2);
 	true ->
 	    void
@@ -55,7 +54,7 @@ generate_dirs(Cur, []) ->
     Cur.
 
 rm_pending_chunk(ChunkID) ->
-    io:format("[dataserver]: has removed ~p~n", ChunkID),
+    io:format("[dataserver]: chuunk should be removed ~p~n", ChunkID),
     {ok, "has removed it"}.
 
 report_metaServer(FileID, _ChunkIndex, ChunkID, Len) ->

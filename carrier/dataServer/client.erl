@@ -5,7 +5,7 @@
 -define(HOST, "192.168.0.111").
 -define(STRIP_SIZE, 8192).
 -define(CHKID, <<0,0,172,10,0,9,103,237>>).
--define(DATA_SERVER, data_gen_server).
+-define(DATA_SERVER, data_server).
 
 test_r() ->
     %%{ok, Host, Port} = gen_server:call({global, data_server}, {read, 2000, 0, 1024*1024*256}).
@@ -59,8 +59,8 @@ send_control(Host, Port) ->
     end.
 
 send_data(Host, Port) ->
-    {ok, Hdl} = file:open("hello_1.rmvb", [binary, raw, read]),
-    {ok, FileSize} = get_file_size("hello_1.rmvb"),
+    {ok, Hdl} = file:open("hello_1.mp3", [binary, raw, read]),
+    {ok, FileSize} = get_file_size("hello_1.mp3"),
 
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     io:format("Transfer begin: ~p~n", [erlang:time()]),

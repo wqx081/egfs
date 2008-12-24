@@ -2,19 +2,22 @@
 -behaviour(gen_server).
 -import(data_worker, [handle_read/3, handle_write/4]).
 -include("../include/egfs.hrl").
--export([start_link/0, 
+-export([start_link/0, stop/0, 
 	 init/1, handle_call/3,
 	 handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
 
 %% -record(chunk_info, {chunkID, location, fileID, index}).
--define(TABLE, "chunk_table").
--define(DATA_SERVER, data_gen_server).
+%% -define(TABLE, "chunk_table").
+-define(DATA_SERVER, {global, data_server}).
 
-start_link() -> gen_server:start_link({global, ?DATA_SERVER}, ?MODULE, [], []).
+start_link() -> gen_server:start_link(?DATA_SERVER, ?MODULE, [], []).
+
+stop() ->
+    gen_server:cast(?DATA_SERVER, stop).
 
 init([]) -> 
-    {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
+    %% {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
@@ -34,7 +37,7 @@ handle_info(_Info, N) -> {noreply, N}.
 
 terminate(_Reason, _N) ->
     ?DEBUG("~p is stopping~n", [?MODULE]),
-    dets:close(?TABLE),
+    %% dets:close(?TABLE),
     ok.
 
 code_change(_OldVsn, N, _Extra) -> {ok, N}.

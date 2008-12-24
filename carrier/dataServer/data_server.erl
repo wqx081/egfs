@@ -7,6 +7,7 @@
 	 handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
 
+-define(DATA_SERVER, old_data_server).
 -define(STRIP_SIZE, 8192).
 -define(DEF_PORT, 9999).
 -define(TO_SEND, "send.dat").
@@ -15,7 +16,7 @@
 %% -record(chunk_info, {chunkID, location, fileID, index}).
 -define(TABLE, "chunk_table").
 
-start_link() -> gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
+start_link() -> gen_server:start_link({global, ?DATA_SERVER}, ?MODULE, [], []).
 
 init([]) -> 
     {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
