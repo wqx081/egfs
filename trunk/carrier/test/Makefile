@@ -22,3 +22,5 @@ test: compile
 clean:
 	-rm -f erl_crash.dump
 	-rm -f *.beam
+	-rm -f *.avi
+	-rm -f zerot
