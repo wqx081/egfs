@@ -121,13 +121,6 @@ clear_tables()->
     mnesia:clear_table(chunkmapping).
 
 
-%% add_shop_item(Name, Quantity, Cost) ->
-%%     Row = #shop{item=Name, quantity=Quantity, cost=Cost},
-%%     F = fun() ->
-%% 		mnesia:write(Row)
-%% 	end,
-%%     mnesia:transaction(F).
-
 reset_tables() ->
     mnesia:clear_table(filemeta),
     mnesia:clear_table(chunkmapping),
@@ -275,5 +268,6 @@ look_up_filesession(FileID, ClientID) ->
 %%     do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
 %% 			     X#filemeta.fileid < 250
 %% 				]));
+
 
 
