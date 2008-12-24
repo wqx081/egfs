@@ -11,11 +11,7 @@
 -define(ChunkSize, 4194304).%64*1024*
 -define(STRIP_SIZE, 8192).
 
-
-%-behaviour(gen_server).
-
 -export([start/0]).
-%-define(DataServer,"192.168.0.111").
 -export([init/1, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -compile(export_all).
 
@@ -72,52 +68,56 @@ readchunks(FileID,{Start_addr, End_addr}) ->
     Start = Start_addr rem ?ChunkSize,
     End = End_addr rem ?ChunkSize,
     ?DEBUG("Start_ChunkIndex,End_ChunkIndex,Start,End ~p-~p-~p-~p~n", [Start_ChunkIndex,End_ChunkIndex,Start,End]),
-    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End).
+    {ok, Hdl} = file:open("recv1.avi", [raw, append, binary]),
+    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End,Hdl),
+    file:close(Hdl).
     
-loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End) when End_ChunkIndex >=ChunkIndex ->    
+loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End,Hdl) when End_ChunkIndex >=ChunkIndex ->
     case  End_ChunkIndex-ChunkIndex  of
         0  ->
             Size = End - Start;
         _Any ->
             Size = ?ChunkSize - Start
     end,
-    ?DEBUG("Size is ok:~p~n", [Size]),
-    ?DEBUG("ChunkIndex,End_ChunkIndex,Start,End ~p-~p-~p-~p~n", [ChunkIndex,End_ChunkIndex,Start,End]),
-    {ok, ChunkID,NodeList} = gen_server:call({global,metagenserver}, {locatechunk, FileID, ChunkIndex}),
-   %NodeID=hd(NodeList),
+    %?DEBUG("Size is ok:~p~n", [Size]),
+    %?DEBUG("ChunkIndex,End_ChunkIndex,Start,Size,End ~p-~p-~p-~p-~p~n", [ChunkIndex,End_ChunkIndex,Start,Size,End]),
+    ?DEBUG("~p:~p", [ChunkIndex,Size]),
+    {ok, ChunkID,_NodeList} = gen_server:call({global,metagenserver}, {locatechunk, FileID, ChunkIndex}),
    %NodeID=hd(NodeList),
     %{ok,DataServer}=inet:getaddr(NodeID,inet4),
     Result = gen_server:call({global,data_server}, {readchunk, ChunkID, Start, Size}),
     {ok, Host, Port} = Result,
-    ?DEBUG("{ok, Host, Port} is: ~p~n", [Result]),
+    %?DEBUG("{ok, Host, Port} is: ~p~n", [Result]),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    ?DEBUG("you have get them,Socket is:~p ~n",[Socket]),
+    %?DEBUG("you have get them,Socket is:~p ~n",[Socket]),
     process_flag(trap_exit, true),
     receive
         {tcp, Socket, Binary} ->
             {ok, Data_Port} = binary_to_term(Binary),
             %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
-            receive_data(Host, Data_Port),
+            receive_data(Host, Data_Port,Hdl),
             Index1 = ChunkIndex + 1,
-            ?DEBUG("FileID, Index1, End_ChunkIndex, 0, End is: ~p--~p--~p--~p~n", [FileID, Index1, End_ChunkIndex, End]),
-            loop_read_chunk(FileID, Index1, End_ChunkIndex, 0, End);
+            %?DEBUG("FileID, Index1, End_ChunkIndex, 0, End is: ~p--~p--~p--~p~n", [FileID, Index1, End_ChunkIndex, End]),
+            loop_read_chunk(FileID, Index1, End_ChunkIndex, 0, End, Hdl);
 
         {tcp_close, Socket} ->
             ?DEBUG("read file closed~n",[]),
             void
     end;
-loop_read_chunk(_, _, _, _, _) ->
+loop_read_chunk(_, _, _, _, _,_) ->
     ?DEBUG("read file closed~n",[]),
     void.
 
     
-receive_data(Host, Port) ->
-    ?DEBUG("data port:~p~n", [Port]),
-    {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
-    {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    ?DEBUG("Receive data begin: ~p~n", [erlang:time()]),
-    loop_recv(DataSocket, Hdl),
-    ?DEBUG("Receive data end: ~p~n", [erlang:time()]).
+receive_data(Host, Port,Hdl) ->
+    %?DEBUG("data port:~p~n", [Port]),
+     %{ok, Hdl} = file:open("recv1.avi", [raw, append, binary]),
+     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    
+    %?DEBUG("Receive data begin: ~p~n", [erlang:time()]),
+    loop_recv(DataSocket, Hdl).
+    %?DEBUG("Receive data end: ~p~n", [erlang:time()]),
+    
 
 loop_recv(DataSocket, Hdl) ->
     receive
@@ -133,7 +133,7 @@ loop_recv(DataSocket, Hdl) ->
 
 write_data(Data, Hdl) ->
     %% {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
-    ?DEBUG("write data now!~n",[]),
+    %?DEBUG("write data now!~n",[]),
     file:write(Hdl, Data).
     %% file:close(Hdl).
 
@@ -157,14 +157,14 @@ writechunks(FileName, FileID)->
 loop_write_chunk(FileName, FileID, ChunkNum, ChunkIndex,Hdl, FileLength) when ChunkNum > 0 ->
     ?DEBUG(" ChunkNum is: ~p~n", [ChunkNum]),
     {ok, ChunkID,NodeList} = gen_server:call({global,metagenserver}, {allocatechunk, FileID}),
-    ?DEBUG("you have get them,ChunkID:~p and NodeList:~p~n",[ChunkID,NodeList]),
+    ?DEBUG("you have get them,ChunkID:~p and NodeList: ~p and --ChunkIndex:~p~n",[ChunkID,NodeList,ChunkIndex]),
     Result = gen_server:call({global,data_server}, {writechunk, FileID, ChunkIndex, ChunkID, NodeList}),    
     {ok, Host, Port} = Result,
-    ?DEBUG("you have get them,Host:~p and Port:~p~n",[Host, Port]),
+    %?DEBUG("you have get them,Host:~p and Port:~p~n",[Host, Port]),
     %_NodeID = hd(NodeList),
     %{ok,DataServer}=inet:getaddr(NodeID,inet4),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    ?DEBUG("you have get them,Socket is:~p ~n",[Socket]),
+    %?DEBUG("you have get them,Socket is:~p ~n",[Socket]),
 	process_flag(trap_exit, true),
     receive
         {tcp, Socket, Binary} ->
@@ -185,35 +185,25 @@ send_data(Host, Port, ChunkIndex,Hdl,FileLength) ->
     
     %{ok, FileLength} = get_file_size(FileName),
     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    ?DEBUG("Transfer data begin: ~p~n", [erlang:time()]),
+    %?DEBUG("Transfer data begin: ~p~n", [erlang:time()]),
     Begin = ChunkIndex*?ChunkSize,
     End = ChunkIndex*?ChunkSize+?ChunkSize,
-    ?DEBUG("before the if::begin and end: ~p ~p~n", [Begin, End]),
-    if
-	(Begin >= FileLength) orelse (End =< 0) ->
-	    ?DEBUG("[shoutServer]: read boundary invalid ~p~n", [Begin]),
-	    Reply = {error, "invalid read boundary"};
-	true ->
-        if End > FileLength ->
-		    End = FileLength;
-         true ->
-             ok
-	    end
-    end,
+    %?DEBUG("before the if::begin and end: ~p ~p~n", [Begin, End]),
+    
     ?DEBUG("on the if::begin and end: ~p ~p~n", [Begin, End]),
-    loop_send(DataSocket, Hdl, Begin, End),
-    gen_tcp:close(DataSocket),
-    ?DEBUG("Transfer data end: ~p~n", [erlang:time()]).
+    loop_send(DataSocket, Hdl, Begin, End, FileLength),
+    gen_tcp:close(DataSocket).
+    %?DEBUG("Transfer data end: ~p~n", [erlang:time()]).
 
 
-loop_send(DataSocket, Hdl, Begin, End) when Begin < End ->
-    ?DEBUG("begin and end: ~p ~p~n", [Begin, End]),
+loop_send(DataSocket, Hdl, Begin, End, FileLength) when Begin< End andalso Begin < FileLength->
+    %?DEBUG("begin and end: ~p ~p~n", [Begin, End]),
     {ok, Binary} = file:pread(Hdl, Begin, ?STRIP_SIZE),
     gen_tcp:send(DataSocket, Binary),
     Begin1 = Begin + ?STRIP_SIZE,
-    loop_send(DataSocket, Hdl, Begin1, End);
+    loop_send(DataSocket, Hdl, Begin1, End,FileLength);
 
-loop_send(_, _, _, _) ->
+loop_send(_, _, _, _,_) ->
     void.
 
 get_file_size(FileName) ->
