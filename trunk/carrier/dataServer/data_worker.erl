@@ -43,12 +43,16 @@ read_process(Listen, ChunkID, Begin, End) ->
     gen_tcp:send(Socket, term_to_binary(Reply)),
 
     process_flag(trap_exit, true),
-    Child = spawn_link(fun() -> send_it(ListenData, ChunkID, Begin, End) end),
+    Parent = self(),
+    Child = spawn_link(fun() -> send_it(Parent, ListenData, ChunkID, Begin, End) end),
 
     loop_read_control(Socket, Child, 0).
     
 loop_read_control(Socket, Child, State) ->
     receive 
+	{finish, Child, Len} ->
+	    ?DEBUG("[data_server]: read finish ~p Bytes~n", [Len]),
+	    gen_tcp:close(Socket);
 	{tcp, Socket, Binary} ->
 	    Term = binary_to_term(Binary),
 	    case Term of 
@@ -64,21 +68,22 @@ loop_read_control(Socket, Child, State) ->
 	    void
     end.
 
-send_it(ListenData, ChunkID, Begin, End) ->
+send_it(Parent, ListenData, ChunkID, Begin, End) ->
     {ok, SocketData} = gen_tcp:accept(ListenData),
     {ok, Hdl} = get_file_handle(read, ChunkID),
-    loop_send(SocketData, Hdl, Begin, End),
+    loop_send(Parent, SocketData, Hdl, Begin, End, 0),
     file:close(Hdl).
 
-loop_send(SocketData, Hdl, Begin, End) when Begin < End ->
+loop_send(Parent, SocketData, Hdl, Begin, End, Len) when Begin < End ->
     {ok, Binary} = file:pread(Hdl, Begin, ?STRIP_SIZE),
     gen_tcp:send(SocketData, Binary),
+    Len2 = Len + size(Binary),
     Begin2 = Begin + ?STRIP_SIZE,
-    loop_send(SocketData, Hdl, Begin2, End);
-loop_send(SocketData, _, _, _) ->
+    loop_send(Parent, SocketData, Hdl, Begin2, End, Len2);
+loop_send(Parent, SocketData, _Hdl, _Begin, _End, Len) ->
     gen_tcp:close(SocketData),
+    Parent ! {finish, self(), Len},
     void.
-
 
 handle_write(FileID, ChunkIndex, ChunkID, _Nodelist) ->
     {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
