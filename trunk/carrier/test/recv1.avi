@@ -1,0 +1,13 @@
+all: compile test
+
+compile: client.beam
+
+client.beam:../carrier/client/client.erl
+	erlc ../carrier/client/client.erl
+
+test:
+	erl -noshell -s client write client.beam
+
+clean:
+	-rm -f erl_crash.dump
+	-rm -f *.beam
