@@ -2,7 +2,7 @@
 -compile(export_all).
 -import(lists, [reverse/1]).
 -import(metaDB,[select_fileid_from_filemeta/1, select_fileid_from_filemeta_s/1, add_filemeta_s_item/2, add_filemeta_item/2]).
--import(metaDB, [select_all_from_anyTable/1, select_all_from_filemeta_s/1,select_nodeip_from_chunkmapping/1,select_from_filemeta/1]).
+-import(metaDB, [select_all_from_Table/1, select_all_from_filemeta_s/1,select_nodeip_from_chunkmapping/1,select_all_from_filemeta/1]).
 
 
 -include("metaformat.hrl").
@@ -61,7 +61,7 @@ do_allocate_chunk(FileID, _ClientID)->
     {_, HighTime, LowTime}=now(),
 	ChunkID = <<HighTime:32, LowTime:32>>,
     
-    Res = select_all_from_anyTable(hostinfo),  % [{}{}{}{}{}]    
+    Res = select_all_from_Table(hostinfo),  % [{}{}{}{}{}]    
     SizeOfRes = length(Res),
          
     random:seed(),
@@ -129,7 +129,7 @@ do_close(FileID, _ClientID)->
 do_get_chunk(FileID, ChunkIdx)->
     % mock return
     % insert chunk into filemeta_s_table
-    case select_from_filemeta(FileID) of				
+    case select_all_from_filemeta(FileID) of				
 		[]->
             {error,"file does not exist"};
 		[{filemeta, _FileID, _FileName, _FileSize, ChunkList, _CreateT, _ModifyT, _ACL}]->
