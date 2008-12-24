@@ -60,27 +60,6 @@ start_mnesia()->
 %%
 
 
-%% SQL equivalent
-%%  SELECT * FROM shop;
-
-demo(select_filemeta) ->
-    do(qlc:q([X || X <- mnesia:table(filemeta)]));
-
-demo(select_chunkmapping) ->
-    do(qlc:q([X || X <- mnesia:table(chunkmapping)]));
-demo(select_clientinfo) ->
-    do(qlc:q([X || X <- mnesia:table(clientinfo)]));
-demo(select_filesession) ->
-    do(qlc:q([X || X <- mnesia:table(filesession)]));
-
-
-
-%% SQL equivalent
-%%  SELECT item, quantity FROM shop;
-
-demo(select_some) ->
-    do(qlc:q([{X#filemeta.fileid, X#filemeta.filename} || X <- mnesia:table(filemeta)])).
-
 do(Q) ->
     F = fun() -> qlc:e(Q) end,
     {atomic, Val} = mnesia:transaction(F),
@@ -109,11 +88,6 @@ example_tables() ->
      {hostinfo,data_server,abc,1000000,2000000}
      
     ].
-
-example_table_filemeta(X)->
-%    {filemeta, X,   "e:/copy/test",3,[X],"today,Dec,12","yestoday,Dec,11","acl"}.
-#filemeta{fileid=X,filename=["e:/copy/test",X],filesize=3,chunklist=[X],createT="today,Dec,12",modifyT="yestoday,Dec,11",acl="acl"}.
-
 clear_tables()->
     mnesia:clear_table(filemeta),
     mnesia:clear_table(filemeta_s),
@@ -131,22 +105,6 @@ reset_tables() ->
 		foreach(fun mnesia:write/1, example_tables())
 		end,
     mnesia:transaction(F).
-
-insert_ten_thousand(X)->
-    mnesia:clear_table(filemeta),
-           
-    util:for(1,X,
-             fun(I)->insert_filemeta_sample(I) end
-			).
-          
-
-insert_filemeta_sample(X)->
-    Row = example_table_filemeta(X),
-    F = fun()->
-                mnesia:write(Row)
-        end,
-    mnesia:transaction(F).
-
 
 %filemeta    {fileid	client}
 %add item
@@ -168,40 +126,16 @@ add_filemeta_s_item(Fileid, FileName) ->
 	end,
     mnesia:transaction(F).
 
-%filesession    {fileid	client}
-%add item
-add_filesession_item(Fileid, Client) ->
-    Row = #filesession{fileid=Fileid, client=Client},
-    F = fun() ->
-		mnesia:write(Row)
-	end,
-    mnesia:transaction(F).
-
-%remove   while remove . we shall use primary key(first element in mnesia.)
-remove_filesession_item(Fileid) ->
-    Oid = {filesession, Fileid},
-    F = fun() ->
-		mnesia:delete(Oid)
-	end,
-    mnesia:transaction(F).
-
-
 %%------------------------------------------------------------------------------------------
 %% select function
 %% all kinds 
 %%------------------------------------------------------------------------------------------ 
-select_all_from_anyTable(T)->
+select_all_from_Table(T)->
     do(qlc:q([
               X||X<-mnesia:table(T)
               ])).  %result [L]
 
-%look up.
-select_from_filesession(Fileid) ->    %result [L]
-    do(qlc:q([
-              X||X<-mnesia:table(filesession),X#filesession.fileid =:= Fileid
-              ])).
-
-select_from_filemeta(FileID) ->    %result [L]
+select_all_from_filemeta(FileID) ->    %result [L]
     do(qlc:q([
               X||X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
               ])).
@@ -220,23 +154,15 @@ select_fileid_from_filemeta(FileName) ->
                                    X#filemeta.filename =:= FileName                                   
                                    ])).   %result [L]
 
-
 select_fileid_from_filemeta_s(FileName) ->
     do(qlc:q([X#filemeta_s.fileid || X <- mnesia:table(filemeta_s),
                                    X#filemeta_s.filename =:= FileName                                   
-                                   ])).   %result [L]
-
-
-select_test(FileID) ->
-    do(qlc:q([X#filemeta.fileid || X <- mnesia:table(filemeta),
-                                   X#filemeta.fileid =:= FileID                                   
                                    ])).   %result [L]
 
 select_nodeip_from_chunkmapping(ChunkID) ->
     do(qlc:q([X#chunkmapping.chunklocations || X <- mnesia:table(chunkmapping),
                                    X#chunkmapping.chunkid =:= ChunkID
              ])).   %result [L]
-
 
 %clear chunks from filemeta
 reset_file_from_filemeta(Fileid) ->
@@ -251,23 +177,24 @@ reset_file_from_filemeta(Fileid) ->
 	end,
     mnesia:transaction(F).
 
-% look_up_filesession(FileID, ClientID) -> w | r | a
-% FileID = binary
-% ClientID = binary
-look_up_filesession(FileID, ClientID) ->
-	case select_from_filesession(FileID) of
-		% file hasn't been opened yet, so open operation is permitted.
-		[clientinfo, [ClientInfo]] when (ClientInfo#clientinfo.clientid =:= ClientID) -> 
-				ClientInfo#clientinfo.modes,
-                {ok, <<FileID:64>>};   
-		% file has been opened by other processes, so open operation is denied.
-		[_] -> {error, "opened already"}
-	end.
-
-%% demo(reorder) ->
-%%     do(qlc:q([X#filemeta.filename || X <- mnesia:table(filemeta),
-%% 			     X#filemeta.fileid < 250
-%% 				]));
 
 
+%% --------------------------------------------------------------------
+%% Function: 
+%% Description: 
+%% Returns: 
+%% --------------------------------------------------------------------
 
+
+%% --------------------------------------------------------------------
+%% Function: reset_file_from_filemeta/1
+%% Description: 
+%% Argument: Fileid  @type <<binary:64>>
+%% Returns: {ok, State}          |
+%%          {ok, State, Timeout} |
+%%          ignore               |
+%%          {stop, Reason}
+%% --------------------------------------------------------------------
+
+
+%%		TODO:  log of all function. 
