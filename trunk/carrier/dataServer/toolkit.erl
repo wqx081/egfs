@@ -23,7 +23,7 @@ get_file_handle(read, ChunkID) when is_binary(ChunkID) ->
     Result;
 get_file_handle(write, ChunkID) when is_binary(ChunkID) ->
     {ok, Name} = get_file_name(ChunkID),
-    file:delete(Name),
+    %% file:delete(Name),
     Result = file:open(Name, [binary, raw, append]),
     Result;
 get_file_handle(_, _) ->
