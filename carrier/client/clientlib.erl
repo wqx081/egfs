@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(clientlib).
 -include_lib("kernel/include/file.hrl").
--include("egfs.hrl").
+-include("../include/egfs.hrl").
 -export([do_open/2, do_pread/3, do_pwrite/3, do_delete/1, do_close/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
