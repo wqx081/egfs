@@ -109,7 +109,7 @@ write_process(FileID, ChunkIndex, Listen, ChunkID) ->
 
     ?DEBUG("write control process finished !~n", []).
 
-loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State) ->
+loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
     receive
 	{finish, Child, Len} ->
 	    %% {ok, _Info} = check_it(Socket, ChunkID, Len),
@@ -123,19 +123,29 @@ loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State) ->
 		    ?DEBUG("[data_server]: write stop msg from client.~n", []),
 		    exit(Child, kill),
 		    rm_pending_chunk(ChunkID);
+		{finish, _ChunkID} ->
+		    ?DEBUG("[data_server]: write control receive finish signal~n", []),
+		    State2 = State + 1,
+		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State2);
 		_Any ->
-		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State)
+		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State)
 	    end;
 	{tcp_closed, Socket} ->
 	    ?DEBUG("[data_server]: control tcp_closed~n", []),
-	    %% exit(Child, kill),
-	    rm_pending_chunk(ChunkID);
+	    if
+		State > 0 ->
+		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State);
+		true ->
+		    ?DEBUG("[data_server]: write control broken~n", []),
+		    %% exit(Child, kill),
+		    rm_pending_chunk(ChunkID)
+	    end;
 	{error, Child, Why} ->
 	    ?DEBUG("[data_server]: data transfer socket error~p~n", [Why]),
 	    rm_pending_chunk(ChunkID);
 	Any ->
 	    ?DEBUG("[data_server]: unkown msg ~p~n", [Any]),
-	    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, _State)
+	    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State)
     end.
 
 receive_it(Parent, ListenData, ChkID) ->
