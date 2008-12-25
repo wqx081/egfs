@@ -16,34 +16,34 @@
 %%----------------------------------------------------------------------
 
 open(FileName, Mode) ->
-	do_open(FileName, Mode).
+    do_open(FileName, Mode).
 
 pwrite(FileID, Location, Bytes) ->
-	do_pwrite(FileID, Location, Bytes).
+    do_pwrite(FileID, Location, Bytes).
 
 pread(FileName, Start, Length) ->
-	do_pread(FileName, Start, Length).
+    do_pread(FileName, Start, Length).
 
 delete(FileName) ->
-	do_delete(FileName).
+    do_delete(FileName).
 
 close(FileID) ->
-	do_close(FileID).
+    do_close(FileID).
 
 test_w(FileName, RemoteFile) ->
     %{ok,Hdl} = file:open(FileName, [binary, raw, read, read_ahead]),
-	%{ok, Binary} = file:read_file(FileName)
-	%file:close(Hdl),
-	Binary =read_tmp(FileName),
-	FileID =open(RemoteFile,w),
-	pwrite(FileID,0,Binary),
-	close(FileID).
+    %{ok, Binary} = file:read_file(FileName)
+    %file:close(Hdl),
+    Binary =read_tmp(FileName),
+    FileID =open(RemoteFile,w),
+    pwrite(FileID,0,Binary),
+    close(FileID).
 
 read_tmp(FileName) ->
-	case  file:read_file(FileName) of
-		{ok, Binary} ->
-			Binary;
-		{error, Why} ->
-			?DEBUG("read file error: ~p~n",[Why]),
-			[]
-	end.
+    case  file:read_file(FileName) of
+	{ok, Binary} ->
+	    Binary;
+	{error, Why} ->
+	    ?DEBUG("read file error: ~p~n",[Why]),
+	    []
+    end.
