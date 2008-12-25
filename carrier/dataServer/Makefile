@@ -1,0 +1,26 @@
+.SUFFIXES: .erl .beam .yrl
+
+ERL = erl -boot start_clean -setcookie abc 
+
+all: compile
+
+compile: 
+	erl -make
+
+start-master:compile
+	${ERL} -sname edfs_master -s edfs_master start
+
+start-slave:compile
+	${ERL} -sname edfs_slave -s edfs_datanode_app start
+
+start-slave2:compile
+	${ERL} -sname edfs_slave2 -s edfs_datanode_app start
+
+start-ds:compile
+	${ERL} -sname lt -s ping_server ping -s data_gen_server start 
+
+clean:
+	rm -rf *.beam erl_crash.dump
+	rm -rf test
+
+

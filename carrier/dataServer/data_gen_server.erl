@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 -import(data_worker, [handle_read/3, handle_write/4]).
 -include("../include/egfs.hrl").
--export([start_link/0, stop/0, 
+-export([start/0, stop/0, 
 	 init/1, handle_call/3,
 	 handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
@@ -11,7 +11,8 @@
 %% -define(TABLE, "chunk_table").
 -define(DATA_SERVER, {global, data_server}).
 
-start_link() -> gen_server:start_link(?DATA_SERVER, ?MODULE, [], []).
+start() -> 
+    gen_server:start_link(?DATA_SERVER, ?MODULE, [], []).
 
 stop() ->
     gen_server:cast(?DATA_SERVER, stop).
