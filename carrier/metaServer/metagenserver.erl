@@ -1,5 +1,8 @@
 -module(metagenserver).
 -behaviour(gen_server).
+
+-include("../include/egfs.hrl").
+
 -import(metaserver, [do_open/3, do_allocate_chunk/2, do_register_chunk/4, do_get_chunk/2, do_close/2]).
 
 -export([start/0,stop/0,terminate/2]).
@@ -37,7 +40,10 @@ handle_call({allocatechunk, FileID}, {From, _}, State) ->
 
 handle_call({registerchunk, FileID, ChunkID, ChunkUsedSize, NodeList},
             From, State) ->
+    ?DEBUG("[ChunkUsedSize]: ChunkUsedSize ~p~n", [ChunkUsedSize]),
     Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
+    
+    
     {reply, Reply, State};
 
 handle_call({locatechunk, FileID, ChunkIndex}, From, State) ->
@@ -46,6 +52,10 @@ handle_call({locatechunk, FileID, ChunkIndex}, From, State) ->
 
 handle_call({close, FileID}, {From, _}, State)->
 	Reply = do_close(FileID, From),
+    {reply, Reply, State};
+
+handle_call(_, {From, _}, State)->
+	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 
 handle_cast(stop, State) ->
@@ -69,7 +79,6 @@ handle_info(Info, State) ->
 
 open(FileName,Mode) ->
     gen_server:call(?GM, {open, FileName,Mode}).
-
 
 open2(FileName,Mode) ->
     gen_server:call(?GM,{open2,FileName,Mode}).

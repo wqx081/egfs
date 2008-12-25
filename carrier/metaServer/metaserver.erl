@@ -1,11 +1,11 @@
 -module(metaserver).
 -compile(export_all).
+-include("metaformat.hrl").
 -import(lists, [reverse/1]).
 -import(metaDB,[select_fileid_from_filemeta/1, select_fileid_from_filemeta_s/1, add_filemeta_s_item/2, add_filemeta_item/2]).
 -import(metaDB, [select_all_from_Table/1, select_all_from_filemeta_s/1,select_nodeip_from_chunkmapping/1,select_all_from_filemeta/1]).
+-import(metaDB, [write_to_db/1,delete_from_db/1]).
 
-
--include("metaformat.hrl").
 
 %"model" methods
 % write step 1: open file
@@ -80,12 +80,10 @@ do_allocate_chunk(FileID, _ClientID)->
             RowFileMeta = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize, chunklist=reverse([ChunkID|reverse(ChunkList)]), 
                               createT=CreateT,modifyT=ModifyT,acl=ACL},
             RowChunkMapping = #chunkmapping{chunkid=ChunkID, chunklocations=SelectedHost},
-            F = fun() ->
-                        mnesia:write(RowFileMeta),
-                		mnesia:write(RowChunkMapping)
-                end,
-            mnesia:transaction(F),
-        {ok, ChunkID, SelectedHost}
+           %io:format("do allocate_chunk"),
+            write_to_db(RowFileMeta),
+    		write_to_db(RowChunkMapping),
+        	{ok, ChunkID, SelectedHost}
      end.
 
 % write step 3: register chunk
@@ -100,10 +98,9 @@ do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
 		[{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
             Row = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize+ChunkUsedSize, chunklist=ChunkList,
                               createT=CreateT,modifyT=ModifyT,acl=ACL},
-            F = fun() ->
-                        mnesia:write(Row)
-                end,
-            mnesia:transaction(F),
+            %io:format("chunkusedsize:~p~n",ChunkUsedSize),
+            %io:format("FileSize~p~n",FileSize),
+            write_to_db(Row),
             {ok, []}
     end.
 
@@ -112,11 +109,8 @@ do_close(FileID, _ClientID)->
     % delete client from filesession table  
 	case select_all_from_filemeta_s(FileID) of
         [{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
-    		F = fun() ->
-                mnesia:write({filemeta, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}),
-                mnesia:delete({filemeta_s, FileID})
-        	end,
-			mnesia:transaction(F),
+            write_to_db({filemeta, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}),
+            delete_from_db({filemeta_s, FileID}),
             {ok, []};
         [_] -> 
             {ok, []};
