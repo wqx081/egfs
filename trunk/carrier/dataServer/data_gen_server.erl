@@ -18,6 +18,7 @@ stop() ->
     gen_server:cast(?DATA_SERVER, stop).
 
 init([]) -> 
+    ?DEBUG("data_gen_server is starting ~n", []),
     %% {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
     {ok, server_has_startup}.
 
@@ -29,8 +30,11 @@ handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
     ?DEBUG("[data_server]: write request from client, chkID(~p)~n", [ChunkID]),
     Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist),
     {reply, Reply, N};
-handle_call(Msg, _From, N) ->
-    ?DEBUG("[data_server]: unknown request ~p~n", [Msg]),
+handle_call({echo, Msg}, _From, N) ->
+    ?DEBUG("[data_server]: echo ~p~n", [Msg]),
+    {reply, Msg, N};
+handle_call(Any, _From, N) ->
+    ?DEBUG("[data_server]: unknown request ~p~n", [Any]),
     {noreply, N}.
     
 handle_cast(_Msg, N) -> {noreply, N}.
