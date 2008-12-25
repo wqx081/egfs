@@ -1,8 +1,7 @@
-%% Author: zyb
-%% Created: 2008-12-22
-%% Description: TODO: Add description to metaDB
-
--module(metaDB).
+%% Author: zyb@fit
+%% Created: 2008-12-24
+%% Description: TODO: Add description to query
+-module(queryDB).
 -import(lists, [foreach/2]).
 -import(util,[for/3]).
 %%
@@ -13,11 +12,16 @@
 %%
 %% Exported Functions
 %%
-%-export([]).
 -compile(export_all).
 
 %%
 %% API Functions
+%%
+
+
+
+%%
+%% Local Functions
 %%
 
 do_this_once() ->
@@ -38,26 +42,25 @@ do_this_once() ->
     mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmapping)},
                                        {disc_copies,[node()]}
                                       ]),
-    mnesia:create_table(hostinfo, [{attributes, record_info(fields,hostinfo)},
+
+    mnesia:create_table(hostinfo, [{attributes, record_info(fields, hostinfo)},
                                       {disc_copies,[node()]}
                                      ]),
     
-    mnesia:create_table(metalog, [{attributes, record_info(fields,metalog)},
+    mnesia:create_table(metalog, [{attributes, record_info(fields, metalog)},
                                       {disc_copies,[node()]}
                                      ]),
     
     mnesia:stop().
 
 start_mnesia()->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
-    mnesia:start(),    
-    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog], 14000),
-    logF(LOG).
+    mnesia:start(),
+    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog], 30000).
+
 
 %%
 %% Local Functions
 %%
-
 
 do(Q) ->
     F = fun() -> qlc:e(Q) end,
@@ -65,37 +68,62 @@ do(Q) ->
     Val.
 
 example_tables() ->
-    [
+    [%% The filemeta table
+     %			fileid,  filename, 			filesize, chunklist, createT, modifyT, acl
+     {filemeta, 0,   "egfs://e:/copy/test.txt",3,[0],"today,Dec,12","yestoday,Dec,11","acl"},
+     {filemeta, 1,   "egfs://e:/copy/test.txt",3,[1],"today,Dec,12","yestoday,Dec,11","acl"},
+     
      {hostinfo,data_server,abc,1000000,2000000}
+     
     ].
-clear_tables()->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
-    logF(LOG),
 
+
+
+clear_tables(T)->
+    LOG = #metalog{logtime = calendar:local_time(),logfunc="clear_tables",logarg=[T]},
+    logF(LOG),
+	mnesia:clear_table(T).
+
+clear_tables()->
     mnesia:clear_table(filemeta),
     mnesia:clear_table(filemeta_s),
     mnesia:clear_table(hostinfo),
     mnesia:clear_table(chunkmapping).
 
-
 reset_tables() ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="reset_tables/0",logarg=[]},
-    logF(LOG),
     mnesia:clear_table(filemeta),
     mnesia:clear_table(chunkmapping),
     mnesia:clear_table(filemeta_s),
-    mnesia:clear_table(hostinfo),
+	mnesia:clear_table(clientinfo),
 
     F = fun() ->
 		foreach(fun mnesia:write/1, example_tables())
 		end,
     mnesia:transaction(F).
 
+insert_ten_thousand(X)->
+    mnesia:clear_table(filemeta),
+           
+    util:for(1,X,
+             fun(I)->insert_filemeta_sample(I) end
+			).
+
+insert_filemeta_sample(X)->
+    Row = example_table_filemeta(X),
+    F = fun()->
+                mnesia:write(Row)
+        end,
+    mnesia:transaction(F).
+
+example_table_filemeta(X)->
+%    {filemeta, X,   "e:/copy/test",3,[X],"today,Dec,12","yestoday,Dec,11","acl"}.
+#filemeta{fileid=X,filename=["e:/copy/test",X],filesize=3,chunklist=[X],createT="today,Dec,12",modifyT="yestoday,Dec,11",acl="acl"}.
+
+
+
 %filemeta    {fileid	client}
 %add item
 add_filemeta_item(Fileid, FileName) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="add_filemeta_item/2",logarg=[Fileid,FileName]},
-    logF(LOG),
     Row = #filemeta{fileid=Fileid, filename=FileName, filesize=0, chunklist=[], 
                          createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
     F = fun() ->
@@ -106,8 +134,6 @@ add_filemeta_item(Fileid, FileName) ->
 %filemeta_s    {fileid	client}
 %add item
 add_filemeta_s_item(Fileid, FileName) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="add_filemeta_s_item/2",logarg=[Fileid,FileName]},
-    logF(LOG),
     Row = #filemeta_s{fileid=Fileid, filename=FileName, filesize=0, chunklist=[], 
                          createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
     F = fun() ->
@@ -115,40 +141,37 @@ add_filemeta_s_item(Fileid, FileName) ->
 	end,
     mnesia:transaction(F).
 
-
-
-%% write a record 
-%% 
-write_to_db(X)->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="write_to_db/1",logarg=[X]},
-    logF(LOG),
-    
-    %io:format("inside write to db"),
+%filesession    {fileid	client}
+%add item
+add_filesession_item(Fileid, Client) ->
+    Row = #filesession{fileid=Fileid, client=Client},
     F = fun() ->
-		mnesia:write(X)
+		mnesia:write(Row)
 	end,
     mnesia:transaction(F).
 
-%% delete a record 
-%%
-delete_from_db(X)->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="delete_from_db/1",logarg=[X]},
-    logF(LOG),
-    %io:format("inside delete from db"),
+%remove   while remove . we shall use primary key(first element in mnesia.)
+remove_filesession_item(Fileid) ->
+    Oid = {filesession, Fileid},
     F = fun() ->
-                mnesia:delete(X)
-        end,
+		mnesia:delete(Oid)
+	end,
     mnesia:transaction(F).
-  
 
 %%------------------------------------------------------------------------------------------
 %% select function
 %% all kinds 
 %%------------------------------------------------------------------------------------------ 
-select_all_from_Table(T)->    
+select_all_from_Table(T)->
     do(qlc:q([
               X||X<-mnesia:table(T)
               ])).  %result [L]
+
+%look up.
+select_from_filesession(Fileid) ->    %result [L]
+    do(qlc:q([
+              X||X<-mnesia:table(filesession),X#filesession.fileid =:= Fileid
+              ])).
 
 select_all_from_filemeta(FileID) ->    %result [L]
     do(qlc:q([
@@ -165,31 +188,26 @@ select_all_from_filemeta_s(FileID)->
 % fileid -> binary().
 
 select_fileid_from_filemeta(FileName) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_fileid_from_filemeta/1",logarg=[FileName]},
-    logF(LOG),
-    
     do(qlc:q([X#filemeta.fileid || X <- mnesia:table(filemeta),
                                    X#filemeta.filename =:= FileName                                   
                                    ])).   %result [L]
 
+
 select_fileid_from_filemeta_s(FileName) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_fileid_from_filemeta_s/1",logarg=[FileName]},
-    logF(LOG),
     do(qlc:q([X#filemeta_s.fileid || X <- mnesia:table(filemeta_s),
                                    X#filemeta_s.filename =:= FileName                                   
                                    ])).   %result [L]
 
+
+
 select_nodeip_from_chunkmapping(ChunkID) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_nodeip_from_chunkmapping",logarg=[ChunkID]},
-    logF(LOG),
     do(qlc:q([X#chunkmapping.chunklocations || X <- mnesia:table(chunkmapping),
                                    X#chunkmapping.chunkid =:= ChunkID
              ])).   %result [L]
 
+
 %clear chunks from filemeta
 reset_file_from_filemeta(Fileid) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="reset_file_from_filemeta",logarg=[Fileid]},
-    logF(LOG),
     [{filemeta, FileID, FileName, _, _, TimeCreated, _, ACL }] =
     do(qlc:q([X || X <- mnesia:table(filemeta),
                                    X#filemeta.fileid =:= Fileid                                   
@@ -201,6 +219,19 @@ reset_file_from_filemeta(Fileid) ->
 	end,
     mnesia:transaction(F).
 
+% look_up_filesession(FileID, ClientID) -> w | r | a
+% FileID = binary
+% ClientID = binary
+look_up_filesession(FileID, ClientID) ->
+	case select_from_filesession(FileID) of
+		% file hasn't been opened yet, so open operation is permitted.
+		[clientinfo, [ClientInfo]] when (ClientInfo#clientinfo.clientid =:= ClientID) -> 
+				ClientInfo#clientinfo.modes,
+                {ok, <<FileID:64>>};   
+		% file has been opened by other processes, so open operation is denied.
+		[_] -> {error, "opened already"}
+	end.
+
 
 %% powerfull log function
 logF(X)->
@@ -209,22 +240,7 @@ logF(X)->
 	end,
 mnesia:transaction(F).
 
-%% --------------------------------------------------------------------
-%% Function: 
-%% Description: 
-%% Returns: 
-%% --------------------------------------------------------------------
 
-
-%% --------------------------------------------------------------------
-%% Function: reset_file_from_filemeta/1
-%% Description: 
-%% Argument: Fileid  @type <<binary:64>>
-%% Returns: {ok, State}          |
-%%          {ok, State, Timeout} |
-%%          ignore               |
-%%          {stop, Reason}
-%% --------------------------------------------------------------------
-
-
-%%		TODO:  log of all function. 
+query_testlog(_A,_B)->
+    LOG = #metalog{logtime = calendar:local_time(),logfunc="test_log",logarg=["null",_A,_B]},
+    logF(LOG).

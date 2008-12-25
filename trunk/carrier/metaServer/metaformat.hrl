@@ -10,3 +10,5 @@
 -record(filesession, {fileid, client}).
 -record(hostinfo,{ip,host,freespace,totalspace}).
 
+
+-record(metalog,{logtime,logfunc,logarg}).
