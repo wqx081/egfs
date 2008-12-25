@@ -21,8 +21,12 @@ open(FileName, Mode) ->
 pwrite(FileID, Location, Bytes) ->
     do_pwrite(FileID, Location, Bytes).
 
-pread(FileName, Start, Length) ->
-    do_pread(FileName, Start, Length).
+pread(FileID, Start, Length) ->
+    do_pread(FileID, Start, Length),
+    case read_tmp("/tmp/temp.txt") of
+	Binary ->
+	    Binary
+    end.
 
 delete(FileName) ->
     do_delete(FileName).
@@ -47,3 +51,11 @@ read_tmp(FileName) ->
 	    ?DEBUG("read file error: ~p~n",[Why]),
 	    []
     end.
+
+test_r(FileName, LocalFile, Start, Length) ->
+    FileID =open(FileName, r),
+    Binary =pread(FileID, Start, Length),
+    close(FileID),
+    {ok, Hdl} = file:open(LocalFile, [raw, append, binary]),
+    file:write(Hdl, Binary),
+    file:close(Hdl).
