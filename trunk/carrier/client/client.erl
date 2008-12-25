@@ -6,7 +6,7 @@
 %%% Created :  
 %%%-------------------------------------------------------------------
 -module(client).
--include("egfs.hrl").
+-include("../include/egfs.hrl").
 -import(clientlib, [do_open/2, do_pread/3, do_pwrite/3, do_delete/1, do_close/1]).
 -export([test_w/2,open/2, pwrite/3, pread/3, delete/1, close/1]).
 -compile(export_all).
