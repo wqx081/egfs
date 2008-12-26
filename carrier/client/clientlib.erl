@@ -132,17 +132,17 @@ readchunks(FileID, {Start_addr, End_addr}) ->
     End_ChunkIndex = End_addr div ?CHUNKSIZE,
     Start = Start_addr rem ?CHUNKSIZE,
     End = End_addr rem ?CHUNKSIZE,
-    case file:open("/tmp/temp.txt",[read]) of
+    case file:open("/tmp/FileID.txt",[read]) of
 	{ok,_} ->
 	    ?DEBUG("[Client]:/tmp has the file. Please rename it or remove it.~n",[]);
 	{error, enoent} ->	    
-	    case file:open("/tmp/temp.txt", [raw, append, binary]) of
-		{ok, Hdl} ->
+	    case file:open("/tmp/FileID.txt", [raw, append, binary]) of
+		{ok, Hdl} ->	
 		    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End, Hdl),
 		    file:close(Hdl),
 		    {ok};
 		{error, Why} ->
-		    ?DEBUG("[Client]:Open file error:~p", [Why]),
+	    	    ?DEBUG("[Client]:Open file error:~p", [Why]),
 		    {error, Why}
 	    end;
 	{error, enospc} ->
@@ -165,14 +165,17 @@ loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End, Hdl) when End_Ch
     Result = gen_server:call(?DATAGENSERVER, {readchunk, ChunkID, Start, Size}),
     {ok, Host, Port} = Result,
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    process_flag(trap_exit, true),
+    Parent =self(),
     receive
         {tcp, Socket, Binary} ->
             {ok, Data_Port} = binary_to_term(Binary),
-            %% spawn_link(fun() -> receive_data(Host, Data_Port) end);
-            receive_data(Host, Data_Port, Hdl),
+	    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
+            process_flag(trap_exit, true),
+	    spawn_link(fun() -> loop_recv_packet(Parent, DataSocket, Hdl) end),
+            %receive_data(Host, Data_Port, Hdl),
             Index1 = ChunkIndex + 1,
-            loop_read_chunk(FileID, Index1, End_ChunkIndex, 0, End, Hdl);
+            loop_read_chunk(FileID, Index1, End_ChunkIndex, 0, End, Hdl),
+	    Parent ! {finished ,self()};
         {tcp_close, Socket} ->
             ?DEBUG("[Client]:read file closed~n",[]),
 	    void
@@ -181,21 +184,23 @@ loop_read_chunk(_, _, _, _, _,_) ->
     ?DEBUG("[Client]:read file closed~n",[]),
     void.
   
-receive_data(Host, Port, Hdl) ->
-     %?DEBUG("data port:~p~n", [Port]),
-     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),   
-     loop_recv(DataSocket, Hdl).  
+%receive_data(Parent, Host, Port, Hdl) ->
+%     %?DEBUG("data port:~p~n", [Port]),
+%     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),   
+%     loop_recv_packet(Parent, DataSocket, Hdl).  
 
-loop_recv(DataSocket, Hdl) ->
+loop_recv_packet(Parent, DataSocket, Hdl) ->
     receive
 	{tcp, DataSocket, Data} ->
 	    write_data(Data, Hdl),
-	    loop_recv(DataSocket, Hdl);
+	    loop_recv_packet(Parent, DataSocket, Hdl);
 	{tcp_closed, DataSocket} ->
 	    ?DEBUG("-->[Client]:read chunk over!~n",[]);
+	    %Parent ! {finished, self()};
 	{client_close, _Why} ->
 	    %?DEBUG("[Client]:client close the datasocket~n",[]),
 	    gen_tcp:close(DataSocket)
+	    %Parent ! {finished, self()}
     end.
 
 write_data(Data, Hdl) ->
