@@ -19,6 +19,7 @@ init(_Arg) ->
     {ok, []}.
 
 start() ->
+    metaDB:start_mnesia(),
     gen_server:start_link(?GM, metagenserver, [], []).
 
 stop() ->
