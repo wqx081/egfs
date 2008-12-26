@@ -7,7 +7,10 @@
 %%%-------------------------------------------------------------------
 -module(client).
 -include("../include/egfs.hrl").
--import(clientlib, [do_open/2, do_pread/3, do_pwrite/3, do_delete/1, do_close/1]).
+-import(clientlib, 
+	[do_open/2, do_pread/3, 
+	do_pwrite/3, do_delete/1, 
+	do_close/1, get_file_name/1]).
 -export([test_w/2,open/2, pwrite/3, pread/3, delete/1, close/1]).
 -compile(export_all).
 
@@ -23,11 +26,8 @@ pwrite(FileID, Location, Bytes) ->
 
 pread(FileID, Start, Length) ->
     do_pread(FileID, Start, Length),
-
-    case read_tmp("/tmp/FileID.txt") of
-	Binary ->
-	    Binary
-    end.
+    FileName = get_file_name(FileID),
+    read_tmp(FileName).
 
 delete(FileName) ->
     do_delete(FileName).
@@ -49,14 +49,12 @@ read_tmp(FileName) ->
 	{ok, Binary} ->
 	    Binary;
 	{error, Why} ->
-	    ?DEBUG("read file error: ~p~n",[Why]),
+	    ?DEBUG("read file(~p) error: ~p, ~n",[FileName, Why]),
 	    []
     end.
 
 test_r(FileName, LocalFile, Start, Length) ->
-    FileID =open(FileName, r),
-    Binary =pread(FileID, Start, Length),
+    FileID = open(FileName, r),
+    Binary = pread(FileID, Start, Length),
     close(FileID),
-    {ok, Hdl} = file:open(LocalFile, [raw, append, binary]),
-    file:write(Hdl, Binary),
-    file:close(Hdl).
+    file:write_file(LocalFile, Binary).
