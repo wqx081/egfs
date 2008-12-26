@@ -132,21 +132,17 @@ readchunks(FileID, {Start_addr, End_addr}) ->
     End_ChunkIndex = End_addr div ?CHUNKSIZE,
     Start = Start_addr rem ?CHUNKSIZE,
     End = End_addr rem ?CHUNKSIZE,
-    case file:open("/tmp/FileID.txt",[read]) of
-	{ok,_} ->
-	    ?DEBUG("[Client]:/tmp has the file. Please rename it or remove it.~n",[]);
-	{error, enoent} ->	    
-	    case file:open("/tmp/FileID.txt", [raw, append, binary]) of
-		{ok, Hdl} ->	
-		    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End, Hdl),
-		    file:close(Hdl),
-		    {ok};
-		{error, Why} ->
-	    	    ?DEBUG("[Client]:Open file error:~p", [Why]),
-		    {error, Why}
-	    end;
-	{error, enospc} ->
-	    ?DEBUG("[Client]:There is no space on the device!!",[])
+    <<Int1:64>> = FileID,
+    FileName = lists:append(["/tmp/", integer_to_list(Int1)]), 
+    case file:open(FileName, [raw, append, binary]) of
+	{ok, Hdl} ->	
+	    file:truncate(Hdl),
+	    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End, Hdl),
+	    file:close(Hdl),
+	    {ok};
+	{error, Why} ->
+	    ?DEBUG("[Client]:Open file error:~p", [Why]),
+	    {error, Why}
     end.
     
 
