@@ -63,28 +63,37 @@ do_allocate_chunk(FileID, _ClientID)->
     
     Res = select_all_from_Table(hostinfo),  % [{}{}{}{}{}]    
     SizeOfRes = length(Res),
-         
-    random:seed(),
-    Select = random:uniform(SizeOfRes),
-    HostRecord = lists:nth(Select,Res),
-	SelectedHost = HostRecord#hostinfo.ip,
-    % SelectedHost = erlang:element(1,lists:nth(Select,Res)),
     
-    % insert chunk into filemeta_s_table
-    case select_all_from_filemeta_s(FileID) of				
-		[]->            
-            {error,"file does not exist"};
+    % if hostinfo table is empty, report error to client
+    if 
+        % hostinfo table is empty!!! error occurs!
+        (SizeOfRes =< 0) ->
+            {erroe, "no data server active"};
         
-		[{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
+        % hostinfo table is not empty
+        true ->
+    		random:seed(),
+    		Select = random:uniform(SizeOfRes),
+    		HostRecord = lists:nth(Select,Res),
+			SelectedHost = HostRecord#hostinfo.ip,
+    		% SelectedHost = erlang:element(1,lists:nth(Select,Res)),
+    
+    		% insert chunk into filemeta_s_table
+    		case select_all_from_filemeta_s(FileID) of				
+				[]->            
+            		{error,"file does not exist"};
+        
+				[{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
             
-            RowFileMeta = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize, chunklist=reverse([ChunkID|reverse(ChunkList)]), 
-                              createT=CreateT,modifyT=ModifyT,acl=ACL},
-            RowChunkMapping = #chunkmapping{chunkid=ChunkID, chunklocations=SelectedHost},
-           %io:format("do allocate_chunk"),
-            write_to_db(RowFileMeta),
-    		write_to_db(RowChunkMapping),
-        	{ok, ChunkID, SelectedHost}
-     end.
+            		RowFileMeta = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize, chunklist=reverse([ChunkID|reverse(ChunkList)]), 
+                    		          createT=CreateT,modifyT=ModifyT,acl=ACL},
+            		RowChunkMapping = #chunkmapping{chunkid=ChunkID, chunklocations=SelectedHost},
+           			%io:format("do allocate_chunk"),
+            		write_to_db(RowFileMeta),
+    				write_to_db(RowChunkMapping),
+        			{ok, ChunkID, SelectedHost}
+     		end
+    end.
 
 % write step 3: register chunk
 do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
