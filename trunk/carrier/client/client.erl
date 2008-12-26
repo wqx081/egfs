@@ -23,7 +23,7 @@ pwrite(FileID, Location, Bytes) ->
 
 pread(FileID, Start, Length) ->
     do_pread(FileID, Start, Length),
-    case read_tmp("/tmp/temp.txt") of
+    case read_tmp("/tmp/FileID.txt") of
 	Binary ->
 	    Binary
     end.
