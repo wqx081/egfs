@@ -1,0 +1,299 @@
+%%%-------------------------------------------------------------------
+%%% File    : client.erl
+%%% Author  : 
+%%% Description : the client template:offer open/write/read/del function
+%%%
+%%% Created :  
+%%%-------------------------------------------------------------------
+-module(clientlib).
+-include_lib("kernel/include/file.hrl").
+-include("../include/egfs.hrl").
+-export([do_open/2, do_pread/3, do_pwrite/3, do_delete/1, do_close/1]).
+-compile(export_all).
+-define(STRIP_SIZE, 8192).   % 8*1024
+
+do_open(FileName, Mode) ->
+    case gen_server:call(?METAGENSERVER, {open, FileName, Mode}) of
+        {ok, FileID} ->
+            FileID;
+        {error, Why} ->
+	    ?DEBUG("[Client]:Open file error:~p~n",[Why])
+    end.
+
+do_pread(FileID, Start, Length) ->
+    %{ok, FileID} = do_open(FileName, r),
+    Start_addr = Start,
+    End_addr = Start + Length,
+    readchunks(FileID, {Start_addr, End_addr}).
+    %{ok}.
+
+do_delete(FileName) -> 
+    case gen_server:call(?METAGENSERVER, {delete, FileName}) of
+        {ok,_} -> 
+	    {ok};
+        {error, Why} -> 
+	    ?DEBUG("[Client]:Delete file error~p~n",[Why]),
+	    {error,Why}
+    end.
+
+do_close(FileID) ->
+    ?DEBUG("[Client]:Send Close Msg~n",[]), 
+    case gen_server:call(?METAGENSERVER, {close, FileID}) of
+        {ok,_} ->
+	    ?DEBUG("[Client]:Close file ok~n",[]), 
+	    {ok, "you close the file!"};
+        {error, Why} -> 
+	    ?DEBUG("[Client]:Close file error~p~n",[Why]),
+	    {error,Why}
+    end.
+
+%compute the chunk index
+do_pwrite(FileID, Location, Bytes) ->
+    case Location rem ?CHUNKSIZE of
+        0 -> 
+	    ChunkIndex = Location div ?CHUNKSIZE;
+        _Any -> 
+	    ChunkIndex = Location div ?CHUNKSIZE + 1
+    end,
+	
+    Begin = Location rem ?CHUNKSIZE,
+    Size = size(Bytes),
+    ?DEBUG("[Client]:do_pwrite() Begin:~p Size:~p~n",[Begin,Size]),
+	
+    case (Begin + Size) > ?CHUNKSIZE of
+	true->
+	    W_Size = ?CHUNKSIZE - Begin,
+
+	    {X,Y} = split_binary(Bytes, W_Size),
+	    do_pwrite_it(FileID, ChunkIndex, X),	
+	    do_pwrite(FileID, ChunkIndex * ?CHUNKSIZE, Y);
+	false ->
+	    do_pwrite_it(FileID, ChunkIndex, Bytes)
+    end.
+
+do_pwrite_it(FileID, ChunkIndex, Bytes) ->		
+    %seek the ChunkID based on the FileID and ChunkIndex
+    {ok, ChunkID, NodeList} = seek_chunk(FileID, ChunkIndex),	
+    %seek the physics host and port based on the FileID, ChunkIndex, and ChunkID 
+    {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {writechunk, FileID, ChunkIndex, ChunkID, NodeList}),
+    %create a control link with the host and port.
+    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    %loop receive the message from control link.
+    loop_controllink_receive(Host, Socket, Bytes).
+
+loop_controllink_receive(Host, Socket, Bytes) ->
+    receive
+        {tcp, Socket, Binary} ->
+            {ok, Data_Port} = binary_to_term(Binary),
+	    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
+	    process_flag(trap_exit, true),
+	    Parent = self(),
+	    spawn_link(fun() -> createdatalink(Parent, DataSocket, Bytes) end),
+            loop_controllink_receive(Host, Socket, Bytes);
+        {tcp_close, Socket} ->
+            ?DEBUG("[Client] tcp_close, write file closed~n",[]);
+	{finish, Child} ->
+	    ?DEBUG("[Client]:write finish ~p~n", [Child]),
+	    %loop_controllink_receive(Host, Socket, Bytes),
+	    gen_tcp:send(Socket, term_to_binary({finish, "info"}))
+	    %gen_tcp:close(Socket)
+    end.
+
+createdatalink(Parent, DataSocket, Bytes) when size(Bytes) > ?STRIP_SIZE   ->
+    {X,Y} = split_binary(Bytes, ?STRIP_SIZE),
+    gen_tcp:send(DataSocket, X),
+    createdatalink(Parent, DataSocket,Y);	
+createdatalink(Parent, DataSocket, Bytes) when size(Bytes) > 0->
+    gen_tcp:send(DataSocket, Bytes),
+    gen_tcp:close(DataSocket),
+    Parent ! {finish, self()};
+createdatalink(Parent, DataSocket, _Bytes) ->
+    gen_tcp:close(DataSocket),
+    Parent ! {finish, self()}.
+
+seek_chunk(FileID, ChunkIndex) ->
+    case gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}) of
+	{ok, C1, N1} ->
+	    ?DEBUG("[Client]:Line=~p locate chunkID=~p, NodeList=~p~n",[?LINE, C1, N1]),
+	    {ok, C1, N1};	
+	{error,_} ->
+	    case gen_server:call(?METAGENSERVER, {allocatechunk, FileID}) of
+		{ok, C2, N2} ->
+		    ?DEBUG("[Client]:Line=~p  allocate chunkID=~p,NodeList=~p~n",[?LINE, C2, N2]),
+		    {ok, C2, N2};
+		{error, Why} ->
+		    {error, Why}
+	    end
+    end.
+
+
+
+readchunks(FileID, {Start_addr, End_addr}) ->
+    Start_ChunkIndex = Start_addr div ?CHUNKSIZE,
+    End_ChunkIndex = End_addr div ?CHUNKSIZE,
+    Start = Start_addr rem ?CHUNKSIZE,
+    End = End_addr rem ?CHUNKSIZE,
+    <<Int1:64>> = FileID,
+    FileName = lists:append(["/tmp/", integer_to_list(Int1)]), 
+    case file:open(FileName, [raw, append, binary]) of
+	{ok, Hdl} ->	
+	    file:truncate(Hdl),
+	    loop_read_chunk(FileID, Start_ChunkIndex, End_ChunkIndex, Start, End, Hdl),
+	    file:close(Hdl),
+	    {ok};
+	{error, Why} ->
+	    ?DEBUG("[Client]:Open file error:~p", [Why]),
+	    {error, Why}
+    end.
+    
+    
+
+loop_read_chunk(FileID, ChunkIndex, End_ChunkIndex, Start, End, Hdl) when End_ChunkIndex >=ChunkIndex ->
+    case  End_ChunkIndex-ChunkIndex  of
+        0  ->
+            Size = End - Start;
+        _Any ->
+            Size = ?CHUNKSIZE - Start
+    end,
+
+    ?DEBUG("[Client]:ChunkIndex:~p, Size is:~p", [ChunkIndex,Size]),
+    {ok, ChunkID,_NodeList} = gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}),
+    %NodeID=hd(NodeList),
+    %{ok,DataServer}=inet:getaddr(NodeID,inet4),
+    Result = gen_server:call(?DATAGENSERVER, {readchunk, ChunkID, Start, Size}),
+    {ok, Host, Port} = Result,
+    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    Parent =self(),
+    receive
+        {tcp, Socket, Binary} ->
+            {ok, Data_Port} = binary_to_term(Binary),
+	    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
+            process_flag(trap_exit, true),
+	    spawn_link(fun() -> loop_recv_packet(Parent, DataSocket, Hdl) end),
+            %receive_data(Host, Data_Port, Hdl),
+            Index1 = ChunkIndex + 1,
+            loop_read_chunk(FileID, Index1, End_ChunkIndex, 0, End, Hdl),
+	    Parent ! {finished ,self()};
+        {tcp_close, Socket} ->
+            ?DEBUG("[Client]:read file closed~n",[]),
+	    void
+    end;
+loop_read_chunk(_, _, _, _, _,_) ->
+    ?DEBUG("[Client]:read file closed~n",[]),
+    void.
+  
+%receive_data(Parent, Host, Port, Hdl) ->
+%     %?DEBUG("data port:~p~n", [Port]),
+%     {ok, DataSocket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),   
+%     loop_recv_packet(Parent, DataSocket, Hdl).  
+
+loop_recv_packet(Parent, DataSocket, Hdl) ->
+    receive
+	{tcp, DataSocket, Data} ->
+	    write_data(Data, Hdl),
+	    loop_recv_packet(Parent, DataSocket, Hdl);
+	{tcp_closed, DataSocket} ->
+	    ?DEBUG("-->[Client]:read chunk over!~n",[]);
+	    %Parent ! {finished, self()};
+	{client_close, _Why} ->
+	    %?DEBUG("[Client]:client close the datasocket~n",[]),
+	    gen_tcp:close(DataSocket)
+	    %Parent ! {finished, self()}
+    end.
+
+write_data(Data, Hdl) ->
+    file:write(Hdl, Data).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%          tools 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+get_file_handle(FileID) ->
+    <<Int1:64>> = FileID,
+    FileName = lists:append(["/tmp/", integer_to_list(Int1)]), 
+    case file:open(FileName, [raw, append, binary]) of
+	{ok, Hdl} ->	
+	    file:truncate(Hdl),
+	    {ok, Hdl};
+	{error, Why} ->
+	    ?DEBUG("[Client]:Open file error:~p", [Why]),
+	    {error, Why}
+    end.
+
+get_chunk_info(FileID, ChunkIndex) ->
+    gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}).
+	    
+get_new_chunk(FileID, ChunkIndex) ->
+    gen_server:call(?METAGENSERVER, {allocatechunk, FileID}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%          read
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+read_them(FileID, {Start, End}) ->
+    ChunkIndex = Start div ?CHUNKSIZE, 
+    {ok, Hdl} = get_file_handle(FileID),
+    loop_read_chunks(FileID, ChunkIndex, Start, End, Hdl),
+    file:close(Hdl).
+
+loop_read_chunks(FileID, ChunkIndex, Start, End, Hdl) when Start < End ->
+    {ok, ChunkID, _Nodelist} = get_chunk_info(FileID, ChunkIndex),
+    Begin = Start rem ?CHUNKSIZE,
+    Size1 = ?CHUNKSIZE - Begin,
+
+    if 
+	Size1 + Start =< End ->
+	    Size = Size1;
+	true ->
+	    Size = End - Start
+    end,
+
+    read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size, Hdl),
+    ChunkIndex2 = ChunkIndex + 1,
+    Start2 = Start + Size,
+    loop_read_chunks(FileID, ChunkIndex2, Start2, End, Hdl);
+loop_read_chunks(_, _, _, _, Hdl) ->
+    ?DEBUG("all chunks read over!~n", []),
+    ok.
+
+read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size, Hdl) ->
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%          write 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+write_them(FileID, Start, Bytes) ->
+    ChunkIndex = Start div ?CHUNKSIZE,
+    Size = size(Bytes),
+    loop_write_chunks(FileID, ChunkIndex, Start, Size, Bytes).
+
+loop_write_chunks(FileID, ChunkIndex, Start, Len, Bytes) when Len > 0 ->
+    Begin = Start rem ?CHUNKSIZE,
+    Size1 = ?CHUNKSIZE - Begin,
+
+    if
+	Size1 > Len ->
+	    Size = Len;
+	true ->
+	    Size = Size1
+    end,
+
+    case Begin of
+	0 ->
+	    {ok, ChunkID, _Nodelist} = get_new_chunk(FileID, ChunkIndex),
+	Any ->
+	    {ok, ChunkID, _Nodelist} = get_chunk_info(FileID, ChunkIndex)
+    end,
+
+    {Part, Left} = split_binary(Bytes, Size),
+    write_a_chunk(FileID, ChunkIndex, Begin, Size, Part),
+
+    Start2 = Start + Size,
+    Len2 = Len - Size,
+    loop_write_chunks(FileID, ChunkIndex, Start2, Len2, Left);
+loop_write_chunks(_, _, _, _, _) ->
+    ?DEBUG("all chunks has been written~n", []),
+    ok.
+
+write_a_chunk(FileID, ChunkIndex, Begin, Size, Content) ->
+    ok.
