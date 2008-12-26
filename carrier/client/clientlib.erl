@@ -8,7 +8,9 @@
 -module(clientlib).
 -include_lib("kernel/include/file.hrl").
 -include("../include/egfs.hrl").
--export([do_open/2, do_pread/3, do_pwrite/3, do_delete/1, do_close/1]).
+-export([do_open/2, do_pread/3, 
+	 do_pwrite/3, do_delete/1, 
+	 do_close/1, get_file_name/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
 
@@ -131,13 +133,18 @@ seek_chunk(FileID, ChunkIndex) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          tools 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_file_name(FileID) ->
+    <<Int1:64>> = FileID,
+    lists:append(["/tmp/", integer_to_list(Int1)]). 
+
+delete_file(FileID) ->
+    FileName = get_file_name(FileID), 
+    file:delete(FileName).
 
 get_file_handle(write, FileID) ->
-    <<Int1:64>> = FileID,
-    FileName = lists:append(["/tmp/", integer_to_list(Int1)]), 
+    FileName = get_file_name(FileID), 
     case file:open(FileName, [raw, append, binary]) of
 	{ok, Hdl} ->	
-%	    file:truncate(Hdl),
 	    {ok, Hdl};
 	{error, Why} ->
 	    ?DEBUG("[Client]:Open file error:~p", [Why]),
@@ -145,33 +152,20 @@ get_file_handle(write, FileID) ->
     end.
 
 get_chunk_info(FileID, ChunkIndex) -> 
-    ?DEBUG("[Client]:go to lacate ~p~n",[?LINE]),
-    case gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}) of
-	{ok, ChunkID, Nodelist} ->
-	    {ok, ChunkID, Nodelist};
-	{error,_} ->
-	    {error}
-    end.
+    gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}).
 	    
 get_new_chunk(FileID, _ChunkIndex) ->
-    ?DEBUG("[Client]:go to allocate ~p~n",[?LINE]),
-    case gen_server:call(?METAGENSERVER, {allocatechunk, FileID}) of
-	{ok, ChunkID, Nodelist} ->
-	    {ok, ChunkID, Nodelist};
-	{error,_} ->
-	    {error}
-    end.
+    gen_server:call(?METAGENSERVER, {allocatechunk, FileID}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          read
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 read_them(FileID, {Start, End}) ->
     ChunkIndex = Start div ?CHUNKSIZE, 
-    {ok, Hdl} = get_file_handle(write, FileID),
-    loop_read_chunks(FileID, ChunkIndex, Start, End, Hdl),
-    file:close(Hdl).
+    delete_file(FileID),
+    loop_read_chunks(FileID, ChunkIndex, Start, End).
 
-loop_read_chunks(FileID, ChunkIndex, Start, End, Hdl) when Start < End ->
+loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
     {ok, ChunkID, _Nodelist} = get_chunk_info(FileID, ChunkIndex),
     Begin = Start rem ?CHUNKSIZE,
     Size1 = ?CHUNKSIZE - Begin,
@@ -183,52 +177,43 @@ loop_read_chunks(FileID, ChunkIndex, Start, End, Hdl) when Start < End ->
 	    Size = End - Start
     end,
 
-    read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size, Hdl),
+    read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size),
     ChunkIndex2 = ChunkIndex + 1,
     Start2 = Start + Size,
-    loop_read_chunks(FileID, ChunkIndex2, Start2, End, Hdl);
-    %file:close(Hdl);
-loop_read_chunks(_, _, _, _, _) ->
+    loop_read_chunks(FileID, ChunkIndex2, Start2, End);
+loop_read_chunks(_, _, _, _) ->
     ?DEBUG("all chunks read over!~n", []).
 
-read_a_chunk(_FileID, _ChunkInedx, ChunkID, Begin, Size, Hdl) when Size =< ?CHUNKSIZE ->
-    ?DEBUG("[Client, ~p]:~p--~p ~n",[?LINE, Begin, Size]),
-     %{ok, Hdl} = get_file_handle(write, FileID),
+read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE ->
     {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {readchunk, ChunkID, Begin, Size}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    Parent =self(),
+    Parent = self(),
     receive
         {tcp, Socket, Binary} ->
             {ok, Data_Port} = binary_to_term(Binary),
-	    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
-	    ?DEBUG("[Client]:goto this~p--~p, ~p",[Data_Port,DataSocket, ?LINE]),
-            process_flag(trap_exit, true),
-	    Child =spawn_link(fun() -> loop_recv_packet(Parent, DataSocket, Hdl, 0) end),
-	    loop_receive_ctrl(Socket, Child),	    
-            ?DEBUG("[Client]:recive control finished~p~n",[?LINE]),
-	    Hdl;
+	    process_flag(trap_exit, true),
+	    Child = spawn_link(fun() -> receive_it(Parent, Host, Data_Port, FileID) end),
+	    loop_receive_ctrl(Socket, Child);  
 	{tcp_close, Socket} ->
             ?DEBUG("[Client]:read file closed~n",[]),
 	    void
     end;    
-read_a_chunk(_, _, _, _,_, _) ->
-    ?DEBUG("[Client]:ERROR:Size is larger than CHUNKSIZE~n",[]),
+read_a_chunk(_, _, _, _,_) ->
     void.
 
-    
 loop_receive_ctrl(Socket, Child) ->
     receive
 	{finish, Child, _Len} ->	
-	    ?DEBUG("[Client]:recive packets finished~n",[]);
+	    ?DEBUG("[Client, ~p]:recive packets finished~n",[?LINE]);
         {tcp, Socket, Binary} -> 
             Term = binary_to_term(Binary),
 	    case Term of
 		{stop, Why} ->	    	    
-		    ?DEBUG("[Client]:stop send from dataserver~n",[]),
+		    ?DEBUG("[Client, ~p]:stop send from dataserver~n",[?LINE]),
 		    Child ! {stop, self(), Why};
 		    %% exit(Child, kill);
 		{finish, _, _Len} ->
-		    ?DEBUG("[Client]:stop send from dataserver~n",[]),
+		    ?DEBUG("[Client, ~p]:finish send from dataserver~n",[?LINE]),
 		    void;
 		_Any ->
 		    loop_receive_ctrl(Socket, Child)
@@ -236,20 +221,24 @@ loop_receive_ctrl(Socket, Child) ->
 	{error, Child, Why} ->
 	    ?DEBUG("[Client]:data receive socket error!~p~n",[Why]);
 	_Any ->
-	    %?DEBUG("[Client, ~p]:unknow messege!~n",[?LINE]),
+	    ?DEBUG("[Client, ~p]:unknow messege!~n",[?LINE]),
 	    loop_receive_ctrl(Socket, Child)
     end.
 
+receive_it(Parent, Host, Data_Port, FileID) ->
+    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
+    {ok, Hdl} = get_file_handle(write, FileID),
+    loop_recv_packet(Parent, DataSocket, Hdl, 0),
+    file:close(Hdl).
+    
 loop_recv_packet(Parent, DataSocket, Hdl, Len) ->
-    ?DEBUG("[Client, ~p]: recv process loop~n", [?LINE]),
     receive
 	{tcp, DataSocket, Data} ->
-	    ?DEBUG("[Client]: ~p~n", [?LINE]),
 	    write_data(Data, Hdl),
 	    Len2 = Len + size(Data),
 	    loop_recv_packet(Parent, DataSocket, Hdl, Len2);
 	{tcp_closed, DataSocket} ->
-	    ?DEBUG("-->[Client]:read chunk over! ~p~n",[?LINE]),
+	    ?DEBUG("[Client]:read chunk over! ~p~n",[?LINE]),
 	    Parent ! {finish, self(), Len};
 	{stop, Parent, _Why} ->
 	    ?DEBUG("[Client]:client close the datasocket~n",[]),
@@ -260,5 +249,4 @@ loop_recv_packet(Parent, DataSocket, Hdl, Len) ->
     end.
 
 write_data(Data, Hdl) ->
-    ?DEBUG("[Client]:you are writing data",[]),
     file:write(Hdl, Data).
