@@ -18,8 +18,8 @@ stop() ->
     gen_server:cast(?DATA_SERVER, stop).
 
 init([]) -> 
-    process_flag(trap_exit, true),
-    ?DEBUG("data_gen_server is starting ~n", []),
+    %%process_flag(trap_exit, true),
+    ?DEBUG("~p is starting ~n", [?MODULE]),
     %% {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
     {ok, server_has_startup}.
 
