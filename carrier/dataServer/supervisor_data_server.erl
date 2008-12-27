@@ -18,7 +18,6 @@ start_in_shell() ->
     unlink(Pid).
 
 start_link(Args) ->
-    ?DEBUG("data server supervisor start_link []", []),
     supervisor:start_link(?NAME, ?MODULE, Args).
 
 init([]) ->
