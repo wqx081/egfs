@@ -23,7 +23,7 @@ start-sup:compile
 	${ERL} -sname lt -s ping_server ping -s supervisor_data_server start_in_shell 
 
 start-ds:compile
-	${ERL} -sname lt -s ping_server ping -s data_gen_server start 
+	${ERL} -sname lt -config elog.config -s ping_server ping -s data_gen_server start 
 
 clean:
 	rm -rf *.beam erl_crash.dump
