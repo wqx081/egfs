@@ -2,19 +2,27 @@
 -compile(export_all).
 -include("metaformat.hrl").
 -import(lists, [reverse/1]).
--import(metaDB,[select_fileid_from_filemeta/1, select_fileid_from_filemeta_s/1, add_filemeta_s_item/2, add_filemeta_item/2]).
--import(metaDB, [select_all_from_Table/1, select_all_from_filemeta_s/1,select_nodeip_from_chunkmapping/1,select_all_from_filemeta/1]).
--import(metaDB, [write_to_db/1,delete_from_db/1]).
+
+-import(metaDB,[select_fileid_from_filemeta/1, 
+                select_fileid_from_filemeta_s/1, 
+                add_filemeta_s_item/2, 
+                add_filemeta_item/2,
+                select_all_from_Table/1, 
+                 select_all_from_filemeta_s/1,
+                 select_nodeip_from_chunkmapping/1,
+                 select_all_from_filemeta/1,
+                write_to_db/1,delete_from_db/1]).
 
 
-%"model" methods
-% write step 1: open file
+%%% "model" methods
+
+%% write step 1: open file
 do_open(Filename, Modes, _ClientID)->
     % Modes 
     case Modes of
         r-> do_read_open(Filename, _ClientID);
         w-> do_write_open(Filename, _ClientID);
-%%      	a-> do_append_open(Filename, ClientID);
+%      	a-> do_append_open(Filename, ClientID);
         _-> {error, "unkown open mode"}
     end.
  
@@ -55,7 +63,7 @@ do_write_open(Filename, _ClientID)->
 			{error, "file exist"}
     end.
 
-% write step 2: allocate chunk
+%% write step 2: allocate chunk
 do_allocate_chunk(FileID, _ClientID)-> 
     % allocate data chunk
     {_, HighTime, LowTime}=now(),
@@ -82,12 +90,12 @@ do_allocate_chunk(FileID, _ClientID)->
     		case select_all_from_filemeta_s(FileID) of				
 				[]->            
             		{error,"file does not exist"};
-        
-				[{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
-            
-            		RowFileMeta = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize, chunklist=reverse([ChunkID|reverse(ChunkList)]), 
-                    		          createT=CreateT,modifyT=ModifyT,acl=ACL},
-            		RowChunkMapping = #chunkmapping{chunkid=ChunkID, chunklocations=SelectedHost},
+                
+                [FileMetaS]->
+                    ChunkList = FileMetaS#filemeta_s.chunklist++[ChunkID],
+                    RowFileMeta = FileMetaS#filemeta_s{chunklist = ChunkList},
+            		RowChunkMapping = #chunkmapping{chunkid=ChunkID, 
+                                                    chunklocations=SelectedHost},
            			%io:format("do allocate_chunk"),
             		write_to_db(RowFileMeta),
     				write_to_db(RowChunkMapping),
@@ -95,7 +103,7 @@ do_allocate_chunk(FileID, _ClientID)->
      		end
     end.
 
-% write step 3: register chunk
+%% write step 3: register chunk
 do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
     % register chunk    
     % update filesize inf filemeta_s table
@@ -104,16 +112,14 @@ do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
 		[]->
             {error,"file does not exist"};
         
-		[{filemeta_s, FileID, FileName, FileSize, ChunkList, CreateT, ModifyT, ACL}]->
-            Row = #filemeta_s{fileid=FileID, filename=FileName, filesize=FileSize+ChunkUsedSize, chunklist=ChunkList,
-                              createT=CreateT,modifyT=ModifyT,acl=ACL},
-            %io:format("chunkusedsize:~p~n",ChunkUsedSize),
-            %io:format("FileSize~p~n",FileSize),
+		[FileMetaS]->
+            FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
+            Row = FileSize#filemeta_s{filesize = FileSize},
             write_to_db(Row),
             {ok, []}
     end.
 
-% write step 4: close file
+%% write step 4: close file
 do_close(FileID, _ClientID)->
     % delete client from filesession table  
 	case select_all_from_filemeta_s(FileID) of
@@ -127,15 +133,16 @@ do_close(FileID, _ClientID)->
             {ok, []}
     end.
 
-% read step 1: open file == wirte step1
-% read step 2: get chunk for further reading
+%% read step 1: open file == wirte step1
+%% read step 2: get chunk for further reading
 do_get_chunk(FileID, ChunkIdx)->
     % mock return
     % insert chunk into filemeta_s_table
     case select_all_from_filemeta(FileID) of				
 		[]->
             {error,"file does not exist"};
-		[{filemeta, _FileID, _FileName, _FileSize, ChunkList, _CreateT, _ModifyT, _ACL}]->
+        
+		[#filemeta{chunklist = ChunkList}]->
             if 
                 (length(ChunkList) =< ChunkIdx) ->
 					{error, "chunkindex is larger than chunklist size"};
