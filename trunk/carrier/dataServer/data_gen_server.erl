@@ -19,7 +19,7 @@ stop() ->
 
 init([]) -> 
     %%process_flag(trap_exit, true),
-    ?DEBUG("~p is starting ~n", [?MODULE]),
+    ?DEBUG("~p is on ~n", [?MODULE]),
     %% {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
     {ok, server_has_startup}.
 
