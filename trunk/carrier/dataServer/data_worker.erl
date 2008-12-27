@@ -16,7 +16,7 @@ handle_read(ChunkID, Begin, Size) ->
 
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
-	    ?DEBUG("[data_server]: read boundary invalid ~p~n", [Begin]),
+	    ?DEBUG("[data_server, ~p]: read boundary invalid ~p~n", [?LINE, Begin]),
 	    Reply = {error, "invalid read args", []};
 	true ->
 	    if 
@@ -51,13 +51,13 @@ read_process(Listen, ChunkID, Begin, End) ->
 loop_read_control(Socket, Child, State) ->
     receive 
 	{finish, Child, Len} ->
-	    ?DEBUG("[data_server]: read finish ~p Bytes~n", [Len]),
+	    ?DEBUG("[data_server, ~p]: read finish ~p Bytes~n", [?LINE, Len]),
 	    gen_tcp:close(Socket);
 	{tcp, Socket, Binary} ->
 	    Term = binary_to_term(Binary),
 	    case Term of 
 		{stop, _Why} ->
-		    ?DEBUG("[data_server]: stop msg from client ", []),
+		    ?DEBUG("[data_server, ~p]: stop msg from client ", [?LINE]),
 		    %% Child ! {stop, Why};
 		    exit(Child, kill);
 		_Any ->
@@ -107,44 +107,44 @@ write_process(FileID, ChunkIndex, Listen, ChunkID) ->
 
     loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, 0),
 
-    ?DEBUG("write control process finished !~n", []).
+    ?DEBUG("[data_server, ~p]: write control process finished !~n", [?LINE]).
 
 loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
     receive
 	{finish, Child, Len} ->
 	    %% {ok, _Info} = check_it(Socket, ChunkID, Len),
-	    ?DEBUG("[data_server]: write transfer finish, ~pBytes~n", [Len]),
+	    ?DEBUG("[data_server, ~p]: write transfer finish, ~pBytes~n", [?LINE, Len]),
 	    {ok, _Info} = report_metaServer(FileID, ChunkIndex, ChunkID, Len);
 	{tcp, Socket, Binary} ->
-	    ?DEBUG("[data_server]: tcp, socket, binary~n", []),
+	    ?DEBUG("[data_server, ~p]: tcp, socket, binary~n", [?LINE]),
 	    Term = binary_to_term(Binary),
 	    case Term of 
 		{stop, _Why} ->
-		    ?DEBUG("[data_server]: write stop msg from client.~n", []),
+		    ?DEBUG("[data_server, ~p]: write stop msg from client.~n", [?LINE]),
 		    exit(Child, kill),
 		    rm_pending_chunk(ChunkID);
 		{finish, _ChunkID} ->
-		    ?DEBUG("[data_server]: write control receive finish signal~n", []),
+		    ?DEBUG("[data_server, ~p]: write control receive finish signal~n", [?LINE]),
 		    State2 = State + 1,
 		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State2);
 		_Any ->
 		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State)
 	    end;
 	{tcp_closed, Socket} ->
-	    ?DEBUG("[data_server]: control tcp_closed~n", []),
+	    ?DEBUG("[data_server, ~p]: control tcp_closed~n", [?LINE]),
 	    if
 		State > 0 ->
 		    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State);
 		true ->
-		    ?DEBUG("[data_server]: write control broken~n", []),
+		    ?DEBUG("[data_server, ~p]: write control broken~n", [?LINE]),
 		    %% exit(Child, kill),
 		    rm_pending_chunk(ChunkID)
 	    end;
 	{error, Child, Why} ->
-	    ?DEBUG("[data_server]: data transfer socket error~p~n", [Why]),
+	    ?DEBUG("[data_server, ~p]: data transfer socket error~p~n", [?LINE, Why]),
 	    rm_pending_chunk(ChunkID);
 	Any ->
-	    ?DEBUG("[data_server]: unkown msg ~p~n", [Any]),
+	    ?DEBUG("[data_server, ~p]: unkown msg ~p~n", [?LINE, Any]),
 	    loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State)
     end.
 
@@ -164,5 +164,5 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	    Parent ! {finish, self(), Len},
 	    file:close(Hdl);
 	Any ->
-	    io:format("loop Any:~p~n", [Any])
+	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any])
     end. 
