@@ -16,6 +16,12 @@ start-slave:compile
 start-slave2:compile
 	${ERL} -sname edfs_slave2 -s edfs_datanode_app start
 
+start-app:compile
+	${ERL} -sname lt -s ping_server ping -s app_data_server start 
+
+start-sup:compile
+	${ERL} -sname lt -s ping_server ping -s supervisor_data_server start_in_shell 
+
 start-ds:compile
 	${ERL} -sname lt -s ping_server ping -s data_gen_server start 
 
