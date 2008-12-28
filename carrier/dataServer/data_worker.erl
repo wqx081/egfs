@@ -27,9 +27,9 @@ handle_read(ChunkID, Begin, Size) ->
 	    end,
 
 	    {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
-	    {ok, Host} = inet:getaddr(lt, inet),
+	    {ok, IP_Addr} = get_local_addr(),
 	    {ok, Port} = inet:port(Listen),
-	    Reply = {ok, Host, Port},
+	    Reply = {ok, IP_Addr, Port},
 	    spawn(fun() -> read_process(Listen, ChunkID, Begin, End) end)
     end,
 
@@ -87,9 +87,9 @@ loop_send(Parent, SocketData, _Hdl, _Begin, _End, Len) ->
 
 handle_write(FileID, ChunkIndex, ChunkID, _Nodelist) ->
     {ok, Listen} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
-    {ok, Host} = inet:getaddr(lt, inet),
+    {ok, IP_Addr} = get_local_addr(),
     {ok, Port} = inet:port(Listen),
-    Reply = {ok, Host, Port},
+    Reply = {ok, IP_Addr, Port},
     spawn(fun() -> write_process(FileID, ChunkIndex, Listen, ChunkID) end),
 
     Reply.
@@ -166,3 +166,10 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	Any ->
 	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any])
     end. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                     kits
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_local_addr() ->
+    {ok, Host} = inet:gethostname(),
+    inet:getaddr(Host, inet).
