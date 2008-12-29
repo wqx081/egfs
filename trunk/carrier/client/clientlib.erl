@@ -310,9 +310,8 @@ write_a_chunk(_, _, Begin, Size, _) ->
 
 loop_send_ctrl(Socket, Child) ->
     receive
-	{finish, Child, Len} ->	
-	    ?DEBUG("[Client, ~p]:write a chunk finished.Size is ~p.~n",[?LINE, Len]),
-	    gen_tcp:send(Socket, term_to_binary({finish, "info"}));
+	{tcp_closed, Socket} ->	    
+	    ?DEBUG("[Client, ~p]: write control socket is closed~n",[?LINE]);
         {tcp, Socket, Binary} -> 
             Term = binary_to_term(Binary),
 	    case Term of
@@ -323,15 +322,13 @@ loop_send_ctrl(Socket, Child) ->
 		    ?DEBUG("[Client, ~p]:message from data_server!~p~n",[?LINE, Any]),
 		    loop_send_ctrl(Socket, Child)
 	    end;
+	{finish, Child} ->	
+	    ?DEBUG("[Client, ~p]:write a chunk finished.~n",[?LINE]),
+	    gen_tcp:send(Socket, term_to_binary({finish, "info"}));
 	{error, Child, Why} ->
 	    ?DEBUG("[Client, ~p]: child report that 'data receive error!'~p~n",[?LINE, Why]);
 	{'EXIT', _, normal} ->
-	    ?DEBUG("[Client, ~p]: child exit normal~n",[?LINE]),
-	    loop_send_ctrl(Socket, Child);
-	{tcp_closed, Socket} ->	    
-	    ?DEBUG("[Client, ~p]: write control socket is closed~n",[?LINE]);
-	{finish, Socket} ->
-	    ?DEBUG("[Client, ~p]:data_server finish the socket!:~p~n",[?LINE, Socket]),
+	    %?DEBUG("[Client, ~p]: child exit normal~n",[?LINE]),
 	    loop_send_ctrl(Socket, Child);
 	Any ->
 	    ?DEBUG("[Client, ~p]:unknow messege!:~p~n",[?LINE, Any]),

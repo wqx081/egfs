@@ -56,14 +56,7 @@ loop_write(_, _, _, _) ->
     
     
 read_tmp(Hdl, Location, Size) ->
-    ?DEBUG("[Client, ~p] read temp(~p, ~p) ~n",[?LINE, Location, Size]),
-    case  file:pread(Hdl, Location, Size) of
-	{ok, Binary} ->
-	    Binary;
-	{error, Why} ->
-	    ?DEBUG("[Client, ~p]read file(~p, ~p) error: ~p, ~n",[?LINE, Location, Size, Why]),
-	    []
-    end.
+    file:pread(Hdl, Location, Size).
 
 get_file_handle(write, FileName) ->
     file:open(FileName, [raw, append, binary]);
