@@ -10,7 +10,6 @@
 -include("../include/egfs.hrl").
 -export([do_open/2, do_pread/3, 
 	 do_pwrite/3, do_delete/1,
-	 write_them/3,
 	 do_close/1, get_file_name/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
@@ -27,7 +26,9 @@ do_pread(FileID, Start, Length) ->
     Start_addr = Start,
     End_addr = Start + Length,
     read_them(FileID, {Start_addr, End_addr}).
-    %{ok}.
+
+do_pwrite(FileID, Start, Bytes) ->
+    write_them(FileID, Start, Bytes).
 
 do_delete(FileName) -> 
     case gen_server:call(?METAGENSERVER, {delete, FileName}) of
@@ -48,90 +49,10 @@ do_close(FileID) ->
 	    {error,Why}
     end.
 
-%compute the chunk index
-do_pwrite(FileID, Location, Bytes) ->
-    case Location rem ?CHUNKSIZE of
-        0 -> 
-	    ChunkIndex = Location div ?CHUNKSIZE;
-        _Any -> 
-	    ChunkIndex = Location div ?CHUNKSIZE + 1
-    end,
-	
-    Begin = Location rem ?CHUNKSIZE,
-    Size = size(Bytes),
-	
-    case (Begin + Size) > ?CHUNKSIZE of
-	true->
-	    W_Size = ?CHUNKSIZE - Begin,
 
-	    {X,Y} = split_binary(Bytes, W_Size),
-	    do_pwrite_it(FileID, ChunkIndex, X),
-	    ChunkIndex1 = ChunkIndex + 1,
-	    do_pwrite(FileID, ChunkIndex1 * ?CHUNKSIZE, Y);
-	false ->
-	    do_pwrite_it(FileID, ChunkIndex, Bytes)
-    end.
-
-do_pwrite_it(FileID, ChunkIndex, Bytes) ->		
-    %seek the ChunkID based on the FileID and ChunkIndex
-    {ok, ChunkID, NodeList} = seek_chunk(FileID, ChunkIndex),	
-    %seek the physics host and port based on the FileID, ChunkIndex, and ChunkID
-    {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {writechunk, FileID, ChunkIndex, ChunkID, NodeList}),
-    %create a control link with the host and port.
-    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
-    %loop receive the message from control link.
-    loop_controllink_receive(Host, Socket, Bytes).
-
-loop_controllink_receive(Host, Socket, Bytes) ->
-    receive
-        {tcp, Socket, Binary} ->
-            {ok, Data_Port} = binary_to_term(Binary),
-	    {ok, DataSocket} = gen_tcp:connect(Host, Data_Port, [binary, {packet, 2}, {active, true}]),
-	    process_flag(trap_exit, true),
-	    Parent = self(),
-	    spawn_link(fun() -> createdatalink(Parent, DataSocket, Bytes) end),
-            loop_controllink_receive(Host, Socket, Bytes);
-        {tcp_close, Socket} ->
-            ?DEBUG("[Client, ~p] tcp_close, write file closed~n",[?LINE]);
-	{finish, Child} ->
-	    ?DEBUG("[Client, ~p]:write finish ~p~n", [?LINE, Child]),
-	    %loop_controllink_receive(Host, Socket, Bytes),
-	    gen_tcp:send(Socket, term_to_binary({finish, "info"}))
-	    %gen_tcp:close(Socket)
-    end.
-
-createdatalink(Parent, DataSocket, Bytes) when size(Bytes) > ?STRIP_SIZE   ->
-    {X,Y} = split_binary(Bytes, ?STRIP_SIZE),
-    gen_tcp:send(DataSocket, X),
-    createdatalink(Parent, DataSocket,Y);	
-createdatalink(Parent, DataSocket, Bytes) when size(Bytes) > 0->
-    gen_tcp:send(DataSocket, Bytes),
-    gen_tcp:close(DataSocket),
-    Parent ! {finish, self()};
-createdatalink(Parent, DataSocket, _Bytes) ->
-    gen_tcp:close(DataSocket),
-    Parent ! {finish, self()}.
-
-seek_chunk(FileID, ChunkIndex) ->
-    ?DEBUG("[Client, ~p]: FILEID=~p, chunkindex=~p~n",[?LINE, FileID, ChunkIndex]),
-    case gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}) of
-	{ok, C1, N1} ->
-	    ?DEBUG("[Client, ~p]:locate chunkID=~p, NodeList=~p~n",[?LINE, C1, N1]),
-	    {ok, C1, N1};
-	{error,_} ->
-	    case gen_server:call(?METAGENSERVER, {allocatechunk, FileID}) of
-		{ok, C2, N2} ->
-		    ?DEBUG("[Client, ~p]:allocate chunkID=~p,NodeList=~p~n",[?LINE, C2, N2]),
-		    {ok, C2, N2};
-		{error, Why} ->
-		    {error, Why}
-	    end
-    end.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%          tools 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%          tools for read and write
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_file_name(FileID) ->
     <<Int1:64>> = FileID,
     lists:append(["/tmp/", integer_to_list(Int1)]). 
@@ -156,9 +77,9 @@ get_chunk_info(FileID, ChunkIndex) ->
 get_new_chunk(FileID, _ChunkIndex) ->
     gen_server:call(?METAGENSERVER, {allocatechunk, FileID}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          read
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 read_them(FileID, {Start, End}) ->
     ChunkIndex = Start div ?CHUNKSIZE, 
     delete_file(FileID),
@@ -253,9 +174,9 @@ loop_recv_packet(Parent, DataSocket, Hdl, Len) ->
 write_data(Data, Hdl) ->
     file:write(Hdl, Data).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          write 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 write_them(FileID, Start, Bytes) ->
     ChunkIndex = Start div ?CHUNKSIZE,
     Size = size(Bytes),
@@ -330,8 +251,8 @@ loop_send_ctrl(Socket, Child) ->
 	{'EXIT', _, normal} ->
 	    %?DEBUG("[Client, ~p]: child exit normal~n",[?LINE]),
 	    loop_send_ctrl(Socket, Child);
-	Any ->
-	    ?DEBUG("[Client, ~p]:unknow messege!:~p~n",[?LINE, Any]),
+	_Any ->
+	    %?DEBUG("[Client, ~p]:unknow messege!:~p~n",[?LINE, Any]),
 	    loop_send_ctrl(Socket, Child)
     end.
 
