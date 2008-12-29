@@ -37,10 +37,12 @@ close(FileID) ->
     do_close(FileID).
 
 test_w(FileName, RemoteFile) ->
+    ?DEBUG("[client, ~p]: test write begin at ~p~n ", [?LINE, erlang:time()]),
     {ok, FileLength} = get_file_size(FileName),
-    FileID = open(RemoteFile, w),
-    {ok, Hdl} = get_file_handle(FileName),
+    FileID = open(RemoteFile, w),	 %%only send open message to metaserver
+    {ok, Hdl} = get_file_handle(read, FileName),
     loop_write(Hdl, FileID, 0, FileLength),
+    ?DEBUG("[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]),
     close(FileID).
 
 loop_write(Hdl, FileID, Start, Length) when Length > 0 ->
@@ -54,22 +56,19 @@ loop_write(_, _, _, _) ->
     
     
 read_tmp(Hdl, Location, Size) ->
+    ?DEBUG("[Client, ~p] read temp(~p, ~p) ~n",[?LINE, Location, Size]),
     case  file:pread(Hdl, Location, Size) of
 	{ok, Binary} ->
 	    Binary;
 	{error, Why} ->
-	    ?DEBUG("read file(~p, ~p) error: ~p, ~n",[Location, Size, Why]),
+	    ?DEBUG("[Client, ~p]read file(~p, ~p) error: ~p, ~n",[?LINE, Location, Size, Why]),
 	    []
     end.
 
-get_file_handle(FileName) ->
-    case file:open(FileName, [raw, append, binary]) of
-	{ok, Hdl} ->	
-	    {ok, Hdl};
-	{error, Why} ->
-	    ?DEBUG("[Client, ~p]:Open file error:~p", [?LINE, Why]),
-	    void
-    end.
+get_file_handle(write, FileName) ->
+    file:open(FileName, [raw, append, binary]);
+get_file_handle(read, FileName) ->
+    file:open(FileName, [raw, read, binary]).
 
 get_file_size(FileName) ->
     case file:read_file_info(FileName) of
@@ -80,15 +79,19 @@ get_file_size(FileName) ->
     end.
 
 test_r(FileName, LocalFile, Start, Length) ->
+    ?DEBUG("[client, ~p]: test read begin at ~p~n ", [?LINE, erlang:time()]),
     FileID = open(FileName, r),
     pread(FileID, Start, Length),
     close(FileID),
     TempFileName = get_file_name(FileID),
-    {ok, Hdl} = get_file_handle(TempFileName),
-    FileSize = get_file_size(TempFileName),
-    loop_read_tmp(Hdl, LocalFile, 0, FileSize).
+    {ok, Hdl} = get_file_handle(read, TempFileName),
+    {ok, FileSize} = get_file_size(TempFileName),
+    {ok, DstHdl} = get_file_handle(write, LocalFile),
+    loop_read_tmp(Hdl, DstHdl, 0, FileSize),
+    file:close(DstHdl),
+    ?DEBUG("[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]).
 
-loop_read_tmp(Hdl, LocalFile, Start, Length) when Length > 0 ->
+loop_read_tmp(Hdl, DstHdl, Start, Length) when Length > 0 ->
     if
 	Length - ?BINARYSIZE > 0 ->
 	    Size = ?BINARYSIZE;
@@ -96,10 +99,12 @@ loop_read_tmp(Hdl, LocalFile, Start, Length) when Length > 0 ->
 	    Size = Length
     end,
     Binary = read_tmp(Hdl, Start, Size),
-    Length1 = Length - ?BINARYSIZE,
-    Start1 = Start + ?BINARYSIZE,
-    file:write_file(LocalFile, Binary),
-    loop_read_tmp(Hdl, LocalFile, Start1, Length1);
+    Length1 = Length - Size,
+    Start1 = Start + Size,
+    ?DEBUG("[client, ~p]: copy file ~p~n ", [?LINE, Length]),
+    file:write(DstHdl, Binary),
+    %% file:write_file(LocalFile, Binary),
+    loop_read_tmp(Hdl, DstHdl, Start1, Length1);
 loop_read_tmp(_, _, _, _) ->
     void.
     
