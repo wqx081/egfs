@@ -19,7 +19,7 @@
 test_w(FileName, RemoteFile) ->
     ?DEBUG("[client, ~p]: test write begin at ~p~n", [?LINE, erlang:time()]),
     {ok, FileLength} = get_file_size(FileName),
-    FileID = open(RemoteFile, w),	 %%only send open message to metaserver
+    {ok, FileID} = open(RemoteFile, w),	 %%only send open message to metaserver
     {ok, Hdl} = get_file_handle(read, FileName),
     loop_write(Hdl, FileID, 0, FileLength),
     ?DEBUG("[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]),    
@@ -55,7 +55,7 @@ get_file_size(FileName) ->
 
 test_r(FileName, LocalFile, Start, Length) ->
     ?DEBUG("[client, ~p]: test read begin at ~p~n", [?LINE, erlang:time()]),
-    FileID = open(FileName, r),
+    {ok, FileID} = open(FileName, r),
     pread(FileID, Start, Length),
     close(FileID),
     TempFileName = get_file_name(FileID),

@@ -17,9 +17,10 @@
 do_open(FileName, Mode) ->
     case gen_server:call(?METAGENSERVER, {open, FileName, Mode}) of
         {ok, FileID} ->
-            FileID;
+	    {ok, FileID};
         {error, Why} ->
-	    ?DEBUG("[Client, ~p]:Open file error:~p~n",[?LINE, Why])
+	    ?DEBUG("[Client, ~p]:Open file error:~p~n",[?LINE, Why]),
+	    {error, Why}
     end.
 
 do_pread(FileID, Start, Length) ->
@@ -33,7 +34,7 @@ do_pwrite(FileID, Start, Bytes) ->
 do_delete(FileName) -> 
     case gen_server:call(?METAGENSERVER, {delete, FileName}) of
         {ok,_} -> 
-	    {ok};
+	    {ok, _};
         {error, Why} -> 
 	    ?DEBUG("[Client, ~p]:Delete file error~p~n",[?LINE, Why]),
 	    {error,Why}
