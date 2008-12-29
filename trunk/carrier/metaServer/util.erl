@@ -32,3 +32,5 @@ getNthList(Max, Max, List) ->  [Head | _] = List,
                                Head;
 getNthList(I, Max, List)   ->  [_| Tail] = List,
                                     getNthList(I+1, Max, Tail).
+
+

@@ -32,30 +32,40 @@ terminate(Reason, State) ->
 %"metaserver" methods
 % write step 1: open file
 handle_call({open, FileName, Mode}, {From, _}, State) ->
+    io:format("inside handle_call_open, FileName:~p,Mode:~p,From:~p~n",[FileName,Mode,From]),
     Reply = do_open(FileName, Mode, From),
     {reply, Reply, State};
 
 handle_call({allocatechunk, FileID}, {From, _}, State) ->
+    io:format("inside handle_call_allocatechunk, FileID:~p,From:~p~n",[FileID,From]),
     Reply = do_allocate_chunk(FileID, From),
     {reply, Reply, State};
 
+%% --------------------------------------------------------------------
+%% Function:
+%% Arg     :		NodeList must be a list
+%% Description: 
+%% Returns: 
+%% --------------------------------------------------------------------
 handle_call({registerchunk, FileID, ChunkID, ChunkUsedSize, NodeList},
-            From, State) ->
-    ?DEBUG("[ChunkUsedSize]: ChunkUsedSize ~p~n", [ChunkUsedSize]),
+            From, State) ->    
+    io:format("inside handle_call_registerchunk,FileID:~p,ChunkID:~p,ChunkUsedSize:~p~n",[FileID,ChunkID,ChunkUsedSize]),
+    io:format("NodeList~p~n",[list_to_tuple(NodeList)]),
     Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
-    
-    
     {reply, Reply, State};
 
 handle_call({locatechunk, FileID, ChunkIndex}, From, State) ->
+    io:format("inside handle_call_locatechunk,FileID:~p,ChunkIndex:~p~n",[FileID,ChunkIndex]),
     Reply = do_get_chunk(FileID, ChunkIndex),
     {reply, Reply, State};
 
 handle_call({close, FileID}, {From, _}, State)->
+    io:format("inside handle_call_close,FileID:~p,From:~p~n",[FileID,From]),
 	Reply = do_close(FileID, From),
     {reply, Reply, State};
 
 handle_call(_, {From, _}, State)->
+    io:format("inside handle_call_error~n"),
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 

@@ -203,7 +203,7 @@ reset_file_from_filemeta(Fileid) ->
 
 
 %% powerfull log function
-logF(X)->
+log(X,Y)->
     F = fun() ->
 		mnesia:write(X)
 	end,

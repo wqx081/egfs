@@ -57,7 +57,7 @@ do_write_open(Filename, _ClientID)->
 					{ok, FileID};
 				[_]->		% another client writing
 					{error,"file exist in shadow table"}
-			end;
+			end; 
         % get fileid sucessfull
         [_] ->	 
 			{error, "file exist"}
@@ -107,14 +107,12 @@ do_allocate_chunk(FileID, _ClientID)->
 do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
     % register chunk    
     % update filesize inf filemeta_s table
-    
-    case select_all_from_filemeta_s(FileID) of				
-		[]->
+    case select_all_from_filemeta_s(FileID) of
+        [] ->
             {error,"file does not exist"};
-        
-		[FileMetaS]->
+        [FileMetaS] ->
             FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
-            Row = FileSize#filemeta_s{filesize = FileSize},
+            Row = FileMetaS#filemeta_s{filesize = FileSize},
             write_to_db(Row),
             {ok, []}
     end.
