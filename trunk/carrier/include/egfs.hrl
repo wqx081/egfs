@@ -9,7 +9,7 @@
 
 %%defien global server name
 %%-define(DATAGENSERVER,{global, data_server}).
--define(METAGENSERVER,{global, metagenserver}).
+-define(META_SERVER,{global, metagenserver}).
 
 %% version
 -define(VERSION,                  16#0001).
