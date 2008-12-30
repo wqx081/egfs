@@ -8,6 +8,7 @@
 -module(clientlib).
 -include_lib("kernel/include/file.hrl").
 -include("../include/egfs.hrl").
+-include("filedevice.hrl").
 -export([do_open/2, do_pread/3, 
 	 do_pwrite/3, do_delete/1,
 	 do_close/1, get_file_name/1]).
@@ -26,15 +27,19 @@ do_open(FileName, Mode) ->
 do_pread(FileID, Start, Length) ->
     Start_addr = Start,
     End_addr = Start + Length,
+    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Start_addr, End_addr]),
+
     read_them(FileID, {Start_addr, End_addr}).
 
-do_pwrite(FileID, Start, Bytes) ->
-    write_them(FileID, Start, Bytes).
+do_pwrite(FileDevice, Start, Bytes) ->
+    ChunkIndex = Start div ?CHUNKSIZE,
+    Size = size(Bytes),
+    loop_write_chunks(FileDevice, ChunkIndex, Start, Size, Bytes).
 
 do_delete(FileName) -> 
     case gen_server:call(?METAGENSERVER, {delete, FileName}) of
-        {ok,_} -> 
-	    {ok, _};
+        {ok, _} -> 
+	    {ok};
         {error, Why} -> 
 	    ?DEBUG("[Client, ~p]:Delete file error~p~n",[?LINE, Why]),
 	    {error,Why}
@@ -97,7 +102,7 @@ loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
 	true ->
 	    Size = End - Start
     end,
-
+    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Begin, Size]),
     read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size),
     ChunkIndex2 = ChunkIndex + 1,
     Start2 = Start + Size,
@@ -106,6 +111,7 @@ loop_read_chunks(_, _, _, _) ->
     ?DEBUG("[Client, ~p]all chunks read finished!~n", [?LINE]).
 
 read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE ->
+    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Begin, Size]),
     {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {readchunk, ChunkID, Begin, Size}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
@@ -178,12 +184,7 @@ write_data(Data, Hdl) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          write 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-write_them(FileID, Start, Bytes) ->
-    ChunkIndex = Start div ?CHUNKSIZE,
-    Size = size(Bytes),
-    loop_write_chunks(FileID, ChunkIndex, Start, Size, Bytes).
-
-loop_write_chunks(FileID, ChunkIndex, Start, Len, Bytes) when Len > 0 ->
+loop_write_chunks(FileDevice, ChunkIndex, Start, Len, Bytes) when Len > 0 ->
     Begin = Start rem ?CHUNKSIZE,
     Size1 = ?CHUNKSIZE - Begin,
 
@@ -195,23 +196,32 @@ loop_write_chunks(FileID, ChunkIndex, Start, Len, Bytes) when Len > 0 ->
     end,
 
     {Part, Left} = split_binary(Bytes, Size),
-    write_a_chunk(FileID, ChunkIndex, Begin, Size, Part),
-
+    {ok, FileDevice1} = write_a_chunk(FileDevice, ChunkIndex, Begin, Size, Part),
     Start2 = Start + Size,
     Len2 = Len - Size,
-    loop_write_chunks(FileID, ChunkIndex, Start2, Len2, Left);
-loop_write_chunks(_, _, _, _, _) ->
-    ?DEBUG("all chunks of the Binary has been written~n", []),
-    ok.
+    loop_write_chunks(FileDevice1, ChunkIndex, Start2, Len2, Left);
+loop_write_chunks(FileDevice1, _, _, _, _) ->
+    %?DEBUG("[Client, ~p]:the Binary has been written~n~n", [?LINE]),
+    {ok, FileDevice1}.
 
-write_a_chunk(FileID, ChunkIndex, Begin, Size, Content) when Begin + Size =< ?CHUNKSIZE ->
+write_a_chunk(FileDevice, ChunkIndex, Begin, Size, Content) when Begin + Size =< ?CHUNKSIZE ->
+    FileID = FileDevice#filedevice.fileid,
+
     case Begin of
 	0 ->
-	    {ok, ChunkID, Nodelist} = get_new_chunk(FileID, ChunkIndex);
+	    ?DEBUG("[Client, ~p]:------------>you allocate a new chunk~n", [?LINE]),
+	    {ok, ChunkID, Nodelist} = get_new_chunk(FileID, ChunkIndex),
+	    FileDevice1 = FileDevice#filedevice{cursornodes = Nodelist, chunkid = ChunkID};
+	    %?DEBUG("[Client, ~p]:record is:~p~n", [?LINE, FileDevice1]);
 	_Any ->
-	    {ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex)
+	    FileDevice1 = FileDevice,
+	    ChunkID = FileDevice1#filedevice.chunkid,
+	    Nodelist = FileDevice1#filedevice.cursornodes
+	    %?DEBUG("[Client, ~p]:record is:~p~n", [?LINE, FileDevice1])
+	    %{ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex)
     end,
 
+    ?DEBUG("[Client, ~p]:begin: ~p, size: ~p in chunk!~n", [?LINE, Begin, Size]),
     {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {writechunk, FileID, ChunkIndex, ChunkID, Nodelist}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
@@ -220,10 +230,11 @@ write_a_chunk(FileID, ChunkIndex, Begin, Size, Content) when Begin + Size =< ?CH
             {ok, Data_Port} = binary_to_term(Binary),
 	    process_flag(trap_exit, true),
 	    Child = spawn_link(fun() -> send_it(Parent, Host, Data_Port, Content) end),
-	    loop_send_ctrl(Socket, Child);  
+	    loop_send_ctrl(Socket, Child),
+	    {ok, FileDevice1};
 	{tcp_close, Socket} ->
             ?DEBUG("[Client, ~p]:write file closed~n",[?LINE]),
-	    void
+	    {ok, FileDevice1}
     end;    
 write_a_chunk(_, _, Begin, Size, _) ->
     Write_Size = Begin + Size,
@@ -245,7 +256,7 @@ loop_send_ctrl(Socket, Child) ->
 		    loop_send_ctrl(Socket, Child)
 	    end;
 	{finish, Child} ->	
-	    ?DEBUG("[Client, ~p]:write a chunk finished.~n",[?LINE]),
+	    ?DEBUG("[Client, ~p]:write a binary finished.~n",[?LINE]),
 	    gen_tcp:send(Socket, term_to_binary({finish, "info"}));
 	{error, Child, Why} ->
 	    ?DEBUG("[Client, ~p]: child report that 'data receive error!'~p~n",[?LINE, Why]);
