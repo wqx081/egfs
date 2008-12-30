@@ -78,13 +78,18 @@ handle_call({delete,FileId},{From,_},State) ->
     {reply, Reply, State};
 
 handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
-    io:format("inside handle_call_bootreport,FileID:~p~n",[HostInfoRec]),
+    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
 	Reply = do_dataserver_bootreport(HostInfoRec, ChunkList),
     {reply, Reply, State};
 
 handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
     io:format("inside handle_call_getorphanchunk,FileID:~p~n",[HostRegName]),
 	Reply = do_collect_orphanchunk(HostRegName),
+    {reply, Reply, State};
+
+handle_call({getfileattr, FileID},{_From,_},State) ->
+    io:format("inside handle_call_getfileattr,FileID:~p~n",[FileID]),
+	Reply = do_get_fileattr(FileID),
     {reply, Reply, State};
 
 handle_call(_, {_From, _}, State)->
@@ -156,4 +161,11 @@ bootReport(HostInfoRec, ChunkList)->
 %% 1. getOrphanChunk(HostRegName) => [<<OrphanChunkID:64>>, ...]
 getOrphanChunk(HostProcName)->
     gen_server:call(?META_SERVER, {getorphanchunk, HostProcName}).
+
+%%
+%% get file attributes methods
+%% 1. open file to get FileID
+%% 2. getFileAttr(FileID) => {ok, [FileSize, <<CreateTime:64>>, <<ModifyTime:64>>, ACL]}
+getFileAttr(FileID)->
+    gen_server:call(?META_SERVER, {getfileattr, FileID}).
 

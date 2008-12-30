@@ -70,7 +70,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,{data_server, 'lt@lt'},abc,1000000,2000000}
+     {hostinfo,{{data_server,lt@lt},{192,168,0,111},1000000,2000000}}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -81,6 +81,11 @@ clear_tables()->
     mnesia:clear_table(hostinfo),
     mnesia:clear_table(chunkmapping).
 
+reset_example_tables()->
+    F = fun() ->
+		foreach(fun mnesia:write/1, example_tables())
+		end,
+    mnesia:transaction(F).
 
 reset_tables() ->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="reset_tables/0",logarg=[]},
@@ -190,6 +195,12 @@ select_all_from_Table(T)->
 select_all_from_filemeta(FileID) ->    %result [L]
     do(qlc:q([
               X||X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
+              ])).
+
+select_attributes_from_filemeta(FileID) ->    %result [L]
+    do(qlc:q([
+              {X#filemeta.filesize, X#filemeta.createT, X#filemeta.modifyT, X#filemeta.acl}||
+              X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
               ])).
 
 select_all_from_filemeta_s(FileID)->

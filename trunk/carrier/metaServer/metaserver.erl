@@ -17,8 +17,8 @@
                 detach_from_chunk_mapping/1,
                 do_register_dataserver/2,
                 do_delete_filemeta/1,
-                do_delete_orphanchunk_byhost/1]).
-
+                do_delete_orphanchunk_byhost/1,
+                select_attributes_from_filemeta/1]).
 
 %%% "model" methods
 
@@ -161,6 +161,12 @@ do_get_chunk(FileID, ChunkIdx)->
 			end
 	end.
 
+%% read file attribute step 1: open file
+%% read file attribute step 2: get chunk for 
+do_get_fileattr(FileID)->
+    AttributeList =select_attributes_from_filemeta(FileID),
+    {ok, AttributeList}.
+
 %%
 %% 
 %% host drop.
@@ -170,14 +176,19 @@ do_get_chunk(FileID, ChunkIdx)->
 do_detach_one_host(HostName)->
     detach_from_chunk_mapping(HostName).
 
+
 do_dataserver_bootreport(HostRecord, ChunkList)->
      do_register_dataserver(HostRecord, ChunkList).
 
 %% 
 %%delete 
-do_delete(FileID, _From)->
-    do_delete_filemeta(FileID).
-
+do_delete(FileName, _From)->
+    case select_fileid_from_filemeta(FileName) of
+        [] -> {error, "filename does not exist"};
+        % get fileid sucessfull	
+        [FileID] ->
+            do_delete_filemeta(FileID)
+    end.
 
 %%
 %% 
