@@ -15,9 +15,6 @@ get_all_chunkid() ->
     BChunklist = lists:map(fun(X) -> <<X:64>> end , Chunklist),
     BChunklist.
 
-get_host_info() ->
-    {hostinfo, {'192.168.0.111', 'lt@lt', 1024000, 4096000}}.
-
 
 
 boot_report()->
