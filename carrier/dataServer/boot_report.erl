@@ -20,7 +20,7 @@ get_host_info(Tmpip) ->
 %%    Hostinfo = {hostinfo, {A,B,C,D}},
     Hostinfo.
 
-
+get_host_info(
 
 boot_report(Tmpip)->
     case gen_server:call(?GM, {bootreport, get_host_info(Tmpip), get_all_chunkid()}) of
