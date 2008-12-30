@@ -1,5 +1,6 @@
 -module(data_worker).
 -include("../include/egfs.hrl").
+-import(chunk_db).
 -import(toolkit, [get_file_size/1,
 		  get_file_handle/2,
 		  get_file_name/1,
@@ -114,6 +115,8 @@ loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
 	{finish, Child, Len} ->
 	    %% {ok, _Info} = check_it(Socket, ChunkID, Len),
 	    ?DEBUG("[data_server, ~p]: write transfer finish, ~pBytes~n", [?LINE, Len]),
+	    {ok, Name} = get_file_name(ChunkID),
+	    chunk_db:insert_chunk_info(ChunkID, FileID, Name, Len),
 	    {ok, _Info} = report_metaServer(FileID, ChunkIndex, ChunkID, Len);
 	{tcp, Socket, Binary} ->
 	    ?DEBUG("[data_server, ~p]: tcp, socket, binary~n", [?LINE]),

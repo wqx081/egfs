@@ -1,6 +1,7 @@
 -module(data_gen_server).
 -behaviour(gen_server).
 -import(data_worker, [handle_read/3, handle_write/4]).
+-import(chunk_db).
 -include("../include/egfs.hrl").
 -export([start/0, stop/0, 
 	 init/1, handle_call/3,
@@ -20,7 +21,7 @@ stop() ->
 init([]) -> 
     %%process_flag(trap_exit, true),
     ?DEBUG("~p is on ~n", [?MODULE]),
-    %% {ok, ?TABLE} = dets:open_file(?TABLE, [{file, ?TABLE}]),
+    chunk_db:start(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
@@ -43,7 +44,7 @@ handle_info(_Info, N) -> {noreply, N}.
 
 terminate(_Reason, _N) ->
     ?DEBUG("~p is stopping~n", [?MODULE]),
-    %% dets:close(?TABLE),
+    chunk_db:stop(),
     ok.
 
 code_change(_OldVsn, N, _Extra) -> {ok, N}.

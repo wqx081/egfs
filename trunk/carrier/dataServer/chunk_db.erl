@@ -8,7 +8,8 @@
 
 %% Include files
 
--include("chunk_meta_format.hrl").
+-include("chunk_info.hrl").
+-include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
 %% Exported Functions
