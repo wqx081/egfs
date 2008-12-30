@@ -39,13 +39,5 @@
     storage_mod = none
 }).
 
-%% record between client and dataServer
-%% read request from client to dataServer
--record(read, {
-	chunkID,
-	pos = 0,
-	len = 0
-}).
-%% crontol file
 -define(CFILE, "/tmp/ctlfile").
 
