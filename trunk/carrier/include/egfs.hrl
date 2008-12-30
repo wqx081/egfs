@@ -30,7 +30,8 @@
 -define(DWORD,                    32/unsigned-big-integer).
 
 %% config record
--record(hostinfo,{ip,host,freespace,totalspace}).
+%% procname={RegName, Node()}; host=IP; 
+-record(hostinfo,{procname,host,freespace,totalspace}).
 -record(config,{
     access = [{tcp,{{127,0,0,1},51206,512,128}}],
     datafile = "xbtdata",
