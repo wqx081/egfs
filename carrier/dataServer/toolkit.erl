@@ -1,8 +1,10 @@
 -module(toolkit).
+-include("../include/egfs.hrl").
 -include_lib("kernel/include/file.hrl").
 -export([get_file_size/1,
 	 get_file_handle/2,
 	 get_file_name/1,
+	 get_local_addr/0,
 	 rm_pending_chunk/1,
 	 report_metaServer/4]).
 -compile(export_all).
@@ -62,3 +64,12 @@ report_metaServer(FileID, _ChunkIndex, ChunkID, Len) ->
     gen_server:call({global, metagenserver}, {registerchunk, FileID, ChunkID, Len, []}),
     {ok, "has reported it"}.
 
+get_host_info(RegName) ->
+    {ok, IP} = get_local_addr(),
+    Used = 1024 * 1024 * 1024,
+    Total = 10 * 1024 * 1024 * 1024,
+    {ok, {hostinfo, {IP, RegName, Used, Total}}}.
+
+get_local_addr() ->
+    {ok, Host} = inet:gethostname(),
+    inet:getaddr(Host, inet).

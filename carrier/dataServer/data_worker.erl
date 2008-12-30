@@ -173,6 +173,6 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%                     kits
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_local_addr() ->
-    {ok, Host} = inet:gethostname(),
-    inet:getaddr(Host, inet).
+%% get_local_addr() ->
+%%    {ok, Host} = inet:gethostname(),
+%%    inet:getaddr(Host, inet).
