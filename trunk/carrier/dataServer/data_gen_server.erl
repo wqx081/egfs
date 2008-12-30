@@ -3,13 +3,13 @@
 -import(data_worker, [handle_read/3, handle_write/4]).
 -import(chunk_db).
 -include("../include/egfs.hrl").
+-include("chunk_info.hrl").
 -export([start/0, stop/0, 
 	 init/1, handle_call/3,
 	 handle_cast/2, handle_info/2, 
 	 terminate/2, code_change/3]).
 
-%% -record(chunk_info, {chunkID, location, fileID, index}).
--define(DATA_SERVER, {global, data_server}).
+-define(DATA_SERVER, {local, ?SERVER_NAME}).
 
 start() -> 
     gen_server:start_link(?DATA_SERVER, ?MODULE, [], []).
@@ -21,6 +21,7 @@ init([]) ->
     %%process_flag(trap_exit, true),
     ?DEBUG("~p is on ~n", [?MODULE]),
     chunk_db:start(),
+    boot_report:boot_report(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
@@ -32,6 +33,8 @@ handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
     Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist),
     {reply, Reply, N};
 handle_call({echo, Msg}, _From, N) ->
+    Name = get(service),
+    ?DEBUG("[data_server]: (service, ~p)~n", [Name]),
     ?DEBUG("[data_server]: echo ~p~n", [Msg]),
     {reply, Msg, N};
 handle_call(Any, _From, N) ->
@@ -47,3 +50,4 @@ terminate(_Reason, _N) ->
     ok.
 
 code_change(_OldVsn, N, _Extra) -> {ok, N}.
+
