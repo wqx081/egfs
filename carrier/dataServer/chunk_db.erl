@@ -1,20 +1,12 @@
-
 -module(chunk_db).
 -import(lists, [foreach/2]).
 -import(util,[for/3]).
-
-
 
 -include("chunk_info.hrl").
 -include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
-
 -compile(export_all).
-
--define(DBNAME,'pp@pp').
-
-
 
 do_this_once() ->
     mnesia:create_schema([node()]),
@@ -160,6 +152,7 @@ get_file_id_by_chunk_id(Chunkid) ->
 					])).
 
 get_all_chunkid() ->
+    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     do(qlc:q([X#chunkmeta.chunk_id || X <- mnesia:table(chunkmeta)				     
 					 ])).
 

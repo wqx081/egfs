@@ -4,6 +4,7 @@
 -import(toolkit, [get_file_size/1,
 		  get_file_handle/2,
 		  get_file_name/1,
+		  get_local_addr/0,
 		  rm_pending_chunk/1,
 		  report_metaServer/4]).
 
@@ -76,10 +77,18 @@ send_it(Parent, ListenData, ChunkID, Begin, End) ->
     file:close(Hdl).
 
 loop_send(Parent, SocketData, Hdl, Begin, End, Len) when Begin < End ->
-    {ok, Binary} = file:pread(Hdl, Begin, ?STRIP_SIZE),
+    Size1  = End - Begin,
+    if
+	Size1 > ?STRIP_SIZE ->
+	    Size = ?STRIP_SIZE;
+	true->
+	    Size = Size1
+    end,
+
+    {ok, Binary} = file:pread(Hdl, Begin, Size),
     gen_tcp:send(SocketData, Binary),
     Len2 = Len + size(Binary),
-    Begin2 = Begin + ?STRIP_SIZE,
+    Begin2 = Begin + size(Binary),
     loop_send(Parent, SocketData, Hdl, Begin2, End, Len2);
 loop_send(Parent, SocketData, _Hdl, _Begin, _End, Len) ->
     gen_tcp:close(SocketData),

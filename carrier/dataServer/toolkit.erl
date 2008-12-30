@@ -5,6 +5,7 @@
 	 get_file_handle/2,
 	 get_file_name/1,
 	 get_local_addr/0,
+	 parse_config/2,
 	 rm_pending_chunk/1,
 	 report_metaServer/4]).
 -compile(export_all).
@@ -61,15 +62,18 @@ rm_pending_chunk(ChunkID) ->
 
 report_metaServer(FileID, _ChunkIndex, ChunkID, Len) ->
     io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", [ChunkID, Len]),
-    gen_server:call({global, metagenserver}, {registerchunk, FileID, ChunkID, Len, []}),
+    gen_server:call(?META_SERVER, {registerchunk, FileID, ChunkID, Len, []}),
     {ok, "has reported it"}.
-
-get_host_info(RegName) ->
-    {ok, IP} = get_local_addr(),
-    Used = 1024 * 1024 * 1024,
-    Total = 10 * 1024 * 1024 * 1024,
-    {ok, {hostinfo, {IP, RegName, Used, Total}}}.
 
 get_local_addr() ->
     {ok, Host} = inet:gethostname(),
     inet:getaddr(Host, inet).
+
+parse_config(service, ConfigFile) ->
+    {ok, Config} = file:consult(ConfigFile),
+    [Value] = [Value || {service, Value} <- Config],
+    {ok, Value};
+parse_config(total_space, ConfigFile) ->
+    {ok, Config} = file:consult(ConfigFile),
+    [Value] = [Value || {total_space, Value} <- Config],
+    {ok, Value}.
