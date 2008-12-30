@@ -69,7 +69,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,[data_server],abc,1000000,2000000}
+     {hostinfo,data_server,abc,1000000,2000000}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -396,7 +396,7 @@ do_find_orphanchunk()->
                 [write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList],
                 delete_from_db({chunkmapping,X})
         end,
-    OrphanChunkList = [GetOrphanPair(X)||X<-OrphanChunk].
+    [GetOrphanPair(X)||X<-OrphanChunk].
 
 % delete orphanchunk record in orphanchunk table by host
 do_delete_orphanchunk_byhost(Host)->

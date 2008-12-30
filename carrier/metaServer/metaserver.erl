@@ -104,7 +104,7 @@ do_allocate_chunk(FileID, _ClientID)->
            			%io:format("do allocate_chunk"),
             		write_to_db(RowFileMeta),
     				write_to_db(RowChunkMapping),
-        			{ok, ChunkID, SelectedHost}
+        			{ok, ChunkID, [SelectedHost]}
      		end
     end.
 
