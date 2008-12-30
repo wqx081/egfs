@@ -8,7 +8,7 @@
 -endif.
 
 %%defien global server name
--define(DATAGENSERVER,{global, data_server}).
+%%-define(DATAGENSERVER,{global, data_server}).
 -define(METAGENSERVER,{global, metagenserver}).
 
 %% version
@@ -23,10 +23,6 @@
 -define(CODE_SERVERROR,           16#0005).
 -define(CODE_NOKEY,               16#0006).
 
-%% define Chunk Size and Strip Size
--define(CHUNKSIZE, 33554432).%32*1024*1024
-
-
 %% type definition
 
 -define(BYTE,                     8/unsigned-big-integer).
@@ -34,6 +30,7 @@
 -define(DWORD,                    32/unsigned-big-integer).
 
 %% config record
+-record(hostinfo,{ip,host,freespace,totalspace}).
 -record(config,{
     access = [{tcp,{{127,0,0,1},51206,512,128}}],
     datafile = "xbtdata",
@@ -42,6 +39,13 @@
     storage_mod = none
 }).
 
+%% record between client and dataServer
+%% read request from client to dataServer
+-record(read, {
+	chunkID,
+	pos = 0,
+	len = 0
+}).
 %% crontol file
 -define(CFILE, "/tmp/ctlfile").
 
