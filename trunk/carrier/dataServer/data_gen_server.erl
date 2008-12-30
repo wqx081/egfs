@@ -9,7 +9,6 @@
 	 terminate/2, code_change/3]).
 
 %% -record(chunk_info, {chunkID, location, fileID, index}).
-%% -define(TABLE, "chunk_table").
 -define(DATA_SERVER, {global, data_server}).
 
 start() -> 
