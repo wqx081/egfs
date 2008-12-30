@@ -14,9 +14,10 @@
 	 do_close/1, get_file_name/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
+-define(DATA_SERVER, {global, data_server}).
 
 do_open(FileName, Mode) ->
-    case gen_server:call(?METAGENSERVER, {open, FileName, Mode}) of
+    case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
         {ok, FileID} ->
 	    {ok, FileID};
         {error, Why} ->
@@ -37,7 +38,7 @@ do_pwrite(FileDevice, Start, Bytes) ->
     loop_write_chunks(FileDevice, ChunkIndex, Start, Size, Bytes).
 
 do_delete(FileName) -> 
-    case gen_server:call(?METAGENSERVER, {delete, FileName}) of
+    case gen_server:call(?META_SERVER, {delete, FileName}) of
         {ok, _} -> 
 	    {ok};
         {error, Why} -> 
@@ -46,7 +47,7 @@ do_delete(FileName) ->
     end.
 
 do_close(FileID) ->
-    case gen_server:call(?METAGENSERVER, {close, FileID}) of
+    case gen_server:call(?META_SERVER, {close, FileID}) of
         {ok,_} ->
 	    ?DEBUG("[Client, ~p]:Close file ok~n",[?LINE]), 
 	    {ok, "you close the file!"};
@@ -78,10 +79,10 @@ get_file_handle(write, FileID) ->
     end.
 
 get_chunk_info(FileID, ChunkIndex) -> 
-    gen_server:call(?METAGENSERVER, {locatechunk, FileID, ChunkIndex}).
+    gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
 	    
 get_new_chunk(FileID, _ChunkIndex) ->
-    gen_server:call(?METAGENSERVER, {allocatechunk, FileID}).
+    gen_server:call(?META_SERVER, {allocatechunk, FileID}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          read
@@ -112,7 +113,7 @@ loop_read_chunks(_, _, _, _) ->
 
 read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE ->
     ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Begin, Size]),
-    {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {readchunk, ChunkID, Begin, Size}),
+    {ok, Host, Port} = gen_server:call(?DATA_SERVER, {readchunk, ChunkID, Begin, Size}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
     receive
@@ -222,7 +223,7 @@ write_a_chunk(FileDevice, ChunkIndex, Begin, Size, Content) when Begin + Size =<
     end,
 
     ?DEBUG("[Client, ~p]:begin: ~p, size: ~p in chunk!~n", [?LINE, Begin, Size]),
-    {ok, Host, Port} = gen_server:call(?DATAGENSERVER, {writechunk, FileID, ChunkIndex, ChunkID, Nodelist}),
+    {ok, Host, Port} = gen_server:call(?DATA_SERVER, {writechunk, FileID, ChunkIndex, ChunkID, Nodelist}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
     receive
