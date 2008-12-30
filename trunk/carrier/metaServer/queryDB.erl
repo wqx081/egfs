@@ -51,11 +51,17 @@ do_this_once() ->
                                       {disc_copies,[node()]}
                                      ]),
     
+    
+     mnesia:create_table(orphanchunk, [{type, bag},{attributes, record_info(fields, orphanchunk)},
+                                      {disc_copies,[node()]}
+                                     ]),
+    
+    
     mnesia:stop().
 
 start_mnesia()->
     mnesia:start(),
-    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog], 30000).
+    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog,orphan,orphanchunk], 5000).
 
 
 %%
@@ -120,6 +126,13 @@ example_table_filemeta(X)->
 #filemeta{fileid=X,filename=["e:/copy/test",X],filesize=3,chunklist=[X],createT="today,Dec,12",modifyT="yestoday,Dec,11",acl="acl"}.
 
 
+
+add_orphan_item(X,Y)->
+    I = #orphanchunk{chunkid=X,chunklocation=Y},
+    F = fun() ->
+		mnesia:write(I)
+	end,
+ 	mnesia:transaction(F).
 
 %filemeta    {fileid	client}
 %add item

@@ -10,5 +10,6 @@
 -record(filesession, {fileid, client}).
 -record(hostinfo,{ip,host,freespace,totalspace}).
 
+-record(orphanchunk,{chunkid,chunklocation}).
 
 -record(metalog,{logtime,logfunc,logarg}).

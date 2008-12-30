@@ -45,13 +45,16 @@ do_this_once() ->
     mnesia:create_table(metalog, [{attributes, record_info(fields,metalog)},
                                       {disc_copies,[node()]}
                                      ]),
-    
+    mnesia:create_table(orphanchunk, [{type,bag},{attributes, record_info(fields,orphanchunk)},
+                                      {disc_copies,[node()]}
+                                     ]),
+	
     mnesia:stop().
 
 start_mnesia()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
     mnesia:start(),    
-    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog], 14000),
+    mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
     logF(LOG).
 
 %%
@@ -66,7 +69,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,data_server,abc,1000000,2000000}
+     {hostinfo,[data_server],abc,1000000,2000000}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -116,6 +119,14 @@ add_filemeta_s_item(Fileid, FileName) ->
     mnesia:transaction(F).
 
 
+%add_orphan_item
+add_orphan_item(Chunkid,Chunklocation)->
+    I = #orphanchunk{chunkid=Chunkid,chunklocation=Chunklocation},
+    F = fun() ->
+		mnesia:write(I)
+	end,
+ 	mnesia:transaction(F).
+
 
 %% write a record 
 %% 
@@ -129,8 +140,22 @@ write_to_db(X)->
 	end,
     mnesia:transaction(F).
 
+
+
+
+
 %% delete a record 
 %%
+delete_object_from_db(X)->
+	LOG = #metalog{logtime = calendar:local_time(),logfunc="delete_object_from_db/1",logarg=[X]},
+    logF(LOG),
+    %io:format("inside delete from db"),
+    F = fun() ->
+                mnesia:delete_object(X)
+        end,
+    mnesia:transaction(F).
+
+
 delete_from_db(X)->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="delete_from_db/1",logarg=[X]},
     logF(LOG),
@@ -140,6 +165,17 @@ delete_from_db(X)->
         end,
     mnesia:transaction(F).
   
+delete_from_db(listrecord,[X|T])->
+    delete_from_db(X),
+    delete_from_db(listrecord,T);
+delete_from_db(listrecord,[])->
+	done.
+
+delete_object_from_db(listrecord,[X|T])->
+    delete_object_from_db(X),
+    delete_object_from_db(listrecord,T);
+delete_object_from_db(listrecord,[])->
+	done.
 
 %%------------------------------------------------------------------------------------------
 %% select function
@@ -158,6 +194,24 @@ select_all_from_filemeta(FileID) ->    %result [L]
 select_all_from_filemeta_s(FileID)->
     do(qlc:q([
               X||X<-mnesia:table(filemeta_s),X#filemeta_s.fileid =:= FileID
+              ])).
+
+
+select_from_hostinfo(HostIp)->
+    do(qlc:q([
+              X||X<-mnesia:table(hostinfo),X#hostinfo.ip =:= HostIp
+              ])).
+
+
+select_chunkid_from_orphanchunk(Host) ->
+    do(qlc:q([
+              X#orphanchunk.chunkid||X<-mnesia:table(orphanchunk),X#orphanchunk.chunklocation =:= Host
+              ])).
+
+
+select_all_from_orphanchunk(Host) ->
+    do(qlc:q([
+              X||X<-mnesia:table(orphanchunk),X#orphanchunk.chunklocation =:= Host
               ])).
 
 %FileName - > fileid
@@ -201,9 +255,33 @@ reset_file_from_filemeta(Fileid) ->
 	end,
     mnesia:transaction(F).
 
+% detach_from_chunk_mapping
+% arg, Host name
+detach_from_chunk_mapping(Host) ->
+    DelHost =
+        fun(ChunkMapping, Acc) ->
+                ChunkLoc = ChunkMapping#chunkmapping.chunklocations,
+                Guard = lists:member(Host,ChunkLoc),
+                if Guard =:= true ->
+                       ChunkLocList = ChunkLoc -- [Host],
+                       ok = mnesia:write(ChunkMapping#chunkmapping{chunklocations = ChunkLocList}),
+                       if 
+                           ChunkLocList =:= [] ->
+                               Acc ++ [ChunkMapping#chunkmapping.chunkid];
+                           true ->
+                               Acc
+                       end; 
+                   true ->
+                    	Acc   
+                end
+        end,
+    DoDel = fun() -> mnesia:foldl(DelHost, [], chunkmapping, write) end,
+    mnesia:transaction(DoDel).
+
+
 
 %% powerfull log function
-log(X,Y)->
+logF(X)->
     F = fun() ->
 		mnesia:write(X)
 	end,
@@ -228,3 +306,105 @@ mnesia:transaction(F).
 
 
 %%		TODO:  log of all function. 
+
+modifyHostLocation() ->
+    ModifyLoc =
+        fun(ChunkMapping, Acc) when is_atom(ChunkMapping#chunkmapping.chunklocations)->
+                ChunkLoc = ChunkMapping#chunkmapping.chunklocations,
+                mnesia:write(ChunkMapping#chunkmapping{chunklocations = [ChunkLoc]}),
+                Acc;
+           (_, Acc) ->
+                Acc
+        end,
+    ModifyFun = fun() -> mnesia:foldl(ModifyLoc, [], chunkmapping, write) end,
+    mnesia:transaction(ModifyFun).
+
+
+%% 
+do_register_dataserver(HostRecord,ChunkList)->
+	X = select_from_hostinfo(HostRecord#hostinfo.ip),
+    case X of
+        []->
+            % insert into hostinfo;
+            F = fun() ->
+                        mnesia:write(HostRecord)
+                        end,
+            mnesia:transaction(F),
+        	do_register_boot_chunks(HostRecord#hostinfo.ip,ChunkList);
+        
+        _->	% host existed.
+            {error, "host collision"}
+    end.
+    
+%%     ChunkLoc = HostRecord#hostinfo.ip,
+%%     ,
+do_register_boot_chunks(HostIp,ChunkList)->
+   AddHost =
+        fun(ChunkMapping, Acc) ->
+                ChunkID = ChunkMapping#chunkmapping.chunkid,                
+                Guard = lists:member(ChunkID,Acc),                
+                if Guard =:= true ->
+%%                        Acc = ChunkList--[ChunkID],
+                       ChunkLocations = 
+                           lists:usort(ChunkMapping#chunkmapping.chunklocations++[HostIp]),
+                       
+                       ok = mnesia:write(
+                              ChunkMapping#chunkmapping{chunklocations = ChunkLocations}),
+                       Acc--[ChunkID];
+                   true ->
+                    	Acc
+                end
+        end,
+    DoAdd = fun() -> mnesia:foldl(AddHost, ChunkList, chunkmapping, write) end,
+    case mnesia:transaction(DoAdd) of
+        {atomic, UnusedChunkList} ->
+            {ok, UnusedChunkList};
+        {aborted, _} ->
+            {error, "Mnesia Transaction Abort!"}
+   end.
+
+
+
+do_delete_filemeta(FileID)->
+    LOG = #metalog{logtime = calendar:local_time(),logfunc="do_delete_filemeta/1",logarg=[FileID]},
+    logF(LOG),
+    delete_from_db({filemeta,FileID}),				%return {atomic,ok} . always
+    {ok,"File deleted"}.
+    
+
+% find orphanchunk every day.
+do_find_orphanchunk()->
+    % Get all chunks of chunkmapping table
+    GetAllChunkIdList = 
+        fun(ChunkMapping,Acm)->
+                [ChunkMapping#chunkmapping.chunkid | Acm]
+        end,
+    DogetAllChunkIdList = fun() -> mnesia:foldl(GetAllChunkIdList, [], chunkmapping) end,
+    {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
+    
+    % filter out used chunks according to filemeta table
+	GetUsedChunkIdList =
+        fun(FileMeta, Acc) ->                
+                Acc--FileMeta#filemeta.chunklist                
+        end,        
+    DogetUsedChunkIdList = fun() -> mnesia:foldl(GetUsedChunkIdList, AllChunkIdList, filemeta) end,
+    {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdList),
+    
+    GetOrphanPair = 
+        fun(X) ->
+                NodeIpList = select_nodeip_from_chunkmapping(X),
+                [write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList],
+                delete_from_db({chunkmapping,X})
+        end,
+    OrphanChunkList = [GetOrphanPair(X)||X<-OrphanChunk].
+
+% delete orphanchunk record in orphanchunk table by host
+do_delete_orphanchunk_byhost(Host)->
+	X = select_all_from_orphanchunk(Host),
+	io:format("~p ~n", [list_to_tuple(X)]),
+	delete_object_from_db(listrecord,X).
+
+% find orphanchunk in orphanchunk table by host
+do_get_orphanchunk_byhost(Host) ->
+    select_all_from_orphanchunk(Host).
+
