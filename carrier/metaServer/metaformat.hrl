@@ -7,8 +7,12 @@
 -record(chunkmapping, {chunkid, chunklocations}).
 
 -record(clientinfo, {clientid, modes}).   % maybe fileid?
--record(filesession, {fileid, client}).
--record(hostinfo,{ip,host,freespace,totalspace}).
+
+%% #filesession has been abandoned
+%%-record(filesession, {fileid, client}).
+
+%% #hostinfo has been moved to "../include/egfs.hrl"
+%%-record(hostinfo,{procname,host,freespace,totalspace}).
 
 -record(orphanchunk,{chunkid,chunklocation}).
 

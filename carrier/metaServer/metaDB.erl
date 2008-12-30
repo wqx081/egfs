@@ -9,6 +9,7 @@
 %% Include files
 %%
 -include("metaformat.hrl").
+-include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 %%
 %% Exported Functions
@@ -69,7 +70,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,data_server,abc,1000000,2000000}
+     {hostinfo,{data_server, 'lt@lt'},abc,1000000,2000000}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -197,9 +198,9 @@ select_all_from_filemeta_s(FileID)->
               ])).
 
 
-select_from_hostinfo(HostIp)->
+select_from_hostinfo(ProcName)->
     do(qlc:q([
-              X||X<-mnesia:table(hostinfo),X#hostinfo.ip =:= HostIp
+              X||X<-mnesia:table(hostinfo),X#hostinfo.procname =:= ProcName
               ])).
 
 
@@ -322,7 +323,7 @@ modifyHostLocation() ->
 
 %% 
 do_register_dataserver(HostRecord,ChunkList)->
-	X = select_from_hostinfo(HostRecord#hostinfo.ip),
+	X = select_from_hostinfo(HostRecord#hostinfo.procname),
     case X of
         []->
             % insert into hostinfo;
@@ -330,15 +331,15 @@ do_register_dataserver(HostRecord,ChunkList)->
                         mnesia:write(HostRecord)
                         end,
             mnesia:transaction(F),
-        	do_register_boot_chunks(HostRecord#hostinfo.ip,ChunkList);
+        	do_register_boot_chunks(HostRecord#hostinfo.procname,ChunkList);
         
         _->	% host existed.
             {error, "host collision"}
     end.
     
-%%     ChunkLoc = HostRecord#hostinfo.ip,
-%%     ,
-do_register_boot_chunks(HostIp,ChunkList)->
+%%
+%%
+do_register_boot_chunks(HostProcName,ChunkList)->
    AddHost =
         fun(ChunkMapping, Acc) ->
                 ChunkID = ChunkMapping#chunkmapping.chunkid,                
@@ -346,7 +347,7 @@ do_register_boot_chunks(HostIp,ChunkList)->
                 if Guard =:= true ->
 %%                        Acc = ChunkList--[ChunkID],
                        ChunkLocations = 
-                           lists:usort(ChunkMapping#chunkmapping.chunklocations++[HostIp]),
+                           lists:usort(ChunkMapping#chunkmapping.chunklocations++[HostProcName]),
                        
                        ok = mnesia:write(
                               ChunkMapping#chunkmapping{chunklocations = ChunkLocations}),
@@ -399,12 +400,12 @@ do_find_orphanchunk()->
     [GetOrphanPair(X)||X<-OrphanChunk].
 
 % delete orphanchunk record in orphanchunk table by host
-do_delete_orphanchunk_byhost(Host)->
-	X = select_all_from_orphanchunk(Host),
+do_delete_orphanchunk_byhost(HostProcName)->
+	X = select_all_from_orphanchunk(HostProcName),
 	io:format("~p ~n", [list_to_tuple(X)]),
 	delete_object_from_db(listrecord,X).
 
 % find orphanchunk in orphanchunk table by host
-do_get_orphanchunk_byhost(Host) ->
-    select_all_from_orphanchunk(Host).
+do_get_orphanchunk_byhost(HostProcName) ->
+    select_all_from_orphanchunk(HostProcName).
 

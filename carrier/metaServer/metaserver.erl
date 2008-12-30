@@ -1,6 +1,7 @@
 -module(metaserver).
 -compile(export_all).
 -include("metaformat.hrl").
+-include("../include/egfs.hrl").
 -import(lists, [reverse/1]).
 
 -import(metaDB,[select_fileid_from_filemeta/1, 
@@ -88,7 +89,7 @@ do_allocate_chunk(FileID, _ClientID)->
     		random:seed(),
     		Select = random:uniform(SizeOfRes),
     		HostRecord = lists:nth(Select,Res),
-			SelectedHost = HostRecord#hostinfo.ip,
+			SelectedHost = HostRecord#hostinfo.procname,
     		% SelectedHost = erlang:element(1,lists:nth(Select,Res)),
     
     		% insert chunk into filemeta_s_table
@@ -181,11 +182,11 @@ do_delete(FileID, _From)->
 %%
 %% 
 %%
-do_collect_orphanchunk(Host)->
+do_collect_orphanchunk(HostProcName)->
     % get orphanchunk from orphanchunk table
-    OrphanChunkList = select_chunkid_from_orphanchunk(Host),
+    OrphanChunkList = select_chunkid_from_orphanchunk(HostProcName),
     % delete notified orphanchunk from orphanchunk table
-    do_delete_orphanchunk_byhost(Host),  
+    do_delete_orphanchunk_byhost(HostProcName),
     OrphanChunkList.
 
 

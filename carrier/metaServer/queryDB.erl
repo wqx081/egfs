@@ -8,6 +8,7 @@
 %% Include files
 %%
 -include("metaformat.hrl").
+-include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 %%
 %% Exported Functions
@@ -79,7 +80,7 @@ example_tables() ->
      {filemeta, 0,   "egfs://e:/copy/test.txt",3,[0],"today,Dec,12","yestoday,Dec,11","acl"},
      {filemeta, 1,   "egfs://e:/copy/test.txt",3,[1],"today,Dec,12","yestoday,Dec,11","acl"},
      
-     {hostinfo,data_server,abc,1000000,2000000}
+     {hostinfo,{data_server, 'lt@lt'},abc,1000000,2000000}
      
     ].
 
@@ -156,20 +157,20 @@ add_filemeta_s_item(Fileid, FileName) ->
 
 %filesession    {fileid	client}
 %add item
-add_filesession_item(Fileid, Client) ->
-    Row = #filesession{fileid=Fileid, client=Client},
-    F = fun() ->
-		mnesia:write(Row)
-	end,
-    mnesia:transaction(F).
+%add_filesession_item(Fileid, Client) ->
+%    Row = #filesession{fileid=Fileid, client=Client},
+%    F = fun() ->
+%		mnesia:write(Row)
+%	end,
+%    mnesia:transaction(F).
 
 %remove   while remove . we shall use primary key(first element in mnesia.)
-remove_filesession_item(Fileid) ->
-    Oid = {filesession, Fileid},
-    F = fun() ->
-		mnesia:delete(Oid)
-	end,
-    mnesia:transaction(F).
+%remove_filesession_item(Fileid) ->
+%    Oid = {filesession, Fileid},
+%    F = fun() ->
+%		mnesia:delete(Oid)
+%	end,
+%    mnesia:transaction(F).
 
 %%------------------------------------------------------------------------------------------
 %% select function
@@ -181,10 +182,10 @@ select_all_from_Table(T)->
               ])).  %result [L]
 
 %look up.
-select_from_filesession(Fileid) ->    %result [L]
-    do(qlc:q([
-              X||X<-mnesia:table(filesession),X#filesession.fileid =:= Fileid
-              ])).
+%select_from_filesession(Fileid) ->    %result [L]
+%    do(qlc:q([
+%              X||X<-mnesia:table(filesession),X#filesession.fileid =:= Fileid
+%              ])).
 
 select_all_from_filemeta(FileID) ->    %result [L]
     do(qlc:q([
@@ -235,15 +236,15 @@ reset_file_from_filemeta(Fileid) ->
 % look_up_filesession(FileID, ClientID) -> w | r | a
 % FileID = binary
 % ClientID = binary
-look_up_filesession(FileID, ClientID) ->
-	case select_from_filesession(FileID) of
-		% file hasn't been opened yet, so open operation is permitted.
-		[clientinfo, [ClientInfo]] when (ClientInfo#clientinfo.clientid =:= ClientID) -> 
-				ClientInfo#clientinfo.modes,
-                {ok, <<FileID:64>>};   
-		% file has been opened by other processes, so open operation is denied.
-		[_] -> {error, "opened already"}
-	end.
+%look_up_filesession(FileID, ClientID) ->
+%	case select_from_filesession(FileID) of
+%		% file hasn't been opened yet, so open operation is permitted.
+%		[clientinfo, [ClientInfo]] when (ClientInfo#clientinfo.clientid =:= ClientID) ->
+%				ClientInfo#clientinfo.modes,
+%                {ok, <<FileID:64>>};
+%		% file has been opened by other processes, so open operation is denied.
+%		[_] -> {error, "opened already"}
+%	end.
 
 
 %% powerfull log function
