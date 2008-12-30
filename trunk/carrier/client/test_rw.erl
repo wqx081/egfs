@@ -15,12 +15,11 @@
 	close/1]).
 -import(clientlib,[get_file_name/1]).
 -compile(export_all).
--define(BINARYSIZE, 8388608).%67108864  %8388608
+-define(BINARYSIZE, 67108864).%67108864  %8388608
 
 test_w(FileName, RemoteFile) ->
     ?DEBUG("[client, ~p]:test write begin at ~p~n~n", [?LINE, erlang:time()]),
     {ok, FileLength} = get_file_size(FileName),
-    ?DEBUG("[client, ~p]:filelength is ~p~n", [?LINE, FileLength]),
     {ok, FileID} = open(RemoteFile, w),	 %%only send open message to metaserver
     {ok, Hdl} = get_file_handle(read, FileName),
     FileDevice = #filedevice{fileid = FileID},
@@ -32,10 +31,10 @@ test_w(FileName, RemoteFile) ->
 loop_write(Hdl, FileDevice, Start, Length) when Length > 0 ->
     {ok, Binary} = read_tmp(Hdl, Start, ?BINARYSIZE),
     {ok, FileDevice1} = pwrite(FileDevice, Start ,Binary),
-    ?DEBUG("[Client, ~p]:binary is ~p~n", [?LINE, Binary]),
     Start1 = Start + ?BINARYSIZE,
     Length1 = Length - ?BINARYSIZE,
-    loop_write(Hdl, FileDevice1, Start1, Length1);
+    loop_write(Hdl, FileDevice1, Start1, Length1),
+    ?DEBUG("[Client, ~p]~n", [?LINE]);
 loop_write(_, _, _, _) ->
     ?DEBUG("[Client, ~p]:write file ok~n", [?LINE]).
     
@@ -68,6 +67,7 @@ test_r(FileName, LocalFile, Start, Length) ->
     {ok, DstHdl} = get_file_handle(write, LocalFile),
     loop_read_tmp(Hdl, DstHdl, 0, FileSize),
     file:close(DstHdl),
+    file:delete(LocalFile),
     ?DEBUG("~n[client, ~p]:test read end at ~p~n", [?LINE, erlang:time()]).
 
 loop_read_tmp(Hdl, DstHdl, Start, Length) when Length > 0 ->
@@ -80,7 +80,6 @@ loop_read_tmp(Hdl, DstHdl, Start, Length) when Length > 0 ->
     {ok, Binary} = read_tmp(Hdl, Start, Size),
     Length1 = Length - Size,
     Start1 = Start + Size,
-    ?DEBUG("[client, ~p]:copy file ~p~n", [?LINE, Length]),
     file:write(DstHdl, Binary),
     loop_read_tmp(Hdl, DstHdl, Start1, Length1);
 loop_read_tmp(_, _, _, _) ->

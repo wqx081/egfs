@@ -28,8 +28,7 @@ do_open(FileName, Mode) ->
 do_pread(FileID, Start, Length) ->
     Start_addr = Start,
     End_addr = Start + Length,
-    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Start_addr, End_addr]),
-
+    ?DEBUG("[Client, ~p]:read Start is: ~p, readlength is: ~p~n",[?LINE, Start_addr, End_addr]),
     read_them(FileID, {Start_addr, End_addr}).
 
 do_pwrite(FileDevice, Start, Bytes) ->
@@ -93,6 +92,7 @@ read_them(FileID, {Start, End}) ->
     loop_read_chunks(FileID, ChunkIndex, Start, End).
 
 loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
+    ?DEBUG("[Client, ~p]:Start is : ~p, ChunkIndex is: ~p~n",[?LINE, Start, ChunkIndex]),
     {ok, ChunkID, _Nodelist} = get_chunk_info(FileID, ChunkIndex),
     Begin = Start rem ?CHUNKSIZE,
     Size1 = ?CHUNKSIZE - Begin,
@@ -103,7 +103,6 @@ loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
 	true ->
 	    Size = End - Start
     end,
-    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Begin, Size]),
     read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size),
     ChunkIndex2 = ChunkIndex + 1,
     Start2 = Start + Size,
@@ -112,7 +111,6 @@ loop_read_chunks(_, _, _, _) ->
     ?DEBUG("[Client, ~p]all chunks read finished!~n", [?LINE]).
 
 read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE ->
-    ?DEBUG("[Client, ~p]:Start and :~p  ~p~n",[?LINE, Begin, Size]),
     {ok, Host, Port} = gen_server:call(?DATA_SERVER, {readchunk, ChunkID, Begin, Size}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
@@ -132,7 +130,7 @@ read_a_chunk(_, _, _, _,_) ->
 loop_receive_ctrl(Socket, Child) ->
     receive
 	{finish, Child, Len} ->	
-	    ?DEBUG("[Client, ~p]:read the chunk finished.Size is ~p.~n",[?LINE, Len]);
+	    ?DEBUG("[Client, ~p]:---->read a chunk, size is ~p.~n",[?LINE, Len]);
         {tcp, Socket, Binary} -> 
             Term = binary_to_term(Binary),
 	    case Term of
