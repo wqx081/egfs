@@ -11,7 +11,12 @@
                  select_all_from_filemeta_s/1,
                  select_nodeip_from_chunkmapping/1,
                  select_all_from_filemeta/1,
-                write_to_db/1,delete_from_db/1]).
+                select_chunkid_from_orphanchunk/1,
+                write_to_db/1,delete_from_db/1,
+                detach_from_chunk_mapping/1,
+                do_register_dataserver/2,
+                do_delete_filemeta/1,
+                do_delete_orphanchunk_byhost/1]).
 
 
 %%% "model" methods
@@ -95,7 +100,7 @@ do_allocate_chunk(FileID, _ClientID)->
                     ChunkList = FileMetaS#filemeta_s.chunklist++[ChunkID],
                     RowFileMeta = FileMetaS#filemeta_s{chunklist = ChunkList},
             		RowChunkMapping = #chunkmapping{chunkid=ChunkID, 
-                                                    chunklocations=SelectedHost},
+                                                    chunklocations=[SelectedHost]},
            			%io:format("do allocate_chunk"),
             		write_to_db(RowFileMeta),
     				write_to_db(RowChunkMapping),
@@ -155,5 +160,34 @@ do_get_chunk(FileID, ChunkIdx)->
 			end
 	end.
 
-% read step 4: close file == write step 4
+%%
+%% 
+%% host drop.
+%% update chunkmapping and delete chunks
+%% arg -  that host
+%% return ---
+do_detach_one_host(HostName)->
+    detach_from_chunk_mapping(HostName).
+
+do_dataserver_bootreport(HostRecord, ChunkList)->
+     do_register_dataserver(HostRecord, ChunkList).
+
+%% 
+%%delete 
+do_delete(FileID, _From)->
+    do_delete_filemeta(FileID).
+
+
+%%
+%% 
+%%
+do_collect_orphanchunk(Host)->
+    % get orphanchunk from orphanchunk table
+    OrphanChunkList = select_chunkid_from_orphanchunk(Host),
+    % delete notified orphanchunk from orphanchunk table
+    do_delete_orphanchunk_byhost(Host),  
+    OrphanChunkList.
+
+
+
 

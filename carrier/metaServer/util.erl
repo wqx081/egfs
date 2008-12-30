@@ -34,3 +34,15 @@ getNthList(I, Max, List)   ->  [_| Tail] = List,
                                     getNthList(I+1, Max, Tail).
 
 
+c()->
+    io:format("compiling file : metaDB~n"),
+   	c:c(metaDB),
+    io:format(".....ok~n"),
+    io:format("compiling file : metagenserver~n"),
+   	c:c(metagenserver),
+    io:format(".....ok~n"),
+    io:format("compiling file : metaserver~n"),
+   	c:c(metaserver),
+	io:format(".....ok~n"),
+	io:format("compile finished.").
+

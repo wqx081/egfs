@@ -9,7 +9,7 @@
                      do_get_chunk/2, 
                      do_close/2,
                      do_dataserver_bootreport/2,
-                     do_delete/1]).
+                     do_delete/2]).
 
 -export([start/0,stop/0,terminate/2]).
 -export([init/1, handle_call/3, handle_cast/2,handle_info/2]).
@@ -71,9 +71,9 @@ handle_call({close, FileID}, {From, _}, State)->
 	Reply = do_close(FileID, From),
     {reply, Reply, State};
 
-handle_call({delete,FileId},{_From,_},State) ->
+handle_call({delete,FileId},{From,_},State) ->
     io:format("inside handle_call_delete,FileID:~p~n",[FileId]),
-	Reply = do_delete(FileId),
+	Reply = do_delete(FileId, From),
     {reply, Reply, State};
 
 handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
@@ -81,6 +81,10 @@ handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
 	Reply = do_dataserver_bootreport(HostInfoRec, ChunkList),
     {reply, Reply, State};
 
+handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
+    io:format("inside handle_call_getorphanchunk,FileID:~p~n",[HostRegName]),
+	Reply = do_collect_orphanchunk(HostRegName),
+    {reply, Reply, State};
 
 handle_call(_, {_From, _}, State)->
     io:format("inside handle_call_error~n"),
@@ -144,4 +148,13 @@ registerChunk(FileID, ChunkID, ChunkUsedSize, NodeList)->
 %% bootReport(HostInfoRec, ChunkList) => {ok, OrphanChunkList} | {error, "Reason for error"}
 bootReport(HostInfoRec, ChunkList)->
     gen_server:call(?GM, {bootreport, HostInfoRec, ChunkList}).
+
+%%
+%% garbage collection methods
+%% get orphan chunks
+%% 1. getOrphanChunk(HostRegName) => [<<OrphanChunkID:64>>, ...]
+getOrphanChunk(HostRegName)->
+    gen_server:call(?GM, {getorphanchunk, HostRegName}).
+
+
 
