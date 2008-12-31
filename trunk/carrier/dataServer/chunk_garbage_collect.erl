@@ -20,14 +20,9 @@ collect(GarbageList) ->
     {atomic, ok} = chunk_db:remove_chunk_infos(GarbageList).
 
 remove_file_on_disk(FilePath) ->
-    file:delete(FilePath).
+     file:delete(FilePath).
     %%{ok, FilePath}.
         	  
 remove_files_on_disk(FilePathList) ->
     foreach(fun remove_file_on_disk/1, FilePathList).
     
-get_garbage_list() ->
-    case gen_server:call(?GM, {getorphanchunk, "pp@pp"}) of
-	_Any ->
-	    _Any    
-    end.
