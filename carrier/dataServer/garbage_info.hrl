@@ -1,0 +1,1 @@
+-record(garbageinfo, {chunk_id, insert_time}).
