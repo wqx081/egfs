@@ -5,6 +5,7 @@ ERLC = erlc
 ERLCFLAGS = -pa eunit/ebin
 
 SUB_DIRECTORIES = eunit
+TEST_OBJS := $(shell ls -1 *_tests.erl)
 
 .SUFFIXES: .erl .beam .yrl
 
@@ -16,10 +17,14 @@ SUB_DIRECTORIES = eunit
 
 all: subdirs compile test
 
-compile: eunit client.beam fib.beam client_tests.beam
+compile: eunit client.beam clientlib.beam $(TEST_OBJS:%.erl=%.beam)
 
-client.beam:../client/client.erl
+client.beam: ../client/client.erl
 	$(ERLC) $(ERLCFLAGS) ../client/client.erl
+
+clientlib.beam: ../client/clientlib.erl
+	$(ERLC) $(ERLCFLAGS) ../client/clientlib.erl
+
 
 subdirs:
 	@for d in $(SUB_DIRECTORIES); do \
@@ -27,7 +32,12 @@ subdirs:
 	done
 
 test: compile
-	 $(ERL) $(ERLFLAGS) -s client_tests ping -s client_tests test -s init stop
+	@for p in $(TEST_OBJS:%.erl=%); do \
+		$(ERL) $(ERLFLAGS) -s $$p ping -s $$p test -s init stop ; \
+	done
+
+echo:
+	echo $(TEST_OBJS)
 
 clean:
 	@for d in $(SUB_DIRECTORIES); do \
