@@ -44,5 +44,6 @@ boot_report()->
     {ok, HostInfo} = get_host_info(),
     BChunklist = get_all_chunkid(),
     {ok, OrphanChunkList} = gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}).
+
 	  
 

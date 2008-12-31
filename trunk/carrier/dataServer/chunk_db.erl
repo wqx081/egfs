@@ -168,7 +168,15 @@ insert_garbage_info(Chunkid) ->
 		      },
     do_trans(Row).
 
-get_garbage_chunk_id() ->
+insert_garbage_infos(Chunkidlist) ->
+    F = fun() ->
+  		foreach(fun insert_garbage_info/1, Chunkidlist)
+  	end,
+    mnesia:transaction(F).
+
+
+
+get_all_garbage_chunkid() ->
     do(qlc:q([X#garbageinfo.chunk_id || X <- mnesia:table(garbageinfo)
 				       ])).
 
