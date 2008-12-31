@@ -14,7 +14,7 @@
 	 do_close/1, get_file_name/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
--define(DATA_SERVER, {global, data_server}).
+%-define(DATA_SERVER, {global, data_server}).
 
 do_open(FileName, Mode) ->
     case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
@@ -36,13 +36,27 @@ do_pwrite(FileDevice, Start, Bytes) ->
     Size = size(Bytes),
     loop_write_chunks(FileDevice, ChunkIndex, Start, Size, Bytes).
 
+do_read_file_info(FileName) ->
+    case gen_server:call(?META_SERVER, {read_info, FileName}) of
+        {ok, FileInfo} -> 
+	    ?DEBUG("[Client, ~p]:get fileinfo ok~n",[?LINE]),
+	    {ok, FileInfo};
+        {error, Why} -> 
+	    ?DEBUG("[Client, ~p]:get fileinfo error~p~n",[?LINE, Why]),
+	    {error, Why}
+    end.
+
 do_delete(FileName) -> 
     case gen_server:call(?META_SERVER, {delete, FileName}) of
         {ok, _} -> 
+	    ?DEBUG("[Client, ~p]:Delete file ok~n",[?LINE]),
 	    {ok};
         {error, Why} -> 
 	    ?DEBUG("[Client, ~p]:Delete file error~p~n",[?LINE, Why]),
-	    {error,Why}
+	    {error, Why};
+	Any ->
+	    ?DEBUG("[Client, ~p]:any info in Delete~p~n",[?LINE, Any]),
+	    {error, Any}
     end.
 
 do_close(FileID) ->
@@ -93,7 +107,8 @@ read_them(FileID, {Start, End}) ->
 
 loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
     ?DEBUG("[Client, ~p]:Start is : ~p, ChunkIndex is: ~p~n",[?LINE, Start, ChunkIndex]),
-    {ok, ChunkID, _Nodelist} = get_chunk_info(FileID, ChunkIndex),
+    {ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex),
+    [Node|_T] = Nodelist,
     Begin = Start rem ?CHUNKSIZE,
     Size1 = ?CHUNKSIZE - Begin,
 
@@ -103,15 +118,15 @@ loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
 	true ->
 	    Size = End - Start
     end,
-    read_a_chunk(FileID, ChunkIndex, ChunkID, Begin, Size),
+    read_a_chunk(FileID, ChunkIndex, ChunkID, Node, Begin, Size),
     ChunkIndex2 = ChunkIndex + 1,
     Start2 = Start + Size,
     loop_read_chunks(FileID, ChunkIndex2, Start2, End);
 loop_read_chunks(_, _, _, _) ->
     ?DEBUG("[Client, ~p]all chunks read finished!~n", [?LINE]).
 
-read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE ->
-    {ok, Host, Port} = gen_server:call(?DATA_SERVER, {readchunk, ChunkID, Begin, Size}),
+read_a_chunk(FileID, _ChunkInedx, ChunkID, Node, Begin, Size) when Size =< ?CHUNKSIZE ->
+    {ok, Host, Port} = gen_server:call(Node, {readchunk, ChunkID, Begin, Size}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
     receive
@@ -124,7 +139,7 @@ read_a_chunk(FileID, _ChunkInedx, ChunkID, Begin, Size) when Size =< ?CHUNKSIZE 
             ?DEBUG("[Client, ~p]:read file closed~n",[?LINE]),
 	    void
     end;    
-read_a_chunk(_, _, _, _,_) ->
+read_a_chunk(_, _, _, _, _, _) ->
     void.
 
 loop_receive_ctrl(Socket, Child) ->
@@ -220,8 +235,9 @@ write_a_chunk(FileDevice, ChunkIndex, Begin, Size, Content) when Begin + Size =<
 	    %{ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex)
     end,
 
+    [Node|T] = Nodelist,
     ?DEBUG("[Client, ~p]:begin: ~p, size: ~p in chunk!~n", [?LINE, Begin, Size]),
-    {ok, Host, Port} = gen_server:call(?DATA_SERVER, {writechunk, FileID, ChunkIndex, ChunkID, Nodelist}),
+    {ok, Host, Port} = gen_server:call(Node, {writechunk, FileID, ChunkIndex, ChunkID, T}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
     receive
