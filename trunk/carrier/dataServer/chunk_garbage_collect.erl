@@ -11,10 +11,8 @@
 -define(GM,{global, metagenserver}).
 
 collect(GarbageList) ->
-    GarbageList,
     {atomic, ok} = chunk_db:insert_garbage_infos(GarbageList),    
     RemoveFileList = chunk_db:get_paths_by_chunk_id(GarbageList),
-    RemoveFileList,
     remove_files_on_disk(RemoveFileList),
     {atomic, ok} = chunk_db:remove_garbage_infos(GarbageList),
     {atomic, ok} = chunk_db:remove_chunk_infos(GarbageList).
