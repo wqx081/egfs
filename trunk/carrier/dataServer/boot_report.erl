@@ -9,13 +9,13 @@
 -include("../include/egfs.hrl").
 -include("chunk_info.hrl").
 -import(toolkit, [get_local_addr/0]).
--export([get_all_chunkid/0, get_host_info/0, boot_report/0]).
+-export([get_all_chunk_id/0, get_host_info/0, boot_report/0]).
 
 %% -define(GM,{global, metagenserver}).
 
 
-get_all_chunkid() ->
-    chunk_db:get_all_chunkid().
+get_all_chunk_id() ->
+    chunk_db:get_all_chunk_id().
     %% BChunklist = lists:map(fun(X) -> <<X:64>> end , Chunklist),
     %% io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
     %% BChunklist.
@@ -42,8 +42,13 @@ get_host_info() ->
 
 boot_report()->
     {ok, HostInfo} = get_host_info(),
-    BChunklist = get_all_chunkid(),
-    {ok, OrphanChunkList} = gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}).
+    BChunklist = get_all_chunk_id(),
+    {ok, OrphanChunkList} = gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}),
+    {ok,_SucceededList} = chunk_garbage_collect:collect(OrphanChunkList).
+    
+
+
+
 
 	  
 
