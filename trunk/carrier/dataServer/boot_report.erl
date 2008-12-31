@@ -38,23 +38,11 @@ get_host_info() ->
     {ok, Host} = get_local_addr(),
     {ok, Free} = get_free_space(),
     {ok, Total} = get_total_space(),
-    {ok, {hostinfo, {Proc, Host, Free, Total}}}.
+    {ok, {hostinfo, Proc, Host, Free, Total}}.
 
 boot_report()->
     {ok, HostInfo} = get_host_info(),
-    io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
     BChunklist = get_all_chunkid(),
-    io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
-    case gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}) of
-	{ok, OrphanChunkList} ->
-	    io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
-	    OrphanChunkList;
-	{error, Reason} ->
-	    io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
-	    Reason;
-	_Any ->
-	    _Any
-    
-    end.
+    {ok, OrphanChunkList} = gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}).
 	  
 
