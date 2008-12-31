@@ -201,10 +201,10 @@ select_all_from_filemeta(FileID) ->    %result [L]
               X||X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
               ])).
 
-select_attributes_from_filemeta(FileID) ->    %result [L]
+select_attributes_from_filemeta(FileName) ->    %result [L]
     do(qlc:q([
-              {X#filemeta.filesize, X#filemeta.createT, X#filemeta.modifyT, X#filemeta.acl}||
-              X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
+              {X#filemeta.filesize,X#filemeta.chunklist X#filemeta.createT, X#filemeta.modifyT, X#filemeta.acl}||
+              X<-mnesia:table(filemeta),X#filemeta.filename =:= FileName
               ])).
 
 select_all_from_filemeta_s(FileID)->
