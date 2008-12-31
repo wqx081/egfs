@@ -10,7 +10,8 @@
                      do_close/2,
                      do_dataserver_bootreport/2,
                      do_delete/2,
-                     do_collect_orphanchunk/1]).
+                     do_collect_orphanchunk/1,
+                     do_get_fileattr/1]).
 
 -export([start/0,stop/0,terminate/2]).
 -export([init/1, handle_call/3, handle_cast/2,handle_info/2]).
@@ -72,9 +73,10 @@ handle_call({close, FileID}, {From, _}, State)->
 	Reply = do_close(FileID, From),
     {reply, Reply, State};
 
-handle_call({delete,FileId},{From,_},State) ->
-    io:format("inside handle_call_delete,FileID:~p~n",[FileId]),
-	Reply = do_delete(FileId, From),
+
+handle_call({delete,FileName},{From,_},State) ->
+    io:format("inside handle_call_delete,FileName:~p~n",[FileName]),
+	Reply = do_delete(FileName, From),
     {reply, Reply, State};
 
 handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
@@ -87,9 +89,9 @@ handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
 	Reply = do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
-handle_call({getfileattr, FileID},{_From,_},State) ->
-    io:format("inside handle_call_getfileattr,FileID:~p~n",[FileID]),
-	Reply = do_get_fileattr(FileID),
+handle_call({getfileattr, FileName},{_From,_},State) ->
+    io:format("inside handle_call_getfileattr,FileName:~p~n",[FileName]),
+	Reply = do_get_fileattr(FileName),
     {reply, Reply, State};
 
 handle_call(_, {_From, _}, State)->
