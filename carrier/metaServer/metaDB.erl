@@ -70,7 +70,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,{{data_server,lt@lt},{192,168,0,111},1000000,2000000}}
+     {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -82,6 +82,10 @@ clear_tables()->
     mnesia:clear_table(chunkmapping).
 
 reset_example_tables()->
+    mnesia:create_table(hostinfo, [{attributes, record_info(fields,hostinfo)},
+                                      {disc_copies,[node()]}
+                                     ]),
+    
     F = fun() ->
 		foreach(fun mnesia:write/1, example_tables())
 		end,
@@ -395,12 +399,21 @@ do_find_orphanchunk()->
     {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
     
     % filter out used chunks according to filemeta table
-	GetUsedChunkIdList =
+	GetUsedChunkIdListInFilemeta =
         fun(FileMeta, Acc) ->                
                 Acc--FileMeta#filemeta.chunklist                
         end,        
-    DogetUsedChunkIdList = fun() -> mnesia:foldl(GetUsedChunkIdList, AllChunkIdList, filemeta) end,
-    {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdList),
+    DogetUsedChunkIdListInFilemeta = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemeta, AllChunkIdList, filemeta) end,
+    {atomic, ChunkNotInFilemeta} = mnesia:transaction(DogetUsedChunkIdListInFilemeta),
+    
+    
+    % filter out used chunks according to filemeta_s table
+	GetUsedChunkIdListInFilemetaS =
+        fun(FileMetaS, AcS) ->                
+                AcS--FileMetaS#filemeta_s.chunklist                
+        end,        
+    DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
+    {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
     
     GetOrphanPair = 
         fun(X) ->
