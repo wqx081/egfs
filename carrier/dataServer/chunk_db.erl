@@ -3,6 +3,7 @@
 -import(util,[for/3]).
 
 -include("chunk_info.hrl").
+-include("garbage_info.hrl").
 -include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
@@ -12,6 +13,7 @@ do_this_once() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
     mnesia:create_table(chunkmeta, [{attributes, record_info(fields, chunkmeta)}, {disc_copies,[node()]}]),
+    mnesia:create_table(garbageinfo, [{attributes, record_info(fields, garbageinfo)}, {disc_copies,[node()]}]),
     mnesia:stop().
 
 start()->
@@ -19,10 +21,11 @@ start()->
 	ok ->
 	    mnesia:start(),
 	    mnesia:create_table(chunkmeta, [{attributes, record_info(fields, chunkmeta)}, {disc_copies,[node()]}]),
-	    mnesia:wait_for_tables([chunkmeta], 5000);
+	    mnesia:create_table(garbageinfo, [{attributes, record_info(fields, garbageinfo)}, {disc_copies,[node()]}]),
+	    mnesia:wait_for_tables([chunkmeta, garbageinfo], 5000);
 	_ -> 
 	    mnesia:start(),
-	    mnesia:wait_for_tables([chunkmeta], 5000)
+	    mnesia:wait_for_tables([chunkmeta, garbageinfo], 5000)
     end.
 
     
@@ -31,7 +34,8 @@ stop()->
     mnesia:stop().
 
 clear_tables()->
-    mnesia:clear_table(chunkmeta).
+    mnesia:clear_table(chunkmeta),
+    mnesia:clear_table(garbageinfo).
     
 
 do(Q) ->
@@ -157,3 +161,15 @@ get_all_chunkid() ->
 					 ])).
 
 
+
+insert_garbage_info(Chunkid) ->
+    Row = #garbageinfo{chunk_id=Chunkid,
+		      insert_time=erlang:localtime()
+		      },
+    do_trans(Row).
+
+get_garbage_chunk_id() ->
+    do(qlc:q([X#garbageinfo.chunk_id || X <- mnesia:table(garbageinfo)
+				       ])).
+
+    

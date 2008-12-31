@@ -10,6 +10,7 @@
 -include("chunk_info.hrl").
 -import(toolkit, [get_local_addr/0]).
 -export([get_all_chunkid/0, get_host_info/0, boot_report/0]).
+
 %% -define(GM,{global, metagenserver}).
 
 
@@ -26,6 +27,7 @@ get_proc_name() ->
 get_free_space() ->
     io:format("[~p, ~p]: unimplemented!~n", [?MODULE, ?LINE]),
     {ok, 16106127360}.
+
 
 get_total_space() ->
     io:format("[~p, ~p]: unimplemented!~n", [?MODULE, ?LINE]),
