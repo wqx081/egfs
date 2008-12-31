@@ -73,7 +73,14 @@ remove_chunk_info(Chunkid)->
 	end,
     mnesia:transaction(F).
 
+remove_chunk_infos(ChunkidList) ->
+    F = fun() ->
+		foreach(fun remove_chunk_info/1, ChunkidList)
+	end,
+    mnesia:transaction(F).
     
+
+
 
 modify_chunk_info(Chunkid, NewPath, NewSize, NewCreatetime, NewModifytime) ->
     [{chunkmeta,Chunkid, Fileid, _, _, _, _ }] = get_chunk_info_by_id(Chunkid),    
@@ -131,34 +138,39 @@ modify_chunk_mt(Chunkid, NewModifytime) ->
 		      create_time=Createtime,
 		      modify_time=NewModifytime      
 		     },
-
     do_trans(Row).
 
 
 get_all_from_table(T)->
     do(qlc:q([X || X <- mnesia:table(T)])).
 
-
 get_chunk_info_by_id(Chunkid) ->  
     do(qlc:q([X || X <- mnesia:table(chunkmeta), 
 		   X#chunkmeta.chunk_id =:= Chunkid
 		      ])).
 
-
-
 get_chunk_id_by_path(Path) ->
     do(qlc:q([X#chunkmeta.chunk_id || X <- mnesia:table(chunkmeta),
                                    X#chunkmeta.path =:= Path
 					 ])).   
+
 get_file_id_by_chunk_id(Chunkid) ->
     do(qlc:q([X#chunkmeta.file_id || X <- mnesia:table(chunkmeta), 
 				     X#chunkmeta.chunk_id =:= Chunkid
 					])).
 
-get_all_chunkid() ->
+get_all_chunk_id() ->
     io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     do(qlc:q([X#chunkmeta.chunk_id || X <- mnesia:table(chunkmeta)				     
 					 ])).
+get_path_by_chunk_id(Chunkid) ->
+    do(qlc:q([X#chunkmeta.path || X <- mnesia:table(chunkmeta), 
+				     X#chunkmeta.chunk_id =:= Chunkid
+					])).
+
+get_paths_by_chunk_id(ChunkidList) ->
+    TmpChunkidList = [get_path_by_chunk_id(X) || X <- ChunkidList],
+    [X || [X] <- TmpChunkidList].
 
 
 
@@ -168,15 +180,29 @@ insert_garbage_info(Chunkid) ->
 		      },
     do_trans(Row).
 
-insert_garbage_infos(Chunkidlist) ->
+insert_garbage_infos(ChunkidList) ->
     F = fun() ->
-  		foreach(fun insert_garbage_info/1, Chunkidlist)
+  		foreach(fun insert_garbage_info/1, ChunkidList)
   	end,
     mnesia:transaction(F).
 
 
+remove_garbage_info(Chunkid) ->
+    Oid = {garbageinfo, Chunkid},
+    F = fun() ->
+		mnesia:delete(Oid)
+	end,
+    mnesia:transaction(F).
 
-get_all_garbage_chunkid() ->
+    
+remove_garbage_infos(ChunkidList) ->
+    F = fun() ->
+		foreach(fun remove_garbage_info/1, ChunkidList)
+	end,
+    mnesia:transaction(F).
+
+
+get_all_garbage_chunk_id() ->
     do(qlc:q([X#garbageinfo.chunk_id || X <- mnesia:table(garbageinfo)
 				       ])).
 
