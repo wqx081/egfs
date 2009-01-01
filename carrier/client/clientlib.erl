@@ -11,7 +11,8 @@
 -include("filedevice.hrl").
 -export([do_open/2, do_pread/3, 
 	 do_pwrite/3, do_delete/1,
-	 do_close/1, get_file_name/1]).
+	 do_close/1, get_file_name/1,
+	 do_read_file_info/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
 %-define(DATA_SERVER, {global, data_server}).
@@ -37,7 +38,7 @@ do_pwrite(FileDevice, Start, Bytes) ->
     loop_write_chunks(FileDevice, ChunkIndex, Start, Size, Bytes).
 
 do_read_file_info(FileName) ->
-    case gen_server:call(?META_SERVER, {read_info, FileName}) of
+    case gen_server:call(?META_SERVER, {getfileattr, FileName}) of
         {ok, FileInfo} -> 
 	    ?DEBUG("[Client, ~p]:get fileinfo ok~n",[?LINE]),
 	    {ok, FileInfo};
@@ -96,7 +97,6 @@ get_chunk_info(FileID, ChunkIndex) ->
 	    
 get_new_chunk(FileID, _ChunkIndex) ->
     gen_server:call(?META_SERVER, {allocatechunk, FileID}).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%          read
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
