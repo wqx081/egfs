@@ -12,7 +12,8 @@
 -import(clientlib, 
 	[do_open/2, do_pread/3, 
 	do_pwrite/3, do_delete/1, 
-	do_close/1, get_file_name/1]).
+	do_close/1, get_file_name/1,
+	do_read_file_info/1]).
 -export([open/2, pwrite/3, pread/3, delete/1, close/1]).
 -compile(export_all).
 %-define(BINARYSIZE, 67108864).
@@ -30,6 +31,10 @@ pwrite(FileDevice, Location, Bytes) ->
 
 pread(FileID, Start, Length) ->
     do_pread(FileID, Start, Length).
+
+read_file_info(FileName) ->
+    do_read_file_info(FileName).
+
 
 delete(FileName) ->
     do_delete(FileName).
