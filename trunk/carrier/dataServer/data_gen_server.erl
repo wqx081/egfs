@@ -33,8 +33,6 @@ handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
     Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist),
     {reply, Reply, N};
 handle_call({echo, Msg}, _From, N) ->
-    Name = get(service),
-    ?DEBUG("[data_server]: (service, ~p)~n", [Name]),
     ?DEBUG("[data_server]: echo ~p~n", [Msg]),
     {reply, Msg, N};
 handle_call(Any, _From, N) ->
