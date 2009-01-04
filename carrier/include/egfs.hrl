@@ -32,7 +32,7 @@
 
 %% config record
 %% procname={RegName, Node()}; host=IP; 
--record(hostinfo,{procname,host,freespace,totalspace}).
+-record(hostinfo,{procname,host,freespace,totalspace,health}).
 -record(config,{
     access = [{tcp,{{127,0,0,1},51206,512,128}}],
     datafile = "xbtdata",
