@@ -30,8 +30,13 @@
 -define(WORD,                     16/unsigned-big-integer).
 -define(DWORD,                    32/unsigned-big-integer).
 
+-define(CFILE, "/tmp/ctlfile").
+
+
+
+%^% meta server
 %% config record
-%% procname={RegName, Node()}; host=IP; 
+%% procname={RegName, Node()}; host=IP; health={TimeStamp, HealthDegree}
 -record(hostinfo,{procname,host,freespace,totalspace,health}).
 -record(config,{
     access = [{tcp,{{127,0,0,1},51206,512,128}}],
@@ -41,5 +46,7 @@
     storage_mod = none
 }).
 
--define(CFILE, "/tmp/ctlfile").
+-define(HEART_BEAT_PERIOD,		5000).    % 5000 milisecond = 5 second
+-define(HEART_BEAT_TIMEOUT,		5*HEART_BEAT_PERIOD).		
+-define(INIT_NODE_HEALTH,		5). % 5 means a healthy connected data node, 0 means a disconnected ndoe
 
