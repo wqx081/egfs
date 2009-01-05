@@ -12,6 +12,7 @@
                  select_all_from_filemeta_s/1,
                  select_nodeip_from_chunkmapping/1,
                  select_all_from_filemeta/1,
+                select_from_hostinfo/1,
                 select_chunkid_from_orphanchunk/1,
                 write_to_db/1,delete_from_db/1,
                 detach_from_chunk_mapping/1,
@@ -164,7 +165,7 @@ do_get_chunk(FileID, ChunkIdx)->
 %% read file attribute step 1: open file
 %% read file attribute step 2: get chunk for 
 do_get_fileattr(FileName)->
-    AttributeList =select_attributes_from_filemeta(FileName),
+    [AttributeList] =select_attributes_from_filemeta(FileName),
     {ok, AttributeList}.
 
 %%
@@ -200,6 +201,15 @@ do_collect_orphanchunk(HostProcName)->
     do_delete_orphanchunk_byhost(HostProcName),
     OrphanChunkList.
 
-
-
+do_register_heartbeat(HostInfoRec)->
+    Res = select_from_hostinfo(HostInfoRec#hostinfo.procname),
+    Host = HostInfoRec#hostinfo.host,
+    case Res of
+        [{hostinfo,_Proc,Host,_TotalSpace,_FreeSpace,_Health}]->
+            {_,TimeTick,_} = now(),
+            NewInfo = HostInfoRec#hostinfo{health = {TimeTick,?INIT_NODE_HEALTH}},
+            write_to_db(NewInfo),
+            {ok,"heartbeat ok"};                
+        _-> {error,"chunk does not exist"}
+    end.
 

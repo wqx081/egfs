@@ -27,9 +27,12 @@ init(_Arg) ->
     %init_mnesia(),
     {ok, []}.
 
+die() ->
+    1000 div 0.
+
 start() ->
     metaDB:start_mnesia(),
-    {ok,Tref} = apply_interval(5000,hostMonistor,checkHostHealt,[]), % check host health every 5 second
+    {ok,Tref} = timer:apply_interval((?HEART_BEAT_TIMEOUT),hostMonitor,checkHostHealth,[]), % check host health every 5 second
     gen_server:start_link(?META_SERVER, metagenserver, [], []).
 
 stop() ->
@@ -98,7 +101,7 @@ handle_call({getfileattr, FileName},{_From,_},State) ->
 
 
 handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
-    io:format("inside handle_call_heartbeat,HostRegName:~p~n",[HostInfoRec]),
+  %  io:format("inside handle_call_heartbeat,HostRegName:~p~n",[HostInfoRec]),
 	Reply = do_register_heartbeat(HostInfoRec),
     {reply, Reply, State};
 
@@ -107,8 +110,6 @@ handle_call(_, {_From, _}, State)->
     io:format("inside handle_call_error~n"),
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
-
-
 
 
 handle_cast(stop, State) ->
