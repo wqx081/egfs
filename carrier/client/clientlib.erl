@@ -19,7 +19,8 @@
 do_open(FileName, Mode) ->
     case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
         {ok, FileID} ->
-	    {ok, FileID};
+            FileDevice = #filedevice{fileid = FileID},
+	    {ok, FileDevice};
         {error, Why} ->
 	    ?DEBUG("[Client, ~p]:Open file error:~p~n",[?LINE, Why]),
 	    {error, Why}
@@ -38,7 +39,8 @@ do_pwrite(FileDevice, Start, Bytes) ->
 
 do_read_file(FileName) ->
     ?DEBUG("[client, ~p]:test read begin at ~p~n~n", [?LINE, erlang:time()]),
-    {ok, FileID} = client:open(FileName, r),
+    {ok, FileDevice} = client:open(FileName, r),
+    FileID = FileDevice#filedevice.fileid,
     {ok, FileInfo} = client:read_file_info(FileName),
     {Length, _, _, _, _} = FileInfo,
     client:pread(FileID, 0, Length),
