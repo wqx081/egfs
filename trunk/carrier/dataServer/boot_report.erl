@@ -16,36 +16,41 @@
 
 get_all_chunk_id() ->
     chunk_db:get_all_chunk_id().
-    %% BChunklist = lists:map(fun(X) -> <<X:64>> end , Chunklist),
-    %% io:format("[~p, ~p]: ~n", [?MODULE, ?LINE]),
-    %% BChunklist.
+    
 
 get_proc_name() ->
     NodeName = node(),
     {ok, {?SERVER_NAME, NodeName}}.
 
 get_free_space() ->
-    io:format("[~p, ~p]: unimplemented!~n", [?MODULE, ?LINE]),
     {ok, 16106127360}.
 
 
 get_total_space() ->
-    io:format("[~p, ~p]: unimplemented!~n", [?MODULE, ?LINE]),
     {ok, 21474836480}.
 
 get_host_info() ->
     {ok, Proc} = get_proc_name(),
     {ok, Host} = get_local_addr(),
     {ok, Free} = get_free_space(),
-    {ok, Total} = get_total_space(),
-    {ok, {hostinfo, Proc, Host, Free, Total}}.
+    {ok, Total} = get_total_space(),    
+    {ok, {hostinfo, Proc, Host, Free, Total, {0, 0}}}.
 
 boot_report()->
     {ok, HostInfo} = get_host_info(),
     BChunklist = get_all_chunk_id(),
-    {ok, OrphanChunkList} = gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}),
-    {ok,_SucceededList} = chunk_garbage_collect:collect(OrphanChunkList).
-    
+    io:format("[~p, ~p ] ~n", [?MODULE, ?LINE]),
+    HostInfo,
+    BChunklist,
+    case  gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}) of
+	{ok, OrphanChunkList} ->
+	    chunk_garbage_collect:collect(OrphanChunkList);
+	_Any ->
+	    _Any
+    end.
+
+    %%io:format("[~p, ~p ] ~n", [?MODULE, ?LINE]),
+
 
 
 
