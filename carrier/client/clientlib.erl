@@ -9,10 +9,9 @@
 -include_lib("kernel/include/file.hrl").
 -include("../include/egfs.hrl").
 -include("filedevice.hrl").
--export([do_open/2, do_pread/3, 
-	 do_pwrite/3, do_delete/1,
-	 do_close/1, get_file_name/1,
-	 do_read_file_info/1]).
+-export([do_open/2, do_pread/3, do_pwrite/3, do_delete/1,
+	 do_close/1, do_read_file/1, do_read_file_info/1,
+	 get_file_name/1, get_file_size/1]).
 -compile(export_all).
 -define(STRIP_SIZE, 8192).   % 8*1024
 %-define(DATA_SERVER, {global, data_server}).
@@ -36,6 +35,27 @@ do_pwrite(FileDevice, Start, Bytes) ->
     ChunkIndex = Start div ?CHUNKSIZE,
     Size = size(Bytes),
     loop_write_chunks(FileDevice, ChunkIndex, Start, Size, Bytes).
+
+do_read_file(FileName) ->
+    ?DEBUG("[client, ~p]:test read begin at ~p~n~n", [?LINE, erlang:time()]),
+    {ok, FileID} = client:open(FileName, r),
+    {ok, FileInfo} = client:read_file_info(FileName),
+    {Length, _, _, _, _} = FileInfo,
+    client:pread(FileID, 0, Length),
+    client:close(FileID),
+    ?DEBUG("~n[client, ~p]:test read end at ~p~n", [?LINE, erlang:time()]),
+    FileName1 = get_file_name(FileID),
+    {ok, FileLength} = get_file_size(FileName1),
+    {ok, Hdl} = get_file_handle(read, FileName1),
+    case file:pread(Hdl, 0, FileLength) of
+	{ok, Binary} ->
+	    file:delete(FileName1),
+	    ?DEBUG("[Client, ~p]:read file ok and return binary~n",[?LINE]),
+	    {ok, Binary};
+	{error, Reason} ->
+	    ?DEBUG("[Client, ~p]:read file error ~p~n",[?LINE, Reason]),
+	    {error, Reason}
+    end.
 
 do_read_file_info(FileName) ->
     case gen_server:call(?META_SERVER, {getfileattr, FileName}) of
@@ -92,6 +112,14 @@ get_file_handle(write, FileID) ->
 	    void
     end.
 
+get_file_size(FileName) ->
+    case file:read_file_info(FileName) of
+	{ok, Facts} ->
+	    {ok, Facts#file_info.size};
+	_ ->
+	    error
+    end.
+    
 get_chunk_info(FileID, ChunkIndex) -> 
     gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
 	    
@@ -108,6 +136,7 @@ read_them(FileID, {Start, End}) ->
 loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
     ?DEBUG("[Client, ~p]:Start is : ~p, ChunkIndex is: ~p~n",[?LINE, Start, ChunkIndex]),
     {ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex),
+    ?DEBUG("[Client, ~p]:Nodelist : ~p, ~n",[?LINE, Nodelist]),
     [Node|_T] = Nodelist,
     Begin = Start rem ?CHUNKSIZE,
     Size1 = ?CHUNKSIZE - Begin,
@@ -237,6 +266,7 @@ write_a_chunk(FileDevice, ChunkIndex, Begin, Size, Content) when Begin + Size =<
 
     [Node|T] = Nodelist,
     ?DEBUG("[Client, ~p]:begin: ~p, size: ~p in chunk!~n", [?LINE, Begin, Size]),
+    ?DEBUG("[Client, ~p]:begin: ~p~n", [?LINE, Node]),
     {ok, Host, Port} = gen_server:call(Node, {writechunk, FileID, ChunkIndex, ChunkID, T}),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
     Parent = self(),
@@ -298,3 +328,4 @@ loop_send_packet(Parent, DataSocket, Bytes) when size(Bytes) > 0->
 loop_send_packet(Parent, DataSocket, _Bytes) ->
     gen_tcp:close(DataSocket),
     Parent ! {finish, self()}.
+
