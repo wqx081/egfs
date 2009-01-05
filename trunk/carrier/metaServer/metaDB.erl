@@ -21,6 +21,15 @@
 %% API Functions
 %%
 
+
+create_a_table()->
+    mnesia:create_schema([node()]),
+    mnesia:start(),
+    mnesia:create_table(hostinfo, [{attributes, record_info(fields,hostinfo)},
+                                      {disc_copies,[node()]}
+                                     ]),
+    mnesia:stop().
+
 do_this_once() ->
     mnesia:create_schema([node()]),
     mnesia:start(),
@@ -70,7 +79,7 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000}
+     {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
@@ -203,7 +212,7 @@ select_all_from_filemeta(FileID) ->    %result [L]
 
 select_attributes_from_filemeta(FileName) ->    %result [L]
     do(qlc:q([
-              {X#filemeta.filesize,X#filemeta.chunklist X#filemeta.createT, X#filemeta.modifyT, X#filemeta.acl}||
+              {X#filemeta.filesize,X#filemeta.chunklist,X#filemeta.createT, X#filemeta.modifyT, X#filemeta.acl}||
               X<-mnesia:table(filemeta),X#filemeta.filename =:= FileName
               ])).
 
@@ -342,8 +351,9 @@ do_register_dataserver(HostRecord,ChunkList)->
     case X of
         []->
             % insert into hostinfo;
+            {_,TimeTick,_} = now(),
             F = fun() ->
-                        mnesia:write(HostRecord)
+                        mnesia:write(HostRecord#hostinfo{health = {TimeTick,?INIT_NODE_HEALTH}})
                         end,
             mnesia:transaction(F),
         	do_register_boot_chunks(HostRecord#hostinfo.procname,ChunkList);
