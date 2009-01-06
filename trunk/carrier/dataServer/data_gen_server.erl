@@ -18,6 +18,7 @@ stop() ->
     gen_server:cast(?DATA_SERVER, stop).
 
 init([]) -> 
+    io:format("data_gen_server is on~n"),
     %%process_flag(trap_exit, true),
     chunk_db:start(),
     boot_report:boot_report(),
@@ -35,10 +36,10 @@ handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
     {reply, Reply, N};
 handle_call({echo, Msg}, _From, N) ->
     ?DEBUG("[data_server]: echo ~p~n", [Msg]),
-    {reply, Msg, N};
-handle_call(Any, _From, N) ->
-    ?DEBUG("[data_server]: unknown request ~p~n", [Any]),
-    {noreply, N}.
+    {reply, Msg, N}.
+%%handle_call(Any, _From, N) ->
+%%    ?DEBUG("[data_server]: unknown request ~p~n", [Any]),
+%%    {noreply, N}.
     
 handle_cast(_Msg, N) -> {noreply, N}.
 handle_info(_Info, N) -> {noreply, N}.

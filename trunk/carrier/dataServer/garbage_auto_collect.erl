@@ -2,7 +2,7 @@
 -include("../include/egfs.hrl").
 -compile(export_all).
 
--define(GARBAGE_AUTO_COLLECT_PERIOD,	7000).    % 5000 milisecond = 5 second
+-define(GARBAGE_AUTO_COLLECT_PERIOD,	70000).    % 5000 milisecond = 5 second
 
 start() ->
     register(garbage_auto_collector, spawn_link(fun() -> loop(?GARBAGE_AUTO_COLLECT_PERIOD) end)).
