@@ -21,7 +21,7 @@ loop(Time) ->
 		 {ok, OrphanChunkList} ->
 		    chunk_garbage_collect:collect(OrphanChunkList);
 		_Any ->
-		    void
+		    io:format("garbage auto collector failed ~p ~n",[_Any])
 	    end,
 	    loop(Time)
     end.
