@@ -61,7 +61,7 @@ rm_pending_chunk(ChunkID) ->
     {ok, "has removed it"}.
 
 report_metaServer(FileID, _ChunkIndex, ChunkID, Len) ->
-    io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", [ChunkID, Len]),
+    %%io:format("[dataserver]: reporting to metaserver (~p, ~p)~n", [ChunkID, Len]),
     gen_server:call(?META_SERVER, {registerchunk, FileID, ChunkID, Len, []}),
     {ok, "has reported it"}.
 

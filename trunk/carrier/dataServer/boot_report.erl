@@ -11,9 +11,6 @@
 -import(toolkit, [get_local_addr/0]).
 -export([get_all_chunk_id/0, get_host_info/0, boot_report/0, get_proc_name/0]).
 
-%% -define(GM,{global, metagenserver}).
-
-
 get_all_chunk_id() ->
     chunk_db:get_all_chunk_id().
     
