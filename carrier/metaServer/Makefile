@@ -1,6 +1,6 @@
 .SUFFIXES: .erl .beam .yrl
 
-ERL = erl -boot start_clean -config elog.config -setcookie abc 
+ERL = erl -boot start_clean -config elog.config -setcookie test 
 
 all: compile
 

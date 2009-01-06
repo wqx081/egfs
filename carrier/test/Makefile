@@ -47,3 +47,6 @@ clean:
 	-rm -f *.beam
 	-rm -f *.avi
 	-rm -f zerot
+
+# gen_server:call({global, metagenserver},{debug,clearShadow}).
+# gen_server:call({data_server1, pp@pp}, {echo, "msg"}).
