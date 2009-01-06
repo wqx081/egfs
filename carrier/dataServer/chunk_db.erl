@@ -74,6 +74,7 @@ remove_chunk_info(Chunkid)->
     mnesia:transaction(F).
 
 remove_chunk_infos(ChunkidList) ->
+    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     F = fun() ->
 		foreach(fun remove_chunk_info/1, ChunkidList)
 	end,
@@ -169,6 +170,7 @@ get_path_by_chunk_id(Chunkid) ->
 					])).
 
 get_paths_by_chunk_id(ChunkidList) ->
+    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     TmpChunkidList = [get_path_by_chunk_id(X) || X <- ChunkidList],
     [X || [X] <- TmpChunkidList].
 
@@ -181,6 +183,7 @@ insert_garbage_info(Chunkid) ->
     do_trans(Row).
 
 insert_garbage_infos(ChunkidList) ->
+    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     F = fun() ->
   		foreach(fun insert_garbage_info/1, ChunkidList)
   	end,
