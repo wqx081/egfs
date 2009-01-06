@@ -41,7 +41,7 @@ do_read_open(Filename, _ClientID)->
         [] -> {error, "filename does not exist"};
         % get fileid sucessfull	
         [FileID] ->
-            {ok, FileID}  
+            {ok, FileID}
     end.
     
     %TODO: Table: clientinfo  ,     
