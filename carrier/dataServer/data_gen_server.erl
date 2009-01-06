@@ -19,9 +19,9 @@ stop() ->
 
 init([]) -> 
     %%process_flag(trap_exit, true),
-    ?DEBUG("~p is on ~n", [?MODULE]),
     chunk_db:start(),
     boot_report:boot_report(),
+    heart_beat_report:start(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
