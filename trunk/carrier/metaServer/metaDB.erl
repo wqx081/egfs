@@ -63,7 +63,7 @@ do_this_once() ->
 
 start_mnesia()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
-    mnesia:start(),    
+    mnesia:start(),
     mnesia:wait_for_tables([filemeta,filemeta_s,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
     logF(LOG).
 
