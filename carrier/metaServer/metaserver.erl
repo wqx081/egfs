@@ -199,7 +199,7 @@ do_collect_orphanchunk(HostProcName)->
     OrphanChunkList = select_chunkid_from_orphanchunk(HostProcName),
     % delete notified orphanchunk from orphanchunk table
     do_delete_orphanchunk_byhost(HostProcName),
-    OrphanChunkList.
+    {ok, OrphanChunkList}.
 
 do_register_heartbeat(HostInfoRec)->
     Res = select_from_hostinfo(HostInfoRec#hostinfo.procname),
