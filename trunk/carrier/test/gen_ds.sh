@@ -27,6 +27,6 @@ mkdir ds
 ./zerot -f ds/txt -s 2048 -n 512
 
 # cpp  1k * 1024 = 1M
-./zerot -f ds/cpp -s 1024 -n 1024 
+./zerot -f ds/cpp -s 1025 -n 1024 
 
 

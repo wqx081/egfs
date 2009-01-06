@@ -10,7 +10,7 @@
 
 
 ping() ->
-    net_adm:ping(zyb@zyb),
+    net_adm:ping(zyb@llk),
     receive 
         after 200 ->
                 true
@@ -18,9 +18,10 @@ ping() ->
 
 make_test_() ->
     {ok, F} = file:open("client_tests.log", write),
-    {ok, SubFileDirs} = file:list_dir("."),
-    SubFiles = lists:filter(fun(I) -> filelib:is_dir(I) =:= false end, SubFileDirs),
-    map(fun(X) -> (fun() -> do_write(F,X) end) end, sort(SubFiles)). 
+    {ok, SubFileDirs} = file:list_dir("./ds"),
+    SubFileDirsPath = map(fun(X) -> string:concat("./ds/", X) end, SubFileDirs),
+    SrcFiles = lists:filter(fun(I) -> filelib:is_dir(I) =:= false end, SubFileDirsPath),
+    map(fun(X) -> {X,{timeout, 10000, fun() -> do_write(F,X) end}} end, sort(SrcFiles)). 
 
 do_write(Log, Filename) ->
     statistics(runtime),
@@ -29,21 +30,19 @@ do_write(Log, Filename) ->
     put_file(Filename, RemoteFile),
     {_,Time1} = statistics(runtime),
     {_,Time2} = statistics(wall_clock),
-    io:format(user, "[~-3s][RT:~10p][WT:~10p][size:~10p]:(W)~p~n", ["OK", Time1, Time2, filelib:file_size(Filename), Filename]),
+    %% io:format(user, "[~-3s][RT:~10p][WT:~10p][size:~10p]:(W)~p~n", ["OK", Time1, Time2, filelib:file_size(Filename), Filename]),
     io:format(Log, "[~-3s][RT:~10p][WT:~10p][size:~10p]:(W)~p~n", ["OK", Time1, Time2, filelib:file_size(Filename), Filename]).
 
 %% put(_Filename) ->
 %%     true.
 
 put_file(FileName, RemoteFile) ->
-    ?DEBUG("[client, ~p]: test write begin at ~p~n ", [?LINE, erlang:time()]),
-    io:format(user, "[client, ~p]: test write begin at ~p~n ", [?LINE, erlang:time()]),
+    io:format(user, "[P:~p]: [F:~p]~n", [erlang:time(), FileName]),
     FileLength = filelib:file_size(FileName),
     {ok, FileID} = client:open(RemoteFile, w),	 %%only send open message to metaserver
     {ok, Hdl} = file:open(FileName, [raw, read, binary]), 
     loop_write(Hdl, FileID, 0, FileLength),
-    ?DEBUG("[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]),
-    io:format(user, "[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]),
+    %% io:format(user, "[client, ~p]: test write end at ~p~n ", [?LINE, erlang:time()]),
     file:close(Hdl),
     client:close(FileID#filedevice.fileid).
 
