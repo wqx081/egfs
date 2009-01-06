@@ -213,3 +213,12 @@ do_register_heartbeat(HostInfoRec)->
         _-> {error,"chunk does not exist"}
     end.
 
+
+%% 
+%% debug 
+%% 
+do_debug(Arg) ->
+    case Arg of
+        clearShadow ->
+            mnesia:clear_table(filemeta_s)
+    end.
