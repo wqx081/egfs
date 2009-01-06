@@ -173,8 +173,8 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	    file:write(Hdl, Binary),
 	    loop_receive(Parent, SocketData, Hdl, Len2);
 	{tcp_closed, SocketData} ->
-	    Parent ! {finish, self(), Len},
 	    file:close(Hdl);
+	    Parent ! {finish, self(), Len},
 	Any ->
 	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any])
     end. 
