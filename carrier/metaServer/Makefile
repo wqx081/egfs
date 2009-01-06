@@ -1,6 +1,6 @@
 .SUFFIXES: .erl .beam .yrl
 
-ERL = erl -boot start_clean -config elog.config -setcookie abc 
+ERL = erl -boot start_clean -config elog.config -setcookie test 
 
 all: compile
 
@@ -8,7 +8,7 @@ compile:
 	erl -make
 
 once:compile
-	${ERL} -sname zyb -s metaDB do_this_once
+	${ERL} -sname zyb -s metaDB do_this_once -s init stop 
 
 start:compile
 	${ERL} -sname zyb -s app_meta_server start
