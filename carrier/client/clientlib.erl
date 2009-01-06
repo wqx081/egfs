@@ -122,8 +122,9 @@ get_file_size(FileName) ->
 	    error
     end.
     
-get_chunk_info(FileID, ChunkIndex) -> 
-    gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
+%get_chunk_info(FileID, ChunkIndex) -> 
+%    gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
+	    
 	    
 get_new_chunk(FileID, _ChunkIndex) ->
     gen_server:call(?META_SERVER, {allocatechunk, FileID}).
@@ -137,28 +138,37 @@ read_them(FileID, {Start, End}) ->
 
 loop_read_chunks(FileID, ChunkIndex, Start, End) when Start < End ->
     ?DEBUG("[Client, ~p]:Start is : ~p, ChunkIndex is: ~p~n",[?LINE, Start, ChunkIndex]),
-    {ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex),
-    ?DEBUG("[Client, ~p]:Nodelist : ~p, ~n",[?LINE, Nodelist]),
-    [Node|_T] = Nodelist,
-    Begin = Start rem ?CHUNKSIZE,
-    Size1 = ?CHUNKSIZE - Begin,
+    %{ok, ChunkID, Nodelist} = get_chunk_info(FileID, ChunkIndex),
+    case gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}) of
+        {ok, ChunkID, Nodelist} ->	    
+	    ?DEBUG("[Client, ~p]:Nodelist : ~p, ~n",[?LINE, Nodelist]),
+	    [Node|_T] = Nodelist,
+	    Begin = Start rem ?CHUNKSIZE,
+	    Size1 = ?CHUNKSIZE - Begin,
 
-    if 
-	Size1 + Start =< End ->
-	    Size = Size1;
-	true ->
-	    Size = End - Start
-    end,
-    read_a_chunk(FileID, ChunkIndex, ChunkID, Node, Begin, Size),
-    ChunkIndex2 = ChunkIndex + 1,
-    Start2 = Start + Size,
-    loop_read_chunks(FileID, ChunkIndex2, Start2, End);
+	    if 
+		Size1 + Start =< End ->
+		    Size = Size1;
+		true ->
+		    Size = End - Start
+	    end,
+	    read_a_chunk(FileID, ChunkIndex, ChunkID, Node, Begin, Size),
+	    ?DEBUG("[Client, ~p]: ~n",[?LINE]),
+	    ChunkIndex2 = ChunkIndex + 1,
+	    Start2 = Start + Size,
+	    loop_read_chunks(FileID, ChunkIndex2, Start2, End);
+	{error, _} ->
+	    void
+    end;
 loop_read_chunks(_, _, _, _) ->
     ?DEBUG("[Client, ~p]all chunks read finished!~n", [?LINE]).
 
 read_a_chunk(FileID, _ChunkInedx, ChunkID, Node, Begin, Size) when Size =< ?CHUNKSIZE ->
+    ?DEBUG("[Client, ~p]:~p~n",[?LINE, ChunkID]),
     {ok, Host, Port} = gen_server:call(Node, {readchunk, ChunkID, Begin, Size}),
+    ?DEBUG("[Client, ~p]:~n",[?LINE]),
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}, {active, true}]),
+    ?DEBUG("[Client, ~p]:~n",[?LINE]),
     Parent = self(),
     receive
         {tcp, Socket, Binary} ->
@@ -193,8 +203,10 @@ loop_receive_ctrl(Socket, Child) ->
 	{error, Child, Why} ->
 	    ?DEBUG("[Client, ~p]:data receive socket error!~p~n",[?LINE, Why]);
 	{'EXIT', _, normal} ->
+	    ?DEBUG("[Client, ~p]:exit~n",[?LINE]),
 	    loop_receive_ctrl(Socket, Child);
 	{tcp_closed, _} ->	    
+	    ?DEBUG("[Client, ~p]:tcp_closed~n",[?LINE]),
 	    loop_receive_ctrl(Socket, Child);	    
 	Any ->
 	    ?DEBUG("[Client, ~p]:unknow messege!:~p~n",[?LINE, Any]),
