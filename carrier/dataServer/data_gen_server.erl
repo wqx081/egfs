@@ -19,7 +19,6 @@ stop() ->
 
 init([]) -> 
     io:format("data_gen_server is on~n"),
-    %%process_flag(trap_exit, true),
     chunk_db:start(),
     boot_report:boot_report(),
     heart_beat_report:start(),

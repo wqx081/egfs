@@ -40,6 +40,7 @@ handle_read(ChunkID, Begin, Size) ->
 %% a read process
 read_process(Listen, ChunkID, Begin, End) ->
     {ok, Socket} = gen_tcp:accept(Listen),
+    gen_tcp:close(Listen),
     {ok, ListenData} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
     Reply = inet:port(ListenData),
     gen_tcp:send(Socket, term_to_binary(Reply)),
@@ -72,6 +73,7 @@ loop_read_control(Socket, Child, State) ->
 
 send_it(Parent, ListenData, ChunkID, Begin, End) ->
     {ok, SocketData} = gen_tcp:accept(ListenData),
+    gen_tcp:close(ListenData),
     {ok, Hdl} = get_file_handle(read, ChunkID),
     loop_send(Parent, SocketData, Hdl, Begin, End, 0),
     file:close(Hdl).
@@ -107,6 +109,7 @@ handle_write(FileID, ChunkIndex, ChunkID, _Nodelist) ->
 %% a write process    
 write_process(FileID, ChunkIndex, Listen, ChunkID) ->
     {ok, Socket} = gen_tcp:accept(Listen),
+    gen_tcp:close(Listen),
     {ok, ListenData} = gen_tcp:listen(0, [binary, {packet, 2}, {active, true}]),
     Reply = inet:port(ListenData),
     gen_tcp:send(Socket, term_to_binary(Reply)),
@@ -116,6 +119,7 @@ write_process(FileID, ChunkIndex, Listen, ChunkID) ->
     Child = spawn_link(fun() -> receive_it(Parent, ListenData, ChunkID) end),
 
     loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, 0),
+    gen_tcp:close(Socket),
 
     ?DEBUG("[data_server, ~p]: write control process finished !~n", [?LINE]).
 
@@ -162,9 +166,11 @@ loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
 
 receive_it(Parent, ListenData, ChkID) ->
     {ok, SocketData} = gen_tcp:accept(ListenData),
+    gen_tcp:close(ListenData),
     {ok, Hdl} = get_file_handle(write, ChkID),
 
-    loop_receive(Parent, SocketData, Hdl, 0).
+    loop_receive(Parent, SocketData, Hdl, 0),
+    gen_tcp:close(SocketData).
 
 loop_receive(Parent, SocketData, Hdl, Len) ->
     receive
