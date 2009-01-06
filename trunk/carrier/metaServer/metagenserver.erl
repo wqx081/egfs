@@ -12,7 +12,8 @@
                      do_delete/2,
                      do_collect_orphanchunk/1,
                      do_get_fileattr/1,
-                     do_register_heartbeat/1]).
+                     do_register_heartbeat/1,
+                     do_debug/1]).
 
 -export([start/0,stop/0,terminate/2]).
 -export([init/1, handle_call/3, handle_cast/2,handle_info/2]).
@@ -32,7 +33,8 @@ die() ->
 
 start() ->
     metaDB:start_mnesia(),
-    {ok,Tref} = timer:apply_interval((?HEART_BEAT_TIMEOUT),hostMonitor,checkHostHealth,[]), % check host health every 5 second
+    {ok,TrefMonitor} = timer:apply_interval((?HEART_BEAT_TIMEOUT),hostMonitor,checkHostHealth,[]), % check host health every 5 second
+    {ok,TrefCollect} = timer:apply_interval((?GARBAGE_COLLECT_PERIOD),metaDB,do_find_orphanchunk,[]),
     gen_server:start_link(?META_SERVER, metagenserver, [], []).
 
 stop() ->
@@ -85,7 +87,7 @@ handle_call({delete,FileName},{From,_},State) ->
     {reply, Reply, State};
 
 handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
-    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
+  %  io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
 	Reply = do_dataserver_bootreport(HostInfoRec, ChunkList),
     {reply, Reply, State};
 
@@ -105,6 +107,11 @@ handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
 	Reply = do_register_heartbeat(HostInfoRec),
     {reply, Reply, State};
 
+%% clearShadow 
+handle_call({debug,Arg},{_From,_},State) ->
+    Reply = do_debug(Arg),
+    {reply,Reply,State};
+
 
 handle_call(_, {_From, _}, State)->
     io:format("inside handle_call_error~n"),
@@ -118,6 +125,10 @@ handle_cast(stop, State) ->
 
 handle_info(_Info, State) ->
     {noreply, State}.
+
+
+
+
 
 %%%"client api" methods
 % write operation sequence:
@@ -185,3 +196,5 @@ getFileAttr(FileID)->
 heartBeat(HostInfoRec) ->
     gen_server:call(?META_SERVER,{heartbeat,HostInfoRec}).
 
+debug(Arg) ->
+    gen_server:call(?META_SERVER,{debug,Arg}).

@@ -79,12 +79,12 @@ do(Q) ->
 
 example_tables() ->
     [
-     {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}}
+    % {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}}
     ].
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
     logF(LOG),
-
+	mnesia:clear_table(chunkmapping),
     mnesia:clear_table(filemeta),
     mnesia:clear_table(filemeta_s),
     mnesia:clear_table(hostinfo),
@@ -440,6 +440,6 @@ do_delete_orphanchunk_byhost(HostProcName)->
 	delete_object_from_db(listrecord,X).
 
 % find orphanchunk in orphanchunk table by host
-do_get_orphanchunk_byhost(HostProcName) ->
-    select_all_from_orphanchunk(HostProcName).
+%% do_get_orphanchunk_byhost(HostProcName) ->
+%%     select_all_from_orphanchunk(HostProcName).
 
