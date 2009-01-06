@@ -22,6 +22,7 @@ init([]) ->
     chunk_db:start(),
     boot_report:boot_report(),
     heart_beat_report:start(),
+    garbage_auto_collect:start(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
