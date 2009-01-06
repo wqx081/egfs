@@ -1,5 +1,5 @@
 ERL = erl
-ERLFLAGS = -pa eunit/ebin -noshell -sname llk -setcookie abc 
+ERLFLAGS = -pa eunit/ebin -noshell -sname llk -setcookie test 
 
 ERLC = erlc 
 ERLCFLAGS = -pa eunit/ebin
