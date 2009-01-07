@@ -32,11 +32,36 @@ init_write_process(Listen) ->
     Parent = self(),
     {ok, Socket, ListenData, Parent}.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%            Write to Itself
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 write_process_tail(FileID, ChunkIndex, ChunkID, Listen) ->
     {ok, Socket, ListenData, Parent} = init_write_process(Listen),
-
     Child = spawn_link(fun() -> receive_it_tail(Parent, ListenData, ChunkID) end),
     loop_write_control_tail(Socket, Child, FileID, ChunkIndex, ChunkID, 0).
+
+loop_write_control_tail(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
+    ok.
+
+receive_it_tail(Parent, ListenData, ChkID) ->
+    {ok, SocketData} = gen_tcp:accept(ListenData),
+    gen_tcp:close(ListenData),
+    {ok, Hdl} = get_file_handle(write, ChkID),
+    loop_receive(Parent, SocketData, Hdl, 0),
+    gen_tcp:close(SocketData).
+
+loop_receive(Parent, SocketData, Hdl, Len) ->
+    receive
+	{tcp, SocketData, Binary} ->
+	    Len2 = Len + size(Binary),
+	    file:write(Hdl, Binary),
+	    loop_receive(Parent, SocketData, Hdl, Len2);
+	{tcp_closed, SocketData} ->
+	    file:close(Hdl),
+	    Parent ! {finish, self(), Len};
+	Any ->
+	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any])
+    end. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%            Relay Write
