@@ -2,15 +2,16 @@
 
 ERL = erl -boot start_clean -config elog.config -setcookie test 
 
-all: compile
+all: start
 
 compile: 
 	erl -make
 
 once:compile
+	-rm -rf Mnesia*
 	${ERL} -sname zyb -s metaDB do_this_once -s init stop 
 
-start:compile
+start:compile once
 	${ERL} -sname zyb -s app_meta_server start
 
 start-app:compile

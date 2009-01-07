@@ -48,5 +48,14 @@ clean:
 	-rm -f *.avi
 	-rm -f zerot
 
+md5src:
+	md5sum ds/* > ds.md5
+	sed 's;ds/;re/;' ds.md5 > re.md5
+
+md5check:
+	md5sum -c re.md5
+
+md5: md5src md5check
+
 # gen_server:call({global, metagenserver},{debug,clearShadow}).
 # gen_server:call({data_server1, pp@pp}, {echo, "msg"}).
