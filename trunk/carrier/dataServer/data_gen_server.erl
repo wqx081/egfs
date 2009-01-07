@@ -3,7 +3,7 @@
 -import(data_worker, [handle_read/3, handle_write/4]).
 -import(chunk_db).
 -include("../include/egfs.hrl").
--include("chunk_info.hrl").
+-include("data_server.hrl").
 -export([start/0, stop/0, 
 	 init/1, handle_call/3,
 	 handle_cast/2, handle_info/2, 
@@ -18,11 +18,10 @@ stop() ->
     gen_server:cast(?DATA_SERVER, stop).
 
 init([]) -> 
-    io:format("data_gen_server is on~n"),
     chunk_db:start(),
     boot_report:boot_report(),
     heart_beat_report:start(),
-    garbage_auto_collect:start(),
+    chunk_garbage_collect:start_auto_collect(),
     {ok, server_has_startup}.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->

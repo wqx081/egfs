@@ -2,8 +2,7 @@
 -import(lists, [foreach/2]).
 -import(util,[for/3]).
 
--include("chunk_info.hrl").
--include("garbage_info.hrl").
+-include("data_server.hrl").
 -include("../include/egfs.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
@@ -74,7 +73,6 @@ remove_chunk_info(Chunkid)->
     mnesia:transaction(F).
 
 remove_chunk_infos(ChunkidList) ->
-    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     F = fun() ->
 		foreach(fun remove_chunk_info/1, ChunkidList)
 	end,
@@ -161,7 +159,6 @@ get_file_id_by_chunk_id(Chunkid) ->
 					])).
 
 get_all_chunk_id() ->
-    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     do(qlc:q([X#chunkmeta.chunk_id || X <- mnesia:table(chunkmeta)				     
 					 ])).
 get_path_by_chunk_id(Chunkid) ->
@@ -170,7 +167,6 @@ get_path_by_chunk_id(Chunkid) ->
 					])).
 
 get_paths_by_chunk_id(ChunkidList) ->
-    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     TmpChunkidList = [get_path_by_chunk_id(X) || X <- ChunkidList],
     [X || [X] <- TmpChunkidList].
 
@@ -183,7 +179,6 @@ insert_garbage_info(Chunkid) ->
     do_trans(Row).
 
 insert_garbage_infos(ChunkidList) ->
-    io:format("[~p, ~p] ~n", [?MODULE, ?LINE]),
     F = fun() ->
   		foreach(fun insert_garbage_info/1, ChunkidList)
   	end,
