@@ -130,7 +130,8 @@ loop_write_control(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
 	    ?DEBUG("[data_server, ~p]: write transfer finish, ~pBytes~n", [?LINE, Len]),
 	    {ok, Name} = get_file_name(ChunkID),
 	    chunk_db:insert_chunk_info(ChunkID, FileID, Name, Len),
-	    {ok, _Info} = report_metaServer(FileID, ChunkIndex, ChunkID, Len);
+	    {ok, _Info} = report_metaServer(FileID, ChunkIndex, ChunkID, Len),
+	    gen_tcp:send(Socket, term_to_binary({ok, report}));
 	{tcp, Socket, Binary} ->
 	    ?DEBUG("[data_server, ~p]: tcp, socket, binary~n", [?LINE]),
 	    Term = binary_to_term(Binary),
