@@ -1,8 +1,8 @@
 -module(garbage_auto_collect).
 -include("../include/egfs.hrl").
--compile(export_all).
+-include("data_server.hrl").
+-export([start/0,stop/0]).
 
--define(GARBAGE_AUTO_COLLECT_PERIOD,	70000).    % 5000 milisecond = 5 second
 
 start() ->
     register(garbage_auto_collector, spawn_link(fun() -> loop(?GARBAGE_AUTO_COLLECT_PERIOD) end)).

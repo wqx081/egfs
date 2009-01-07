@@ -2,7 +2,7 @@
 -export([ping/0]).
 
 ping() ->
-    net_adm:ping(zyb@llk),
+    net_adm:ping(zyb@zyb),
     receive 
         after 200 ->
                 true
