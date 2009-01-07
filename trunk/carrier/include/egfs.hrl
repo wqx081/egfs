@@ -49,5 +49,5 @@
 -define(GARBAGE_COLLECT_PERIOD, 1000*60*60*24).    % do collect every day.
 -define(HEART_BEAT_PERIOD,		5000).    % 5000 milisecond = 5 second
 -define(HEART_BEAT_TIMEOUT,		5*?HEART_BEAT_PERIOD).		
--define(INIT_NODE_HEALTH,		500). % 5 means a healthy connected data node, 0 means a disconnected ndoe
+-define(INIT_NODE_HEALTH,		5000). % 5 means a healthy connected data node, 0 means a disconnected ndoe
 
