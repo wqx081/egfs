@@ -1,4 +1,4 @@
 %%record for save chunkid and nodelist infomation.
 
 
--record(filedevice, {fileid, cursornodes, chunkid, cursoroffset}).
+-record(filedevice, {filename, fileid, cursornodes, chunkid, cursoroffset}).

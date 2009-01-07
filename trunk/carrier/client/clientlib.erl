@@ -20,7 +20,7 @@
 do_open(FileName, Mode) ->
     case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
         {ok, FileID} ->
-            FileDevice = #filedevice{fileid = FileID},
+            FileDevice = #filedevice{filename = FileName, fileid = FileID},
 	    {ok, FileDevice};
         {error, Why} ->
 	    ?DEBUG("[Client, ~p]:Open file error:~p~n",[?LINE, Why]),
@@ -29,7 +29,15 @@ do_open(FileName, Mode) ->
 
 do_pread(FileDevice, Start, Length) ->
     Start_addr = Start,
-    End_addr = Start + Length,
+    {ok, FileSize} = get_file_length(FileDevice),
+    End_will = Start + Length,
+    if
+	End_will < FileSize ->
+	    End_addr = End_will;
+	true ->
+	    End_addr = FileSize
+    end,
+
     ?DEBUG("[Client, ~p]:read Start is: ~p, readlength is: ~p~n",[?LINE, Start_addr, End_addr]),
     case read_them(FileDevice, {Start_addr, End_addr}) of
 	{ok, FileID} ->
@@ -142,6 +150,12 @@ get_file_size(FileID) ->
 	_ ->
 	    error
     end.
+
+get_file_length(FileDevice) ->
+    FileName  = FileDevice#filedevice.filename,
+    {ok, FileInfo} = client:read_info(FileName),
+    {FileSize, _, _, _, _} = FileInfo,
+    {ok, FileSize}.
 
 %get_chunk_info(FileID, ChunkIndex) -> 
 %    gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
