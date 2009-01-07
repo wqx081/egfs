@@ -9,7 +9,8 @@
 -include("../include/egfs.hrl").
 -include_lib("kernel/include/file.hrl").
 -include("filedevice.hrl").
--import(clientlib,[get_file_name/1, get_file_size/1]).
+-import(clientlib,[get_file_name/1, get_file_size/1,
+	get_file_handle/2, delete_file/1]).
 -compile(export_all).
 -define(BINARYSIZE, 67108864).%67108864  %8388608
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -17,14 +18,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 write(FileName, RemoteFile) ->
     ?DEBUG("[client, ~p]:test write begin at ~p~n~n", [?LINE, erlang:time()]),
-    {ok, FileLength} = get_file_size(FileName),
+    {ok, FileLength} = file_size(FileName),
     {ok, FileDevice} = client:open(RemoteFile, w),	 %%only send open message to metaserver
-    FileID = FileDevice#filedevice.fileid,
-    {ok, Hdl} = get_file_handle(read, FileName),
+    {ok, Hdl} = own_file_handle(read, FileName),
     loop_write(Hdl, FileDevice, 0, FileLength),
     ?DEBUG("~n[client, ~p]:test write end at ~p~n", [?LINE, erlang:time()]),    
     file:close(Hdl),
-    client:close(FileID).
+    client:close(FileDevice).
 
 loop_write(Hdl, FileDevice, Start, Length) when Length > 0 ->
     {ok, Binary} = read_tmp(Hdl, Start, ?BINARYSIZE),
@@ -39,9 +39,17 @@ loop_write(_, _, _, _) ->
 read_tmp(Hdl, Location, Size) ->
     file:pread(Hdl, Location, Size).
 
-get_file_handle(write, FileName) ->
+file_size(FileName) ->
+    case file:read_file_info(FileName) of
+	{ok, Facts} ->
+	    {ok, Facts#file_info.size};
+	_ ->
+	    error
+    end.
+
+own_file_handle(write, FileName) ->
     file:open(FileName, [raw, append, binary]);
-get_file_handle(read, FileName) ->
+own_file_handle(read, FileName) ->
     file:open(FileName, [raw, read, binary]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -50,16 +58,15 @@ get_file_handle(read, FileName) ->
 read(FileName, LocalFile, Start, Length) ->
     ?DEBUG("[client, ~p]:test read begin at ~p~n~n", [?LINE, erlang:time()]),
     {ok, FileDevice} = client:open(FileName, r),
+    client:pread(FileDevice, Start, Length),
+    client:close(FileDevice),
     FileID = FileDevice#filedevice.fileid,
-    client:pread(FileID, Start, Length),
-    client:close(FileID),
-    TempFileName = get_file_name(FileID),
-    {ok, Hdl} = get_file_handle(read, TempFileName),
-    {ok, FileSize} = get_file_size(TempFileName),
-    {ok, DstHdl} = get_file_handle(write, LocalFile),
+    {ok, Hdl} = get_file_handle(read, FileID),
+    {ok, FileSize} = get_file_size(FileID),
+    {ok, DstHdl} = own_file_handle(write, LocalFile),
     loop_read_tmp(Hdl, DstHdl, 0, FileSize),
     file:close(DstHdl),
-    file:delete(TempFileName),
+    delete_file(FileID),
     ?DEBUG("~n[client, ~p]:test read end at ~p~n", [?LINE, erlang:time()]).
 
 loop_read_tmp(Hdl, DstHdl, Start, Length) when Length > 0 ->
@@ -84,19 +91,18 @@ loop_read_tmp(_, _, _, _) ->
 read(FileName, LocalFile) ->
     ?DEBUG("[client, ~p]:test read begin at ~p~n~n", [?LINE, erlang:time()]),
     {ok, FileDevice} = client:open(FileName, r),
-    FileID = FileDevice#filedevice.fileid,
     {ok, FileInfo} = client:read_file_info(FileName),
     {Length, _, _, _, _} = FileInfo,
     ?DEBUG("[client, ~p]:Length from read_file_info:~p~n~n", [?LINE, Length]),
-    client:pread(FileID, 0, Length),
-    client:close(FileID),
-    TempFileName = get_file_name(FileID),
-    {ok, Hdl} = get_file_handle(read, TempFileName),
-    {ok, FileSize1} = get_file_size(TempFileName),
-    {ok, DstHdl} = get_file_handle(write, LocalFile),
-    loop_read_tmp(Hdl, DstHdl, 0, FileSize1),
+    client:pread(FileDevice, 0, Length),
+    client:close(FileDevice),
+    FileID = FileDevice#filedevice.fileid,
+    {ok, Hdl} = get_file_handle(read, FileID),
+    {ok, FileSize} = get_file_size(FileID),
+    {ok, DstHdl} = own_file_handle(write, LocalFile),
+    loop_read_tmp(Hdl, DstHdl, 0, FileSize),
     file:close(DstHdl),
-    file:delete(TempFileName),
+    delete_file(FileID),
     ?DEBUG("~n[client, ~p]:test read end at ~p~n", [?LINE, erlang:time()]).
 
 

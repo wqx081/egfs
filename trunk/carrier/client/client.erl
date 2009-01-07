@@ -23,26 +23,69 @@
 %% client_api,can be used for application programming
 %%----------------------------------------------------------------------
 
+
+%% --------------------------------------------------------------------
+%% Function: open/2
+%% Description: call metaserver to open file
+%% Returns: {ok, Filedevice}          |
+%%          {error, Why}              |
+%% --------------------------------------------------------------------
 open(FileName, Mode) ->
     do_open(FileName, Mode).
 
+%% --------------------------------------------------------------------
+%% Function: pwrite/3
+%% Description: write Bytes to dataserver
+%% Returns: {ok, Filedevice}          |
+%%          {error, Why}              |
+%% --------------------------------------------------------------------
 pwrite(FileDevice, Location, Bytes) ->
     do_pwrite(FileDevice, Location, Bytes).
 
-pread(FileID, Start, Length) ->
-    do_pread(FileID, Start, Length).
+%% --------------------------------------------------------------------
+%% Function: pread/3
+%% Description: read Bytes from dataserver
+%% Returns: {ok, Binary}	      |
+%%          {error, Why}              |
+%% --------------------------------------------------------------------
+pread(FileDevice, Start, Length) ->
+    do_pread(FileDevice, Start, Length).
 
+%% --------------------------------------------------------------------
+%% Function: read_file/1
+%% Description: read a file from dataserver
+%% Returns: {ok, Binary}	      |
+%%          {error, Why}	      |
+%% --------------------------------------------------------------------
 read_file(FileName) ->
     do_read_file(FileName).
 
+%% --------------------------------------------------------------------
+%% Function: read_file_info/1
+%% Description: read a file info from metaserver
+%% Returns: {ok, FileInfo}	      |
+%%          {error, Why}	      |
+%% --------------------------------------------------------------------
 read_file_info(FileName) ->
     do_read_file_info(FileName).
 
+%% --------------------------------------------------------------------
+%% Function: del_file/3
+%% Description: delete file which at dataserver
+%% Returns: ok			      |
+%%          {error, Why}	      |
+%% --------------------------------------------------------------------
 delete(FileName) ->
     do_delete(FileName).
 
-close(FileID) ->
-    do_close(FileID).
+%% --------------------------------------------------------------------
+%% Function: close/1
+%% Description: delete file which at dataserver
+%% Returns: ok			      |
+%%          {error, Why}	      |
+%% --------------------------------------------------------------------
+close(FileDevice) ->
+    do_close(FileDevice).
 
 
     
