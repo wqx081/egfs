@@ -303,6 +303,53 @@ write_a_chunk(_, _, Begin, Size, _) ->
 loop_send_ctrl(Socket, Child) ->
     receive
 	{tcp_closed, Socket} ->	    
+	    ?DEBUG("[Client, ~p]: write control socket is closed~n",[?LINE]),
+	    {error, control_broken};
+        {tcp, Socket, Binary} -> 
+            Term = binary_to_term(Binary),
+	    case Term of
+		{stop, Why} ->	    	    
+		    ?DEBUG("[Client, ~p]:stop ctrl message from dataserver~n",[?LINE]),
+		    Child ! {stop, self(), Why},
+		    {ok, stop};
+		Any ->
+		    ?DEBUG("[Client, ~p]:message from data_server!~p~n",[?LINE, Any]),
+		    loop_send_ctrl(Socket, Child)
+	    end;
+	{finish, Child} ->	
+	    ?DEBUG("[Client, ~p]:write a binary finished.~n",[?LINE]),
+	    wait_for_report(Socket);
+	    %% gen_tcp:send(Socket, term_to_binary({finish, "info"}));
+	{error, Child, Why} ->
+	    ?DEBUG("[Client, ~p]: child report that 'data receive error!'~p~n",[?LINE, Why]),
+	    {error, "child error"};
+	{'EXIT', _, normal} ->
+	    %?DEBUG("[Client, ~p]: child exit normal~n",[?LINE]),
+	    loop_send_ctrl(Socket, Child);
+	_Any ->
+	    %?DEBUG("[Client, ~p]:unknow messege!:~p~n",[?LINE, Any]),
+	    loop_send_ctrl(Socket, Child)
+    end.
+
+wait_for_report(Socket) ->
+    receive 
+	{tcp, Socket, Binary} ->
+	    Term = binary_to_term(Binary),
+	    case Term of
+		{ok, report} ->
+		    Term;
+		{error, report} ->
+		    Term;
+		_Any ->
+		    wait_for_report(Socket)
+	    end;
+	_Any ->
+	    wait_for_report(Socket)
+    end.
+
+loop_send_ctrl_bk(Socket, Child) ->
+    receive
+	{tcp_closed, Socket} ->	    
 	    ?DEBUG("[Client, ~p]: write control socket is closed~n",[?LINE]);
         {tcp, Socket, Binary} -> 
             Term = binary_to_term(Binary),
