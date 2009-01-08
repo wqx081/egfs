@@ -1,5 +1,6 @@
 -module(data_worker).
 -include("../include/egfs.hrl").
+-include("data_server.hrl").
 -import(chunk_db).
 -import(toolkit, [get_file_size/1,
 		  get_file_handle/2,
@@ -9,8 +10,6 @@
 		  report_metaServer/4]).
 
 -export([handle_read/3, handle_write/4]).
-
--define(STRIP_SIZE, 8192).
 
 handle_read(ChunkID, Begin, Size) ->
     {ok, Name} = get_file_name(ChunkID),
