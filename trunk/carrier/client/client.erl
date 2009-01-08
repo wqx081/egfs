@@ -14,7 +14,8 @@
 	do_pwrite/3, do_delete/1, 
 	do_close/1, do_read_file/1,
 	do_read_file_info/1]).
--export([open/2, pwrite/3, pread/3, delete/1, close/1]).
+-export([open/2, pwrite/3, pread/3, read_file/1,
+	read_file_info/1, delete/1, close/1]).
 -compile(export_all).
 %-define(BINARYSIZE, 67108864).
 %-record(filedevice, {fileid, cursornodes, chunkid, cursoroffset}).

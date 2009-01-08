@@ -56,11 +56,11 @@ do_pwrite(FileDevice, Start, Bytes) ->
 
 do_read_file(FileName) ->
     ?DEBUG("[client, ~p]:test read begin at ~p~n~n", [?LINE, erlang:time()]),
-    {ok, FileDevice} = client:open(FileName, r),
-    {ok, FileInfo} = client:read_file_info(FileName),
+    {ok, FileDevice} = do_open(FileName, r),
+    {ok, FileInfo} = do_read_file_info(FileName),
     {Length, _, _, _, _} = FileInfo,
-    client:pread(FileDevice, 0, Length),
-    client:close(FileDevice),
+    do_pread(FileDevice, 0, Length),
+    do_close(FileDevice),
     ?DEBUG("~n[client, ~p]:test read end at ~p~n", [?LINE, erlang:time()]),
     FileID = FileDevice#filedevice.fileid,
     {ok, FileLength} = get_file_size(FileID),
@@ -153,7 +153,7 @@ get_file_size(FileID) ->
 
 get_file_length(FileDevice) ->
     FileName  = FileDevice#filedevice.filename,
-    {ok, FileInfo} = client:read_info(FileName),
+    {ok, FileInfo} = do_read_file_info(FileName),
     {FileSize, _, _, _, _} = FileInfo,
     {ok, FileSize}.
 
