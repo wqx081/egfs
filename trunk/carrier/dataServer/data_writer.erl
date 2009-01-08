@@ -17,7 +17,7 @@ handle_write(FileID, ChunkIndex, ChunkID, []) ->
     Reply;
 handle_write(FileID, ChunkIndex, ChunkID, [H|T]) ->
     {ok, Listen, Reply} = generate_write_reply(),
-    Next = gen_server:call(H, {writechunk, FileID, ChunkIndex, chunkID, T}),
+    Next = gen_server:call(H, {writechunk, FileID, ChunkIndex, ChunkID, T}),
     {ok, _Next_IP, _Next_Port} = Next,
     spawn(fun() -> relay_write_process(FileID, ChunkIndex, ChunkID, Listen, Next) end),
     Reply.
@@ -40,7 +40,9 @@ write_process(FileID, ChunkIndex, ChunkID, Listen) ->
     {ok, Socket, ListenData, Parent} = init_write_process(Listen),
     Child = spawn_link(fun() -> receive_it_tail(Parent, ListenData, ChunkID) end),
     Result = loop_write_control_tail(Socket, Child, FileID, ChunkIndex, ChunkID, 0),
-    write_aftercare(Result, ChunkID).
+    io:format("[~p, ~p] write control finish: ~p~n", [?MODULE, ?LINE, Result]),
+    write_aftercare(Result, ChunkID),
+    io:format("[~p, ~p] write_process finish~n", [?MODULE, ?LINE]).
 
 loop_write_control_tail(Socket, Child, FileID, ChunkIndex, ChunkID, State) ->
     receive
@@ -92,7 +94,8 @@ loop_receive(Parent, SocketData, Hdl, Len) ->
 	    file:close(Hdl),
 	    get_tcp:close(SocketData);
 	Any ->
-	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any])
+	    ?DEBUG("[data_server, ~p]:loop Any:~p~n", [?LINE, Any]),
+	    loop_receive(Parent, SocketData, Hdl, Len)
     end. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,7 +108,7 @@ connect_to_next({ok, Next_IP, Next_Port}) ->
 	    {ok, Next_DataPort} = binary_to_term(Binary),
 	    {ok, NextSocket, Next_IP, Next_DataPort};
 	_Any ->
-	    {error, next_connect, "cann't get next data port", []}
+	    {error, next_connect, "cann't get next data port"}
     end.
 	    
 relay_write_process(FileID, ChunkIndex, ChunkID, Listen, Next) ->
@@ -113,7 +116,9 @@ relay_write_process(FileID, ChunkIndex, ChunkID, Listen, Next) ->
     {ok, NextSocket, Next_IP, Next_DataPort} = connect_to_next(Next),
     Child = spawn_link(fun() -> relay_receive_it(Parent, ListenData, Next_IP, Next_DataPort, ChunkID) end),
     Result = loop_relay_write_control(Socket, NextSocket, Child, FileID, ChunkIndex, ChunkID, 0),
+    io:format("[~p, ~p] write control finish: ~p~n", [?MODULE, ?LINE, Result]),
     write_aftercare(Result, ChunkID),
+    io:format("[~p, ~p] write_process finish~n", [?MODULE, ?LINE]),
     gen_tcp:close(NextSocket).
 
 write_aftercare(Result, ChunkID) ->
@@ -141,6 +146,8 @@ loop_relay_write_control(Socket, NextSocket, Child, FileID, ChunkIndex, ChunkID,
 	    gen_tcp:close(NextSocket),
 	    Child ! {die, self()},
 	    {error, data_receive, Why};
+	{'EXIT', _, normal} ->
+	    loop_relay_write_control(Socket, NextSocket, Child, FileID, ChunkIndex, ChunkID, State);
 	{tcp, Socket, Binary} ->
 	    gen_tcp:send(NextSocket, Binary),
 	    loop_relay_write_control(Socket, NextSocket, Child, FileID, ChunkIndex, ChunkID, State);
@@ -217,24 +224,24 @@ loop_relay_receive(Parent, SocketData, NextSocketData, Hdl, Len) ->
 	{tcp_closed, SocketData} ->
 	    file:close(Hdl),
 	    Parent ! {finish, self(), Len},
-	    receive_death(Parent, NextSocketData, 0);
+	    wait_to_die(Parent, NextSocketData, 0);
 	{tcp_closed, NextSocketData} ->
 	    ?DEBUG("[~p, ~p] next data socket broken ~n", [?MODULE, ?LINE]),
 	    file:close(Hdl),
 	    Parent ! {error, self(), "next socket data closed"},
-	    receive_death(Parent, NextSocketData, 0);
+	    wait_to_die(Parent, NextSocketData, 0);
 	Any ->
 	    ?DEBUG("[~p, ~p] unknown: ~p~n", [?MODULE, ?LINE, Any]),
 	    loop_relay_receive(Parent, SocketData, NextSocketData, Hdl, Len)
     end.
 
-receive_death(Parent, NextSocketData, State) ->
+wait_to_die(Parent, NextSocketData, State) ->
     receive
 	{die, Parent} ->
 	    gen_tcp:close(NextSocketData),
 	    ?DEBUG("[~p, ~p] close next socket data~n", [?MODULE, ?LINE]); 
 	Any ->
 	    ?DEBUG("[~p, ~p] unknown when wait for death: ~p~n", [?MODULE, ?LINE, Any]),
-	    receive_death(Parent, NextSocketData, State)
+	    wait_to_die(Parent, NextSocketData, State)
     end.
 	    
