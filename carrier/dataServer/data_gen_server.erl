@@ -1,6 +1,7 @@
 -module(data_gen_server).
 -behaviour(gen_server).
--import(data_worker, [handle_read/3, handle_write/4]).
+-import(data_worker, [handle_read/3]).%%, handle_write/4]).
+-import(data_writer, [handle_write/4]).
 -import(chunk_db).
 -include("../include/egfs.hrl").
 -include("data_server.hrl").
