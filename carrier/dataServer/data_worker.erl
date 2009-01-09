@@ -18,7 +18,7 @@ handle_read(ChunkID, Begin, Size) ->
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
 	    ?DEBUG("[data_server, ~p]: read boundary invalid ~p~n", [?LINE, Begin]),
-	    Reply = {error, "invalid read args", []};
+	    Reply = {error, read, "invalid read args"};
 	true ->
 	    if 
 		Begin + Size > FileSize ->
