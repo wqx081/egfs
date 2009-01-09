@@ -220,5 +220,12 @@ do_register_heartbeat(HostInfoRec)->
 do_debug(Arg) ->
     case Arg of
         clearShadow ->
-            mnesia:clear_table(filemeta_s)
+            mnesia:clear_table(filemeta_s);
+        show ->
+            io:format("u wana show, i give u show ,~n");
+        die ->
+            io:format("u wna die ,i let u die.~n"),
+            1000 div 0;
+        _ ->
+            io:format("ohter~n")
     end.
