@@ -51,7 +51,8 @@ loop_read_control(Socket, Child, State) ->
     receive 
 	{finish, Child, Len} ->
 	    ?DEBUG("[data_server, ~p]: read finish ~p Bytes~n", [?LINE, Len]),
-	    gen_tcp:close(Socket);
+	    Child ! {die, self()},
+	    wait_for_check(Socket, Len);
 	{tcp, Socket, Binary} ->
 	    Term = binary_to_term(Binary),
 	    case Term of 
@@ -89,6 +90,31 @@ loop_send(Parent, SocketData, Hdl, Begin, End, Len) when Begin < End ->
     Begin2 = Begin + size(Binary),
     loop_send(Parent, SocketData, Hdl, Begin2, End, Len2);
 loop_send(Parent, SocketData, _Hdl, _Begin, _End, Len) ->
-    gen_tcp:close(SocketData),
     Parent ! {finish, self(), Len},
+    wait_to_die(Parent, SocketData),
     void.
+
+wait_to_die(Parent, SocketData) ->
+    receive
+	{die, Parent} ->
+	    gen_tcp:close(SocketData);
+	_Any ->	
+	    wait_to_die(Parent, SocketData)
+    end.
+
+wait_for_check(Socket, Len) ->
+   receive
+	{tcp, Socket, Binary} ->
+	    Term = binary_to_term(Binary),
+	    case Term of
+		{check, data_length} ->
+		    gen_tcp:send(Socket, term_to_binary({check, Len}));
+		_Other->
+		    wait_for_check(Socket, Len)
+	    end;
+	{tcp_closed, Socket} ->
+	    ?DEBUG("[~p, ~p] control socket broken when waiting for check~n", [?MODULE, ?LINE]);
+	_Any ->
+	    wait_for_check(Socket, Len)
+    end.
+	

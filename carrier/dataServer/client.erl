@@ -133,7 +133,8 @@ transfer_control_read(Socket, Child) ->
     receive
 	{finish, Child, Len} ->	
 	    ?DEBUG("[~p, ~p]:read a chunk, size is ~p.~n",[?MODULE, ?LINE, Len]),
-	    {ok, Len};
+	    gen_tcp:send(Socket, term_to_binary({check, data_length})),
+	    wait_for_check_result(Socket, Len);
 	{error, Child, Why} ->
 	    ?DEBUG("[~p, ~p]:data receive socket error!~p~n",[?MODULE, ?LINE, Why]),
 	    {error, read_data, Why};
@@ -156,6 +157,25 @@ transfer_control_read(Socket, Child) ->
 	    transfer_control_read(Socket, Child)
     end.
 
+wait_for_check_result(Socket, Len) ->
+    receive
+	{tcp, Socket, Binary} ->
+	    Term = binary_to_term(Binary),
+	    case Term of
+		{check, Len} ->
+		    {ok, Len};
+		{check, _Other} ->
+		    {error, check_len_error, "data received length check error"};
+		_Any ->
+		    wait_for_check_result(Socket, Len)
+	    end;
+	{tcp_closed, Socket} ->
+	    ?DEBUG("[~p, ~p] control socket broken when waiting for check result~n", [?MODULE, ?LINE]),
+	    {error, control_socket, "Control socket broken waiting for check result"};
+	_AnyOther ->
+	    wait_for_check_result(Socket, Len)
+    end.
+
 receive_data(Host, Port, Parent) ->
     io:format("data port:~p~n", [Port]),
     {ok, Hdl} = file:open("recv.dat", [raw, append, binary]),
@@ -174,7 +194,7 @@ loop_receive(Parent, DataSocket, Hdl, Len) ->
 	    Len2 = Len + size(Data),
 	    loop_receive(Parent, DataSocket, Hdl, Len2);
 	{tcp_closed, DataSocket} ->
-	    Parent ! {finish, self(), 10},
+	    Parent ! {finish, self(), Len},
 	    io:format("read chunk over!~n");
 	{stop, Parent, _Why} ->
 	    gen_tcp:close(DataSocket)
