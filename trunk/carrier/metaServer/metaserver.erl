@@ -218,7 +218,12 @@ do_register_heartbeat(HostInfoRec)->
 %% debug 
 %% 
 do_debug(Arg) ->
+    io:format("in func do_debug~n"),
     case Arg of
+        wait ->
+            io:format("111 ,~n"),
+            timer:sleep(2000),
+			io:format("222 ,~n");
         clearShadow ->
             mnesia:clear_table(filemeta_s);
         show ->
