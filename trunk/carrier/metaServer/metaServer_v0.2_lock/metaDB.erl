@@ -233,10 +233,20 @@ select_all_from_orphanchunk(Host) ->
 % fileid -> binary().
 
 
+
+
+
 select_filesize_from_filemeta(FileId) ->
 	LOG = #metalog{logtime = calendar:local_time(),logfunc="select_filesize_from_filemeta/1",logarg=[FileId]},
     logF(LOG),    
     do(qlc:q([X#filemeta.filesize || X <- mnesia:table(filemeta),
+                                   X#filemeta.fileid =:= FileId                                   
+                                   ])).   %result [L]
+
+select_chunklist_from_filemeta(FileId) ->
+    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_chunklist_from_filemeta/1",logarg=[FileId]},
+    logF(LOG),    
+    do(qlc:q([X#filemeta.chunklist || X <- mnesia:table(filemeta),
                                    X#filemeta.fileid =:= FileId                                   
                                    ])).   %result [L]
 
