@@ -6,4 +6,8 @@
 -define(SERVER_NAME, data_server).
 -define(STRIP_SIZE, 8192).
 -define(TOTAL_SPACE, 21474836480).
--define(GARBAGE_AUTO_COLLECT_PERIOD,	70000).    % 5000 milisecond = 5 second
+-define(GARBAGE_AUTO_COLLECT_PERIOD,	7000).    % 5000 milisecond = 5 second
+-define(BOOT_REPORT_RETRY_PERIOD,	7000).    % 5000 milisecond = 5 second
+-define(HEART_BEAT_REPORT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
+-define(GARBAGE_AUTO_COLLECT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
+

@@ -7,8 +7,9 @@
 	 get_local_addr/0,
 	 parse_config/2,
 	 rm_pending_chunk/1,
-	 report_metaServer/4]).
--compile(export_all).
+	 report_metaServer/4,
+	 sleep/1]).
+
 
 -define(DATA_HOME, "./data").
 
@@ -77,3 +78,10 @@ parse_config(total_space, ConfigFile) ->
     {ok, Config} = file:consult(ConfigFile),
     [Value] = [Value || {total_space, Value} <- Config],
     {ok, Value}.
+
+sleep(T) -> 
+    receive
+    after T ->
+	    true
+    end.
+
