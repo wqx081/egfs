@@ -34,15 +34,21 @@ get_host_info() ->
 boot_report()->
     {ok, HostInfo} = get_host_info(),
     BChunklist = get_all_chunk_id(),
-    case  gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}) of
+    try  gen_server:call(?META_SERVER, {bootreport, HostInfo, BChunklist}) of
 	{ok, OrphanChunkList} ->
 	    chunk_garbage_collect:collect(OrphanChunkList);
+	{error, "host collision"} ->
+	    {error, "host collision"};
+	 _Any ->
+	    io:format("[~p , ~p], ~p ~n", [?MODULE, ?LINE], [_Any])	
+    catch
+	exit:X  ->
+	    io:format("Exit caught ~p ~n", [X]),
+	    toolkit:sleep(?BOOT_REPORT_RETRY_PERIOD),
+	    boot_report();
 	_Any ->
-	    _Any
+	    io:format("[~p , ~p], ~p ~n", [?MODULE, ?LINE], [_Any])
     end.
-
-
-
 
 
 

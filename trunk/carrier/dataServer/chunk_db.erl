@@ -203,5 +203,3 @@ remove_garbage_infos(ChunkidList) ->
 get_all_garbage_chunk_id() ->
     do(qlc:q([X#garbageinfo.chunk_id || X <- mnesia:table(garbageinfo)
 				       ])).
-
-    
