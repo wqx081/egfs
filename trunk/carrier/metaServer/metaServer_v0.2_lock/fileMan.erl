@@ -33,7 +33,7 @@
 %%
 %% Exported Functions
 %%
--export([startReadProcess/1,startWriteProcess/1,dieP/0]).
+-export([startReadProcess/1,startWriteProcess/1,dieP/0,writeProcess/1,readProcess/1]).
 
 %%
 %% API Functions

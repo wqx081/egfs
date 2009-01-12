@@ -3,6 +3,9 @@
 -include("metaformat.hrl").
 -include("../../include/egfs.hrl").
 -import(lists, [reverse/1]).
+-import(util,[for/3,idToAtom/2]).
+
+-import(fileMan,[readProcess/1,writeProcess/1]).
 
 -import(metaDB,[select_fileid_from_filemeta/1, 
                 select_fileid_from_filemeta_s/1, 
@@ -58,7 +61,10 @@ do_read_open(Filename, _ClientID)->
             ReadAtom = idToAtom(FileID,r),
             case whereis(ReadAtom) of
                 undefined ->		% no readp , create one to read.
-                    register(ReadAtom,spawn(node(),fileMan,fun readProcess/1,FileID)),
+                    register(ReadAtom,
+                             spawn(fileMan,readProcess,[FileID])
+                            ),
+                    
                     {ok, FileID};                
                 [Pid]->			% pid exist, return it?
                     {ok, FileID}  
@@ -74,7 +80,7 @@ do_read_open_N(Filename,_ClientID)->
             ReadAtom = idToAtom(FileID,r),
             case whereis(ReadAtom) of
                 undefined ->		% no readp , create one to read.
-                    register(ReadAtom,spawn(node(),fileMan,fun readProcess/1,FileID)),
+                    register(ReadAtom,spawn(fileMan,readProcess,[FileID])),                    
                     whereis(ReadAtom);                
                 [Pid]->			% pid exist, return it?
                     Pid  
@@ -93,14 +99,14 @@ do_write_open_N(Filename, _ClientID)->
                     WriteAtom = idToAtom(FileID,w),
             		ets:new(WriteAtom,[]),
             		
-                    Row = #filemeta{fileid=FileID, filename=FileName, filesize=0, chunklist=[], 
-                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"}
-                    
+                    Row = #filemeta{fileid=FileID, filename=Filename, filesize=0, chunklist=[], 
+                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
+                                       
                     ets:insert(WriteAtom,Row),                    
                     
                     io:format("File ~p created.~n",Filename),
                     
-                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),
                     whereis(WriteAtom);  
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
@@ -109,7 +115,7 @@ do_write_open_N(Filename, _ClientID)->
             WriteAtom = idToAtom(FileID,w),
             case whereis(WriteAtom) of
                 undefined ->		% no WriteAtom , create one to write.
-                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),
                     whereis(WriteAtom);                
                 [Pid]->			% pid exist, write deny
                     {error,"some other client writing."}  
@@ -132,12 +138,12 @@ do_write_open(Filename, _ClientID)->
                     WriteAtom = idToAtom(FileID,w),
             		ets:new(WriteAtom,[set,public,{keypos,1},named_table]), %table name = return value = WriteAtom
             		
-                    Row = #filemeta{fileid=FileID, filename=FileName, filesize=0, chunklist=[], 
-                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"}
+                    Row = #filemeta{fileid=FileID, filename=Filename, filesize=0, chunklist=[], 
+                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
                     
                     ets:insert(WriteAtom,Row),
                     io:format("File ~p created.~n",Filename),                   
-                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),                    
+                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),                    
                     {ok, FileID};  
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
@@ -146,9 +152,9 @@ do_write_open(Filename, _ClientID)->
             WriteAtom = idToAtom(FileID,w),
             case whereis(WriteAtom) of
                 undefined ->		% no WriteAtom , create one to write.
-                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),
                     {ok, FileID};                
-                [Pid]->			% pid exist, write deny
+                [_Pid]->			% pid exist, write deny
                     {error,"some other client writing."}  
             end
     end.
@@ -168,7 +174,7 @@ do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
     WriteAtom = idToAtom(FileID,w),
     WriteManPid = whereis(WriteAtom),
     %%	return value.  
-    rpc(WriteManPid,{register_chunk,_ClientID, ChunkUsedSize, _NodeList}).
+    rpc(WriteManPid,{register_chunk,_ChunkID, ChunkUsedSize, _NodeList}).
 %%     WriteManPid ! {register_chunk,_ClientID, ChunkUsedSize, _NodeList}.
     
 
