@@ -106,12 +106,30 @@ writeProcess(FileID)->
                     io:format("last chunk allocated!~n"),
                     allocate_this
             end;
-        {register_chunk,_ClientID, ChunkUsedSize, _NodeList}->
+        {From,{register_chunk,_ClientID, ChunkUsedSize, _NodeList}}->
+            %%TODO: check ets table.
+            WriteAtom = idToAtom(FileID,w),
+            
+            ets:insert(WriteAtom,{}),
+            
             todo;
         {close,_ClientID}->
             todo          
     end.
 
+%% write step 3: register chunk
+do_register_chunk_o(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
+    % register chunk    
+    % update filesize inf filemeta_s table
+    case select_all_from_filemeta_s(FileID) of
+        [] ->
+            {error,"file does not exist"};
+        [FileMetaS] ->
+            FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
+            Row = FileMetaS#filemeta_s{filesize = FileSize},
+            write_to_db(Row),
+            {ok, []}
+    end.
 
 
 %% write step 2: allocate chunk
@@ -156,19 +174,7 @@ do_allocate_chunk_o(FileID, _ClientID)->
 
 
 
-%% write step 3: register chunk
-do_register_chunk_o(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
-    % register chunk    
-    % update filesize inf filemeta_s table
-    case select_all_from_filemeta_s(FileID) of
-        [] ->
-            {error,"file does not exist"};
-        [FileMetaS] ->
-            FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
-            Row = FileMetaS#filemeta_s{filesize = FileSize},
-            write_to_db(Row),
-            {ok, []}
-    end.
+
 
 
 %% write step 4: close file
