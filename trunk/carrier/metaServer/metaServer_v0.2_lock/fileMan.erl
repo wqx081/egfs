@@ -104,17 +104,18 @@ writeProcess(FileID)->
                     
                 _ ->
                     io:format("last chunk allocated!~n"),
-                    allocate_this
+                    writeProcess(FileID)
             end;
         {From,{register_chunk,_ClientID, ChunkUsedSize, _NodeList}}->
             %%TODO: check ets table.
             WriteAtom = idToAtom(FileID,w),
             
             ets:insert(WriteAtom,{}),
+            writeProcess(FileID);
             
-            todo;
-        {close,_ClientID}->
-            todo          
+        {close,_ClientID}->            
+            {ok, []},
+            writeProcess(FileID)          
     end.
 
 %% write step 3: register chunk
