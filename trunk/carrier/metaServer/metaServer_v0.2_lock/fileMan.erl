@@ -55,16 +55,33 @@ dieP()->
 
 readProcess(FileID)->
     receive
-        {locatechunk, FileID, ChunkIndex} ->
-			io:format("asdf"),
+        {From,{locatechunk, FileID, ChunkIndex}} ->
+			io:format("locatechunk"),
 			readProcess(FileID);
-        {get_chunk,ChunkIdx}->
-            todo
+        {From,{get_chunk,ChunkIdx}}->
+            case select_all_from_filemeta(FileID) of
+                []->
+                    From!{error,"file does not exist"};
+                [#filemeta{chunklist = ChunkList}]->
+                    if
+                        (length(ChunkList) =< ChunkIdx) ->
+                            From!{error, "chunkindex is larger than chunklist size"};
+                        true ->
+                            ChunkID = lists:nth(ChunkIdx+1, ChunkList),
+                            case select_nodeip_from_chunkmapping(ChunkID) of
+                                [] -> From!{error, "chunk does not exist"};
+                                [ChunkLocations] ->
+                                    From!{ok, ChunkID, ChunkLocations}
+                            end
+                    end
+            end,
+            readProcess(FileID)
 	end.
+
 
 writeProcess(FileID)->
     receive        
-        {allocate,_ClientID}->    % if append,  we shall return that very last chunk.
+        {From,{allocate,_ClientID}}->    % if append,  we shall return that very last chunk.
             [Size] = select_filesize_from_filemeta(FileID),
             Rem = Size rem ?CHUNKSIZE,
  			case Rem of
@@ -167,26 +184,3 @@ do_close_o(FileID, _ClientID)->
     end.
 
 
-%% read step 1: open file == wirte step1
-%% read step 2: get chunk for further reading
-do_get_chunk_o(FileID, ChunkIdx)->
-    % mock return
-    % insert chunk into filemeta_s_table
-    case select_all_from_filemeta(FileID) of				
-		[]->
-            {error,"file does not exist"};
-        
-		[#filemeta{chunklist = ChunkList}]->
-            if 
-                (length(ChunkList) =< ChunkIdx) ->
-					{error, "chunkindex is larger than chunklist size"};
-				true ->
-					ChunkID = lists:nth(ChunkIdx+1, ChunkList),
-    				case select_nodeip_from_chunkmapping(ChunkID) of
-        				[] -> {error, "chunk does not exist"};
-        				% get fileid sucessfull	
-        				[ChunkLocations] ->
-							{ok, ChunkID, ChunkLocations}
-					end
-			end
-	end.
