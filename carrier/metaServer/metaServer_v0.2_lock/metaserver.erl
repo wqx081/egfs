@@ -90,9 +90,16 @@ do_write_open_N(Filename, _ClientID)->
             
             case select_all_from_filemeta(FileID) of
                 []->	% ok. we got FileID now, create file record, and writeP to write.
-                    add_filemeta_item(FileID,Filename),
-                    io:format("File ~p created.~n",Filename),
                     WriteAtom = idToAtom(FileID,w),
+            		ets:new(WriteAtom,[]),
+            		
+                    Row = #filemeta{fileid=FileID, filename=FileName, filesize=0, chunklist=[], 
+                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"}
+                    
+                    ets:insert(WriteAtom,Row),                    
+                    
+                    io:format("File ~p created.~n",Filename),
+                    
                     register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
                     whereis(WriteAtom);  
                 [FileMetaS]->
@@ -122,10 +129,15 @@ do_write_open(Filename, _ClientID)->
             
             case select_all_from_filemeta(FileID) of
                 []->	% ok. we got FileID now, create file record, and writeP to write.
-                    add_filemeta_item(FileID,Filename),
-                    io:format("File ~p created.~n",Filename),
                     WriteAtom = idToAtom(FileID,w),
-                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+            		ets:new(WriteAtom,[]),
+            		
+                    Row = #filemeta{fileid=FileID, filename=FileName, filesize=0, chunklist=[], 
+                         createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"}
+                    
+                    ets:insert(WriteAtom,Row),
+                    io:format("File ~p created.~n",Filename),                   
+                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),                    
                     {ok, FileID};  
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
