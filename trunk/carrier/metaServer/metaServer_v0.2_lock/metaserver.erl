@@ -130,7 +130,7 @@ do_write_open(Filename, _ClientID)->
             case select_all_from_filemeta(FileID) of
                 []->	% ok. we got FileID now, create file record, and writeP to write.
                     WriteAtom = idToAtom(FileID,w),
-            		ets:new(WriteAtom,[]),
+            		ets:new(WriteAtom,[set,public,{keypos,1},named_table]), %table name = return value = WriteAtom
             		
                     Row = #filemeta{fileid=FileID, filename=FileName, filesize=0, chunklist=[], 
                          createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"}
@@ -142,7 +142,7 @@ do_write_open(Filename, _ClientID)->
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
             end;    
-        [FileID] ->	 
+        [FileID] ->	 %file exist
             WriteAtom = idToAtom(FileID,w),
             case whereis(WriteAtom) of
                 undefined ->		% no WriteAtom , create one to write.

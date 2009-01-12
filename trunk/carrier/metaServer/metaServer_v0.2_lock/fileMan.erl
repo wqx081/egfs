@@ -79,6 +79,41 @@ readProcess(FileID)->
 	end.
 
 
+%% write step 2: allocate chunk
+do_allocate_chunk_o(FileID, _ClientID)-> 
+    % allocate data chunk
+    {_, HighTime, LowTime}=now(),
+	ChunkID = <<HighTime:32, LowTime:32>>,    
+    Res = select_all_from_Table(hostinfo),  % [{}{}{}{}{}]    
+    SizeOfRes = length(Res),
+    % if hostinfo table is empty, report error to client
+    if 
+        % hostinfo table is empty!!! error occurs!
+        (SizeOfRes =< 0) ->
+            {erroe, "no data server active"};
+        % hostinfo table is not empty
+        true ->
+    		random:seed(),
+    		Select = random:uniform(SizeOfRes),
+    		HostRecord = lists:nth(Select,Res),
+			SelectedHost = HostRecord#hostinfo.procname,
+    		% SelectedHost = erlang:element(1,lists:nth(Select,Res)),
+    		% insert chunk into filemeta_s_table
+    		case select_all_from_filemeta_s(FileID) of				
+				[]->            
+            		{error,"file does not exist"};
+                [FileMetaS]->
+                    ChunkList = FileMetaS#filemeta_s.chunklist++[ChunkID],
+                    RowFileMeta = FileMetaS#filemeta_s{chunklist = ChunkList},
+            		RowChunkMapping = #chunkmapping{chunkid=ChunkID, 
+                                                    chunklocations=[SelectedHost]},
+           			%io:format("do allocate_chunk"),
+            		write_to_db(RowFileMeta),
+    				write_to_db(RowChunkMapping),
+        			{ok, ChunkID, [SelectedHost]}
+     		end
+    end.
+
 writeProcess(FileID)->
     receive        
         {From,{allocate,_ClientID}}->    % if append,  we shall return that very last chunk.
@@ -94,12 +129,13 @@ writeProcess(FileID)->
     				SizeOfRes = length(Res),
                     if
                         (SizeOfRes =< 0) ->
-                            {error, "no data server active"};
+                            From!{error, "no data server active"};
                         true ->
                             random:seed(),
     						Select = random:uniform(SizeOfRes),
     						HostRecord = lists:nth(Select,Res),
-							SelectedHost = HostRecord#hostinfo.procname
+							SelectedHost = HostRecord#hostinfo.procname,
+                            From!{ok, ChunkID, [SelectedHost]}
                     end;
                     
                 _ ->
@@ -110,68 +146,22 @@ writeProcess(FileID)->
             %%TODO: check ets table.
             WriteAtom = idToAtom(FileID,w),
             
-            ets:insert(WriteAtom,{}),
-            writeProcess(FileID);
-            
-        {close,_ClientID}->            
-            {ok, []},
+            case ets:info(WriteAtom) of
+                undefined ->
+                    {error,"file does not exist"};
+                [_]->
+                    [FileMetas] = ets:lookup(WriteAtom,filemeta), % one process, one ets key,named filemeta
+                    FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
+                    NewMeta = FileMetaS#filemeta_s{filesize = FileSize},
+                    ets:insert(WriteAtom,NewMeta),
+                    From!{ok,[]},
+                    writeProcess(FileID)
+            end;
+        {From,{close,_ClientID}}->            
+            From!{ok, []},
             writeProcess(FileID)          
     end.
 
-%% write step 3: register chunk
-do_register_chunk_o(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
-    % register chunk    
-    % update filesize inf filemeta_s table
-    case select_all_from_filemeta_s(FileID) of
-        [] ->
-            {error,"file does not exist"};
-        [FileMetaS] ->
-            FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
-            Row = FileMetaS#filemeta_s{filesize = FileSize},
-            write_to_db(Row),
-            {ok, []}
-    end.
-
-
-%% write step 2: allocate chunk
-do_allocate_chunk_o(FileID, _ClientID)-> 
-    % allocate data chunk
-    {_, HighTime, LowTime}=now(),
-	ChunkID = <<HighTime:32, LowTime:32>>,
-    
-    Res = select_all_from_Table(hostinfo),  % [{}{}{}{}{}]    
-    SizeOfRes = length(Res),
-    
-    % if hostinfo table is empty, report error to client
-    if 
-        % hostinfo table is empty!!! error occurs!
-        (SizeOfRes =< 0) ->
-            {erroe, "no data server active"};
-        
-        % hostinfo table is not empty
-        true ->
-    		random:seed(),
-    		Select = random:uniform(SizeOfRes),
-    		HostRecord = lists:nth(Select,Res),
-			SelectedHost = HostRecord#hostinfo.procname,
-    		% SelectedHost = erlang:element(1,lists:nth(Select,Res)),
-    
-    		% insert chunk into filemeta_s_table
-    		case select_all_from_filemeta_s(FileID) of				
-				[]->            
-            		{error,"file does not exist"};
-                
-                [FileMetaS]->
-                    ChunkList = FileMetaS#filemeta_s.chunklist++[ChunkID],
-                    RowFileMeta = FileMetaS#filemeta_s{chunklist = ChunkList},
-            		RowChunkMapping = #chunkmapping{chunkid=ChunkID, 
-                                                    chunklocations=[SelectedHost]},
-           			%io:format("do allocate_chunk"),
-            		write_to_db(RowFileMeta),
-    				write_to_db(RowChunkMapping),
-        			{ok, ChunkID, [SelectedHost]}
-     		end
-    end.
 
 
 
