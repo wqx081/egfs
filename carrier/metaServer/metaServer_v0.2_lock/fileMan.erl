@@ -8,6 +8,7 @@
 %%
 -include("metaformat.hrl").
 -include("../../include/egfs.hrl").
+-import(util,[for/3,idToAtom/2]).
 
 -import(metaDB,[select_fileid_from_filemeta/1, 
                 select_fileid_from_filemeta_s/1, 
@@ -25,7 +26,8 @@
                 do_delete_filemeta/1,
                 do_delete_orphanchunk_byhost/1,
                 select_attributes_from_filemeta/1,
-                select_filesize_from_filemeta/1]).
+                select_filesize_from_filemeta/1,
+                select_chunklist_from_filemeta/1]).
 
 
 %%
@@ -55,9 +57,6 @@ dieP()->
 
 readProcess(FileID)->
     receive
-        {From,{locatechunk, FileID, ChunkIndex}} ->
-			io:format("locatechunk"),
-			readProcess(FileID);
         {From,{get_chunk,ChunkIdx}}->
             case select_all_from_filemeta(FileID) of
                 []->
@@ -138,8 +137,12 @@ writeProcess(FileID)->
                             From!{ok, ChunkID, [SelectedHost]}
                     end;
                     
-                _ ->
+                _ ->  % append
+                    [ChunkList] = select_chunklist_from_filemeta(FileID),
+                    LastItem = lists:last(ChunkList),                    
                     io:format("last chunk allocated!~n"),
+                    
+                    From!{ok,LastItem},
                     writeProcess(FileID)
             end;
         {From,{register_chunk,_ClientID, ChunkUsedSize, _NodeList}}->
@@ -150,8 +153,9 @@ writeProcess(FileID)->
                 undefined ->
                     {error,"file does not exist"};
                 [_]->
-                    [FileMetas] = ets:lookup(WriteAtom,filemeta), % one process, one ets key,named filemeta
-                    FileSize = FileMetaS#filemeta_s.filesize + ChunkUsedSize,
+                    [FileMetaS] = ets:lookup(WriteAtom,filemeta), % one process, one ets key,named filemeta
+                    
+                    FileSize = FileMetaS#filemeta.filesize + ChunkUsedSize,
                     NewMeta = FileMetaS#filemeta_s{filesize = FileSize},
                     ets:insert(WriteAtom,NewMeta),
                     From!{ok,[]},
