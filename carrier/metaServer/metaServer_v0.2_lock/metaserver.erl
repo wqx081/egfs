@@ -46,7 +46,27 @@ do_open(Filename,Modes,_ClientID)->
         _->{error,"unkown open mode"}
     end.
 
-do_read_open(Filename,_ClientID)->
+
+do_read_open(Filename, _ClientID)->
+    % mock return
+    % get fileid from filemetaTable
+    
+    case select_fileid_from_filemeta(Filename) of
+        [] -> {error, "filename does not exist"};
+        % get fileid sucessfull	
+        [FileID] ->
+            ReadAtom = idToAtom(FileID,r),
+            case whereis(ReadAtom) of
+                undefined ->		% no readp , create one to read.
+                    register(ReadAtom,spawn(node(),fileMan,fun readProcess/1,FileID)),
+                    {ok, FileID};                
+                [Pid]->			% pid exist, return it?
+                    {ok, FileID}  
+            end
+            
+    end.
+
+do_read_open_N(Filename,_ClientID)->
     case select_fileid_from_filemeta(Filename) of
         [] -> {error, "filename does not exist"};
         % get fileid sucessfull	
@@ -61,7 +81,7 @@ do_read_open(Filename,_ClientID)->
             end
     end.
 
-do_write_open(Filename, _ClientID)->
+do_write_open_N(Filename, _ClientID)->
     case select_fileid_from_filemeta(Filename) of
 		% create file id 
         [] ->		%create new file
@@ -89,6 +109,37 @@ do_write_open(Filename, _ClientID)->
             end			
     end.
 
+    
+do_write_open(Filename, _ClientID)->
+    % mock return    
+    %TODO: Table: filesession {fileid, client} ,mode =w
+	% get fileid from filemetaTable
+    case select_fileid_from_filemeta(Filename) of
+		% create file id 
+        [] ->		%create new file
+            {_, HighTime, LowTime}=now(),
+					FileID = <<HighTime:32, LowTime:32>>,
+            
+            case select_all_from_filemeta(FileID) of
+                []->	% ok. we got FileID now, create file record, and writeP to write.
+                    add_filemeta_item(FileID,Filename),
+                    io:format("File ~p created.~n",Filename),
+                    WriteAtom = idToAtom(FileID,w),
+                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+                    {ok, FileID};  
+                [FileMetaS]->
+                    {error,"fileid already exist , new fileid generator needed"}                    
+            end;    
+        [FileID] ->	 
+            WriteAtom = idToAtom(FileID,w),
+            case whereis(WriteAtom) of
+                undefined ->		% no WriteAtom , create one to write.
+                    register(WriteAtom,spawn(node(),fileMan,fun writeProcess/1,FileID)),
+                    {ok, FileID};                
+                [Pid]->			% pid exist, write deny
+                    {error,"some other client writing."}  
+            end
+    end.
 
 do_allocate_chunk(FileID,_ClientID)->
 %%  meta server would not handle this request in later version.
@@ -96,15 +147,17 @@ do_allocate_chunk(FileID,_ClientID)->
     WriteAtom = idToAtom(FileID,w),
     WriteManPid = whereis(WriteAtom),
 	%%	return value.     
-    WriteManPid ! {allocate,_ClientID}.
+    rpc(WriteManPid,{allocate,_ClientID}).
+%% 	WriteManPid ! {allocate,_ClientID}.
     
 do_register_chunk(FileID, _ChunkID, ChunkUsedSize, _NodeList)->
 %%  meta server would not handle this request in later version.
 %%  client shall find that man to do this job
     WriteAtom = idToAtom(FileID,w),
     WriteManPid = whereis(WriteAtom),
-    %%	return value.     
-    WriteManPid ! {register_chunk,_ClientID, ChunkUsedSize, _NodeList}.
+    %%	return value.  
+    rpc(WriteManPid,{register_chunk,_ClientID, ChunkUsedSize, _NodeList}).
+%%     WriteManPid ! {register_chunk,_ClientID, ChunkUsedSize, _NodeList}.
     
 
 do_close(FileID, _ClientID)->
@@ -113,7 +166,8 @@ do_close(FileID, _ClientID)->
     WriteAtom = idToAtom(FileID,w),
     WriteManPid = whereis(WriteAtom),
     %%	return value.     
-    WriteManPid ! {close,_ClientID}.
+    rpc(WriteManPid,{close,_ClientID}).
+%%     WriteManPid ! {close,_ClientID}.
 
 do_get_chunk(FileID, ChunkIdx)->
 %%  meta server would not handle this request in later version.
@@ -121,7 +175,8 @@ do_get_chunk(FileID, ChunkIdx)->
     ReadAtom = idToAtom(FileID,r),
     ReadManPid = whereis(ReadAtom),
     %%	return value.     
-    ReadManPid ! {get_chunk,ChunkIdx}.
+    rpc(ReadManPid,{get_chunk,ChunkIdx}).
+%%     ReadManPid ! {get_chunk,ChunkIdx}.
 
 
 %% read file attribute step 1: open file
@@ -175,3 +230,9 @@ do_register_heartbeat(HostInfoRec)->
         _-> {error,"chunk does not exist"}
     end.
 
+rpc(Pid, Request) ->
+    Pid ! {self(), Request},
+    receive
+	Response ->
+	    Response
+    end.
