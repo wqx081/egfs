@@ -1,7 +1,6 @@
 -module(data_reader).
 -include("../include/egfs.hrl").
 -include("data_server.hrl").
--import(chunk_db).
 -import(toolkit, [get_file_size/1,
 		  get_file_handle/2,
 		  get_file_name/1,
