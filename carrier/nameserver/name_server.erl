@@ -1,6 +1,9 @@
 -module(name_server).
 -include("name_server.hrl").
+-include("../")
+
 -define(ROOT_DIR, "/home/mere/myroot").
+
 -compile(export_all).
 
 %%"name server" methods
@@ -118,6 +121,7 @@ get_real_path(FilePathName) ->
     [UserPathHead | _Any] = FilePathName,
     case UserPathHead =:= 47 of % 47 = ASCII("/")
         true ->
+            filelib:
             UserPath1 = FilePathName;
         false ->
             UserPath1 = lists:append("/", FilePathName)
@@ -140,7 +144,7 @@ call_meta_copy(FileID) ->
 call_meta_check(FileID)->
     {ok, FileID}
 .
-read_meta(Path) ->
+read_meta(Path) ->    
 	case file:read_file(Path) of
 		{ok,<<Binary/binary>>} ->
 			Meta = binary_to_term(Binary),
