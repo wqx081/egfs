@@ -24,15 +24,19 @@ init([]) ->
     %% boot_report:boot_report(),
     %% heart_beat_report:start(),
     %% chunk_garbage_collect:start_auto_collect(),
-    {ok, server_has_startup}.
+    toolkit:start_listen().
 
-handle_call({readchunk, ChkID, Begin, Size}, _From, N) ->
+handle_call({readchunk, ChkID, Begin, Size}, _From, Inet) ->
     ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
-    Reply = handle_read(ChkID, Begin, Size),
+    Reply = handle_read(ChkID, Begin, Size, Inet),
     {reply, Reply, N};
-handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, N) ->
+handle_call({readchunk, startup, ChkID, Begin, Size}, _From, Inet) ->
+    ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
+    Reply = handle_read(ChkID, Begin, Size, Inet),
+    {reply, Reply, N};
+handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, Inet) ->
     ?DEBUG("[data_server]: write request from client, chkID(~p)~n", [ChunkID]),
-    Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist),
+    Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist, Inet),
     {reply, Reply, N};
 handle_call({echo, Msg}, _From, N) ->
     ?DEBUG("[data_server]: echo ~p~n", [Msg]),
