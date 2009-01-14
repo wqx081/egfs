@@ -95,12 +95,12 @@ writeProcessTest(FileID,A,Bool)->
             %%TODO: check ets table.
             WriteAtom = idToAtom(FileID,w),
             
-            case ets:info(WriteAtom) of
+            case ets:info(?FILE_WRITE_SHADOW_TABLE) of
                 undefined ->
                     {error,"file does not exist"};
                 [_]->
-                    [FileMetaS] = ets:lookup(WriteAtom,filemeta), % one process, one ets key,named filemeta
-                    
+                    [FileMetaS] = ets:lookup(?FILE_WRITE_SHADOW_TABLE,WriteAtom), % one process, one ets key,named filemeta
+                    todo
                     FileSize = FileMetaS#filemeta.filesize + ChunkUsedSize,
                     NewMeta = FileMetaS#filemeta_s{filesize = FileSize},
                     ets:insert(WriteAtom,NewMeta),
