@@ -47,14 +47,13 @@ loop_send(Socket, Hdl, Begin, End) when Begin < End ->
     Begin2 = Begin + size(Binary),
     loop_send(Socket, Hdl, Begin2, End);
 loop_send(SocketData, _Hdl, _Begin, _End) ->
-    wait_for_another(Socket, Hdl),
-    void.
+    wait_for_another(Socket, Hdl).
 
 wait_for_another(Socket, Hdl) ->
     receive
-	{tcp, Socket, {readchunk, ChunkID, Begin, End}} ->
+	{tcp, Socket, {readchunk, ChunkID, Begin, Size}} ->
 	    gen_tcp:send(Socket, term_to_binary({ok, readchunk})),
-	    loop_send(Socket, Hdl, Begin, End);
+	    loop_send(Socket, Hdl, Begin, Begin + Size);
 	{tcp_closed, Socket} ->
 	    void
     after
