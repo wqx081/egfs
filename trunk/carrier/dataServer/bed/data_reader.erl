@@ -4,38 +4,8 @@
 -import(toolkit, [get_file_size/1,
 		  get_file_handle/2,
 		  get_file_name/1,
-		  get_local_addr/0]).
+		  get_proper_size/3]).
 -export([handle_read/3]).
-
-handle_read(ChunkID, Begin, Size, {Listen, IP, Port}, CPid) ->
-    {ok, Name} = toolkit:get_file_name(ChunkID),
-    {ok, FileSize} = toolkit:get_file_size(Name),
-
-    if 
-	(Begin >= FileSize) orelse (Size =< 0) ->
-	    ?DEBUG("[~p, ~p]: read boundary invalid ~p~n", [?MODULE, ?LINE, Begin]),
-	    Reply = {error, "invalid read args", []};
-	true ->
-	    if 
-		Begin + Size > FileSize ->
-		    End = FileSize;
-		true ->
-		    End = Begin + Size
-	    end,
-
-	    PName = toolkit:get_proc_name(read, CPid, ChunkID),
-	    case whereis(PName) of
-		Pid ->
-		    Pid ! {restart, ChunkID, Begin, End},
-		    Reply = {ok, reuse};
-		undefined ->    
-		    Reply = {ok, IP, Port},
-		    Child = spawn(fun() -> read_process(Listen, ChunkID, Begin, End) end),
-		    register(PName, Child)
-	    end
-    end,
-
-    Reply.
 
 handle_read(ChunkID, Begin, Size, {Listen, IP, Port}) ->
     {ok, End} = get_proper_end(ChunkID, Begin, Size),
@@ -48,18 +18,12 @@ get_proper_end(ChunkID, Begin, Size) ->
     if 
 	(Begin >= FileSize) orelse (Size =< 0) ->
 	    ?DEBUG("[~p, ~p]: read boundary invalid ~p~n", [?MODULE, ?LINE, Begin]),
-	    Result = {error, bad_bundary, "invalid read begin or size"};
+	    _Result = {error, bad_bundary, "invalid read begin or size"};
 	true ->
-	    if 
-		Begin + Size > FileSize ->
-		    End = FileSize;
-		true ->
-		    End = Begin + Size
-	    end,
-
-	    Result = {ok, End}
-    end
-    Result .
+	    Size2 = toolkit:get_proper_size(Begin, FileSize, Size),
+	    End = Begin + Size2,
+	    _Result = {ok, End}
+    end.
     
 %% a read process
 read_process(Listen, ChunkID, Begin, End) ->
@@ -88,8 +52,6 @@ loop_send(SocketData, _Hdl, _Begin, _End) ->
 
 wait_for_another(Socket, Hdl) ->
     receive
-	{restart, _ChunkID, Begin, End} ->
-	    loop_send(Socket, Hdl, Begin, End);
 	{tcp, Socket, {readchunk, ChunkID, Begin, End}} ->
 	    gen_tcp:send(Socket, term_to_binary({ok, readchunk})),
 	    loop_send(Socket, Hdl, Begin, End);

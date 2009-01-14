@@ -90,12 +90,10 @@ get_socket(ChunkIndex, Begin, Size, ReadContext) ->
 
     receive
 	{tcp, Socket, {ok, readchunk}} ->
-	    Result = {ok, Socket, ReadContext};
+	    _Result = {ok, Socket, ReadContext};
     after
 	10000 ->
 	    gen_tcp:close(Socket),
 	    {ok, NewSocket, NewContext} = generate_new(ChunkIndex, Begin, Size, ReadContext),
-	    Result = {ok, NewSocket, NewContext},
-    end,
-
-    Result.
+	    _Result = {ok, NewSocket, NewContext},
+    end.
