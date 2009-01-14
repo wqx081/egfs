@@ -40,6 +40,7 @@
  
 
 
+
 do_open(Filename,Modes,_ClientID)->
     %find that man first.
     case Modes of
@@ -96,14 +97,25 @@ do_write_open_N(Filename, _ClientID)->
             case select_all_from_filemeta(FileID) of
                 []->	% ok. we got FileID now, create file record, and writeP to write.
                     WriteAtom = idToAtom(FileID,w),
-            		ets:new(WriteAtom,[]),
-            		
+                    
+                    
+                    case ets:info(?FILE_WRITE_SHADOW_TABLE) of
+                        undefined ->
+                            ets:new(?FILE_WRITE_SHADOW_TABLE,[set,public,{keypos,1},named_table]);
+                        [_] ->
+                            true
+                    end,
+                    
+            		ets:new(WriteAtom,[set,public,{keypos,1},named_table]), %table name = return value = WriteAtom
                     Row = #filemeta{fileid=FileID, filename=Filename, filesize=0, chunklist=[], 
                          createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
                                        
-                    ets:insert(WriteAtom,Row),                    
+                    ets:insert(?FILE_WRITE_SHADOW_TABLE,{WriteAtom,Row}),% WriteAtom is key of that object,
+                    													 % result of lookup func is [{WriteAtom,Row}]
                     
-                    io:format("File ~p created.~n",Filename),
+                    io:format("File ~p created.~n",Filename),                    
+                    Pid = spawn(fileWorker,writeProcess,[FileID]),
+                    global:register_name(Name,Pid).
                     
                     register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),
                     whereis(WriteAtom);  
