@@ -51,3 +51,4 @@
 -define(HEART_BEAT_TIMEOUT,		5*?HEART_BEAT_PERIOD).		
 -define(INIT_NODE_HEALTH,		5000). % 5 means a healthy connected data node, 0 means a disconnected ndoe
 
+-define(FILE_WRITE_SHADOW_TABLE,	fwst).
