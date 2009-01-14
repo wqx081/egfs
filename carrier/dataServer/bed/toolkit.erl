@@ -88,3 +88,7 @@ parse_config(total_space, ConfigFile) ->
     {ok, Config} = file:consult(ConfigFile),
     [Value] = [Value || {total_space, Value} <- Config],
     {ok, Value}.
+
+timestamp() ->
+    {H, M, S} = time(),
+    _Result = H*3600 + M*60 + S.
