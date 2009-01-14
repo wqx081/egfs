@@ -30,10 +30,6 @@ handle_call({readchunk, ChkID, Begin, Size}, _From, Inet) ->
     ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
     Reply = handle_read(ChkID, Begin, Size, Inet),
     {reply, Reply, N};
-handle_call({readchunk, startup, ChkID, Begin, Size}, _From, Inet) ->
-    ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
-    Reply = handle_read(ChkID, Begin, Size, Inet),
-    {reply, Reply, N};
 handle_call({writechunk, FileID, ChunkIndex, ChunkID, _Nodelist}, _From, Inet) ->
     ?DEBUG("[data_server]: write request from client, chkID(~p)~n", [ChunkID]),
     Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist, Inet),
