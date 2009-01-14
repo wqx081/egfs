@@ -37,6 +37,30 @@ handle_read(ChunkID, Begin, Size, {Listen, IP, Port}, CPid) ->
 
     Reply.
 
+handle_read(ChunkID, Begin, Size, {Listen, IP, Port}) ->
+    {ok, End} = get_proper_end(ChunkID, Begin, Size),
+    _Child = spawn(fun() -> read_process(Listen, ChunkID, Begin, End) end),
+    {ok, IP, Port}.
+
+get_proper_end(ChunkID, Begin, Size) ->
+    {ok, Name} = toolkit:get_file_name(ChunkID),
+    {ok, FileSize} = toolkit:get_file_size(Name),
+    if 
+	(Begin >= FileSize) orelse (Size =< 0) ->
+	    ?DEBUG("[~p, ~p]: read boundary invalid ~p~n", [?MODULE, ?LINE, Begin]),
+	    Result = {error, bad_bundary, "invalid read begin or size"};
+	true ->
+	    if 
+		Begin + Size > FileSize ->
+		    End = FileSize;
+		true ->
+		    End = Begin + Size
+	    end,
+
+	    Result = {ok, End}
+    end
+    Result .
+    
 %% a read process
 read_process(Listen, ChunkID, Begin, End) ->
     {ok, Socket} = gen_tcp:accept(Listen),
@@ -65,6 +89,9 @@ loop_send(SocketData, _Hdl, _Begin, _End) ->
 wait_for_another(Socket, Hdl) ->
     receive
 	{restart, _ChunkID, Begin, End} ->
+	    loop_send(Socket, Hdl, Begin, End);
+	{tcp, Socket, {readchunk, ChunkID, Begin, End}} ->
+	    gen_tcp:send(Socket, term_to_binary({ok, readchunk})),
 	    loop_send(Socket, Hdl, Begin, End);
 	{tcp_closed, Socket} ->
 	    void
