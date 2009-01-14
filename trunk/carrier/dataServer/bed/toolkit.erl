@@ -6,6 +6,7 @@
 	 get_file_name/1,
 	 get_local_addr/0,
 	 get_proc_name/3,
+	 get_proper_size/3,
 	 parse_config/2,
 	 rm_pending_chunk/1,
 	 report_metaServer/4]).
@@ -92,3 +93,12 @@ parse_config(total_space, ConfigFile) ->
 timestamp() ->
     {H, M, S} = time(),
     _Result = H*3600 + M*60 + S.
+
+get_proper_size(Begin, Size, Want_Size) ->
+    Size1 = Size - Begin,
+    if
+	Size1 > Want_Size ->
+	    _Result = Want_Size;
+	true ->
+	    _Result = Size1
+    end.
