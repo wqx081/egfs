@@ -26,6 +26,7 @@ get_pname(read, ChunkID, CPid) ->
     _Atom = list_to_atom(List).
 
 get_chunk_info(FileID, ChunkIndex) ->
+    io:format("[~p, ~p] get_chunk_info not implemented!~n", [?MODULE, ?LINE]),
     {ok, ChunkID, Nodelist}.
 
 %% ReadContext.file_id && file_size be defined.
