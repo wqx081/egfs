@@ -9,6 +9,7 @@
 
 %%defien global server name
 -define(META_SERVER,{global, metagenserver}).
+-define(CHUNK_SERVER,{global,data_server}).
 %% define Chunk Size and Strip Size
 -define(CHUNKSIZE, 33554432).%32*1024*1024
 
