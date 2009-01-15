@@ -40,10 +40,10 @@
 %%
 
 startReadProcess(FileID)->
-    spawn(node(),fileMan,fun readProcess/1,FileID).
+    spawn(node(),fileWorker,readProcess,[FileID]).
 
 startWriteProcess(FileID)->
-    spawn(node(),fileMan,fun writeProcess/1,FileID).
+    spawn(node(),fileWorker,writeProcess,[FileID]).
         
 %%
 %% Local Functions
@@ -99,8 +99,8 @@ writeProcessTest(FileID,A,Bool)->
                 undefined ->
                     {error,"file does not exist"};
                 [_]->
-                    [FileMetaS] = ets:lookup(?FILE_WRITE_SHADOW_TABLE,WriteAtom), % one process, one ets key,named filemeta
-                    todo
+                    [{WriteAtom,FileMetaS}] = ets:lookup(?FILE_WRITE_SHADOW_TABLE,WriteAtom), % one process, one ets key,named filemeta
+                    
                     FileSize = FileMetaS#filemeta.filesize + ChunkUsedSize,
                     NewMeta = FileMetaS#filemeta_s{filesize = FileSize},
                     ets:insert(WriteAtom,NewMeta),

@@ -56,6 +56,9 @@ idToAtom(Bin,Mode)->
 
 
 
+
+
+
 gen_guid() ->
     TimeIn100NanosBeg = calendar:datetime_to_gregorian_seconds({{1582, 10, 15}, {0, 0, 0}}) * 10000000,
     {_MegaSecs, _Secs, MicroSecs} = now(),
