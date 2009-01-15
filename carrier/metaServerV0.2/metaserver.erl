@@ -115,10 +115,8 @@ do_write_open_N(Filename, _ClientID)->
                     
                     io:format("File ~p created.~n",Filename),                    
                     Pid = spawn(fileWorker,writeProcess,[FileID]),
-                    global:register_name(Name,Pid).
-                    
-                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),
-                    whereis(WriteAtom);  
+                    global:register_name(WriteAtom,Pid),
+                    WriteAtom;  
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
             end;    
@@ -152,9 +150,12 @@ do_write_open(Filename, _ClientID)->
                     Row = #filemeta{fileid=FileID, filename=Filename, filesize=0, chunklist=[], 
                          createT=term_to_binary(erlang:localtime()), modifyT=term_to_binary(erlang:localtime()),acl="acl"},
                     
-                    ets:insert(WriteAtom,Row),
-                    io:format("File ~p created.~n",Filename),                   
-                    register(WriteAtom,spawn(fileMan,writeProcess,[FileID])),                    
+                    ets:insert(?FILE_WRITE_SHADOW_TABLE,{WriteAtom,Row}),% WriteAtom is key of that object,
+                    													 % result of lookup func is [{WriteAtom,Row}]
+                    
+                    io:format("File ~p created.~n",Filename),                    
+                    Pid = spawn(fileWorker,writeProcess,[FileID]),
+                    global:register_name(WriteAtom,Pid),
                     {ok, FileID};  
                 [FileMetaS]->
                     {error,"fileid already exist , new fileid generator needed"}                    
@@ -287,3 +288,45 @@ do_debug(Arg) ->
         _ ->
             io:format("ohter~n")
     end.
+
+
+
+
+%% 
+%% for name_server 
+%% 
+call_meta_open(FileID, Mode)->
+    do_open(FileID, Mode,[]).
+
+
+call_meta_new() ->
+    {_, HighTime, LowTime}=now(),
+    FileID = <<HighTime:32, LowTime:32>>,
+    {ok, FileID}.
+
+
+call_meta_delete(FileID)->
+    do_delete_filemeta(FileID).
+
+
+call_meta_copy(FileID) ->
+ 
+%%     gen_server:call(?CHUNK_SERVER,{chunkCopy,[From],[To1,To2]}),
+    
+    {ok, <<1:64>>}
+.
+call_meta_check(FileID)->
+    WA = idToAtom(FileID,w),
+    RA = idToAtom(FileID,r),
+    [L] = global:registered_names(), 
+    
+    Res = lists:member(WA, L) or lists:member(RA,L) 
+    case Res of
+        true ->
+            {error,"someone writing or reading this file."};
+        false ->
+			{ok, FileID}
+    end.
+
+     
+
