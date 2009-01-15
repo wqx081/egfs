@@ -50,8 +50,7 @@ receive_it(Socket, BinaryList, Len, Size) ->
 %%%%   tools
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_chunk_info(FileID, ChunkIndex) ->
-    io:format("[~p, ~p] get_chunk_info not implemented!~n", [?MODULE, ?LINE]),
-    {ok, ChunkID, Nodelist}.
+    gen_server:call(?META_SERVER, {locatechunk, FileID, ChunkIndex}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ReadContext.file_id && file_size be defined.
@@ -86,8 +85,10 @@ get_socket(ChunkIndex, Begin, Size, ReadContext) ->
     Socket = ReadContext#read_context.socket,
     ChunkID = ReadContext#read_context.chunk_id,
     Req = {readchunk, ChunkID, Begin, Size},
-    gen_tcp:send(Socket, term_to_binary(Req)),
+    activate_socket(Socket, Req, ChunkIndex).
 
+activate_socket(Socket, Req, ChunkIndex) ->
+    gen_tcp:send(Socket, term_to_binary(Req)),
     receive
 	{tcp, Socket, {ok, readchunk}} ->
 	    _Result = {ok, Socket, ReadContext};
