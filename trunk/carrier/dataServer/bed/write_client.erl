@@ -83,7 +83,7 @@ get_socket(ChunkIndex, Begin, Size, WriteContext) ->
 activate_socket(Socket, Req, ChunkIndex) ->
     gen_tcp:send(Socket, term_to_binary(Req)),
     receive
-	{tcp, Socket, {ok, readchunk}} ->
+	{tcp, Socket, {ok, _}} ->
 	    _Result = {ok, Socket, WriteContext};
     after
 	10000 ->
