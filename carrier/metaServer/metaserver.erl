@@ -165,8 +165,12 @@ do_get_chunk(FileID, ChunkIdx)->
 %% read file attribute step 1: open file
 %% read file attribute step 2: get chunk for 
 do_get_fileattr(FileName)->
-    [AttributeList] =select_attributes_from_filemeta(FileName),
-    {ok, AttributeList}.
+    case select_attributes_from_filemeta(FileName) of
+    []-> 
+	{error, ""};
+    [AttributeList] ->
+	{ok, AttributeList}
+    end.
 
 %%
 %% 
