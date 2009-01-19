@@ -5,7 +5,7 @@
 -import(toolkit).
 -export([handle_write/6]).
 
-handle_write(FileID, ChunkID, Begin, Size, {Listen, IP, Port}, _Nodelist) ->
+handle_write(FileID, ChunkID, Begin, Size, _Nodelist, {Listen, IP, Port}) ->
     case check_boundary(ChunkID, Begin, Size) of
 	true ->
 	    spawn(fun() -> write_process(Listen, FileID, ChunkID, Begin, Size) end),
@@ -13,7 +13,7 @@ handle_write(FileID, ChunkID, Begin, Size, {Listen, IP, Port}, _Nodelist) ->
 	_Other ->
 	    _Reply = {error, bad_write, "bad write boundary"}
     end;
-handle_write(_FileID, _ChunkID, _Begin, _Size, _Inet, [_H|_T]) ->
+handle_write(_FileID, _ChunkID, _Begin, _Size, [_H|_T], _Inet) ->
     {error, not_implemented}.
 
 check_boundary(_ChunkId, _Begin, _Size) ->
