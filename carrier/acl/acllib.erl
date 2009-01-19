@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% File    : acl.erl
+%%% File    : acllib.erl
 %%% Author  : 
 %%% Description : the access control list functions
 %%%
@@ -9,30 +9,48 @@
 %-behaviour(gen_server).
 %-include("../include/egfs.hrl").
 %%gen_server callbacks
+-export([lookup_acltab/5, addmember/6]).
 -compile(export_all).
-
-%%default setting，以后应该改成找到该文件的目录，继承acl
--define(UserCtrl, 2#111).   %% rwd
--define(GroupCtrl, 2#011).   %% rw-
--define(OtherCtrl, 2#001).   %% r--
-
 
 %%----------------------------------------------------------------------
 %% loop up ets and return ok or not
 %%----------------------------------------------------------------------
-lookup_acltab(_Tabacl, _Optype, FileName, _UserName) when FileName =:= []->
-    {ok, file_does_not_exit};
-lookup_acltab(Tabacl, Optype, FileName, UserName) ->
+
+%% --------------------------------------------------------------------
+%% Function: open/2
+%% Description: call metaserver to open file
+%% Returns: {ok, Filedevice}          |
+%%          {error, Why}              |
+%% --------------------------------------------------------------------
+lookup_acltab(Tabacl, Tabgroup, Optype, FileName, UserName) ->
+    case get_CtrlValue(Tabacl, Tabgroup, FileName, UserName) of
+	{ok, CtrlValue} ->
+	    understand_ctrlvalue(Optype, CtrlValue);
+	{no, not_exit} ->
+	    {ok, no_exit}
+    end.
+
+get_CtrlValue(_Tabacl, _Tabgroup, FileName, _UserName) when FileName =:= []->
+    {no, not_exit};
+get_CtrlValue(Tabacl, Tabgroup, FileName, UserName) ->
     case ets:lookup(Tabacl, FileName) of
 	[] ->
-	    io:format("[Acl:~p]:filename not in acltab~n",[?LINE]),
+	    io:format("[Acl:~p]:FileName is:~p~n",[?LINE, FileName]),
 	    FileName1 = lists:reverse(FileName),
-	    Father_folder = get_father_folder(FileName1),
+	    [H|T] = FileName1,
+	    case H of
+		47 ->
+		    FileNameTemp = T;
+		_Any ->
+		    FileNameTemp = FileName1
+	    end,
+	    Father_folder = get_father_folder(FileNameTemp),
 	    io:format("[Acl:~p]:Father_folder:~p~n",[?LINE, Father_folder]),
-	    lookup_acltab(Tabacl, Optype, Father_folder, UserName);
+	    get_CtrlValue(Tabacl, Tabgroup, Father_folder, UserName);
 	[Object] ->
 	    %%to look up if the user can operate this file
-	    lookup_aclrecord(Optype, Object, UserName)
+	    io:format("[Acl:~p]:FileName is:~p~n",[?LINE, FileName]),
+	    lookup_aclrecord(Tabgroup, Object, UserName)
     end.
 
 get_father_folder(FileName) ->
@@ -40,51 +58,47 @@ get_father_folder(FileName) ->
     %io:format("[Acl:~p]:H:~p,FileName:~p~n",[?LINE, H, FileName]),
     case H of
 	47 ->
-	    %io:format("[Acl:~p]:~n",[?LINE]),
-	    lists:reverse(T);
+	    io:format("[Acl:~p]:T is:~p~n",[?LINE, T]),
+	    lists:reverse(FileName);
 	_Any ->
 	    get_father_folder(T)
     end.
 
-lookup_aclrecord(Optype, Object, UserName) ->
+lookup_aclrecord(Tabgroup, Object, UserName) ->
     {_FileName, UserList, GroupList, OtherList} = Object,
     %% 1.to lookup userlist 2.to lookup grouplist 3.to lookup otherlist
     io:format("[Acl:~p]:userName is:~p, UserList is:~p~n",[?LINE, UserName, UserList]),
     case lists:keysearch(UserName, 1, UserList) of
 	{value, Tuple} ->
 	    {_UserNameTemp, CtrlValue_User} = Tuple,
-	    understand_ctrlvalue(Optype, CtrlValue_User);
+	    {ok, CtrlValue_User};
 	false ->
-	    case lookup_list(UserName, GroupList) of
+	    case lookup_list(Tabgroup, UserName, GroupList) of
 		{ok, CtrlValue_Group} ->
-		    understand_ctrlvalue(Optype, CtrlValue_Group);
+		    {ok, CtrlValue_Group};
 		{no, not_exist} ->
 		    %%look up otherlist and return
 		    [{other, CtrlValue_Other}] = OtherList,
-		    understand_ctrlvalue(Optype, CtrlValue_Other)
+		    {ok, CtrlValue_Other}
 	    end
     end.
 
-lookup_list(_UserName, Tuple) when Tuple =:=[]->
+lookup_list(_Tabgroup, _UserName, Tuple) when Tuple =:=[]->
     {no, not_exist};
-lookup_list(UserName, Tuple) ->
+lookup_list(Tabgroup, UserName, Tuple) ->
     %io:format("[Acl:~p]Tuple :~p~n",[?LINE, Tuple]),
     [H|T] = Tuple,
     io:format("[Acl:~p]H:~p, T :~p~n",[?LINE, H, T]),
     {TempGroupName, CtrlValue} = H,
-    case lookup_grouptab(UserName, TempGroupName) of
+    case lookup_grouptab(Tabgroup, UserName, TempGroupName) of
 	true ->
 	    io:format("[Acl:~p]:you found username in grouptab~n",[?LINE]),
 	    {ok, CtrlValue};
 	false ->
-	    lookup_list(UserName, T)
+	    lookup_list(Tabgroup, UserName, T)
     end.
 
-lookup_grouptab(UserName, GroupName) ->
-    Tabgroup = ets:new(tabgroup, []),
-    ets:insert(Tabgroup, {user1, [zyb, njr, zm]}),
-    ets:insert(Tabgroup, {admin, [hxm, llk, xpz]}),
-    ets:insert(Tabgroup, {user2, [xcc, lsb, pyy]}),
+lookup_grouptab(Tabgroup, UserName, GroupName) ->
     case ets:lookup(Tabgroup, GroupName) of
 	[] ->
 	    io:format("[Acl:~p]:group not in grouptab:~p~n",[?LINE, GroupName]),
@@ -124,26 +138,69 @@ pass_or_reject(CtrlTemp) ->
 	    {ok, reject}
     end.
 
-addmember_to_List(Tabacl, FileName, AddName, CtrlValue, Type) ->
+addmember(Tabacl, Tabgroup, FileName, AddName, CtrlValue, Type) ->
+    io:format("[Acl:~p]:add member:~p~n",[?LINE, AddName]),
     case ets:lookup(Tabacl, FileName) of
 	[] ->
-	    {ok, no_this_file};
+	    %%判断父目录是否有CtrlValue这一权限，如果有就添加记录
+	    case get_CtrlValue(Tabacl, Tabgroup, FileName, AddName) of
+		{ok, CtrlValue_Get} ->
+		    if
+			CtrlValue_Get > CtrlValue ->
+			    {ok, not_need_add};
+			true ->
+			    ets:insert(Tabacl, {FileName, [{root, 7}], [{group, 3}], [{other, 1}]}),
+			    addmember(Tabacl, Tabgroup, FileName, AddName, CtrlValue, Type)
+		    end;
+		{no, not_exit} ->
+		    ets:insert(Tabacl, {FileName, [{root, 7}], [{group, 3}], [{other, 1}]}),
+		    addmember(Tabacl, Tabgroup, FileName, AddName, CtrlValue, Type)
+	    end;
 	[Object] ->
-	    {FileName, UserList, GroupList, OtherList} = Object,
-	    %%需查询列表中是否有UserName对应的元组，有则替换，没有则添加
-	    case Type of
-		user ->
-		    NewList = lists:append(UserList, [{AddName, CtrlValue}]),
-		    ets:delete_object(Tabacl, Object),
-		    ets:insert(Tabacl, {FileName, NewList, GroupList, OtherList}),
-		    io:format("[Acl:~p]:add NewList:~p~n", [?LINE, NewList]);
-		group ->
-		    NewList = lists:append(GroupList, [{AddName, CtrlValue}]),
-		    ets:delete_object(Tabacl, Object),
-		    ets:insert(Tabacl, {FileName, UserList, NewList, OtherList}),
-		    io:format("[Acl:~p]:add NewList:~p~n", [?LINE, NewList]);
-		Any ->
-	            io:format("[Acl:~p]:don't understand type:~p~n", [?LINE, Any])
-	    end,
-	    {ok, addmember_ok}
+	    addmember_ctrl(Tabacl, Tabgroup, AddName, CtrlValue, Object, Type)
     end.
+
+addmember_ctrl(Tabacl, Tabgroup, AddName, CtrlValue, Object, Type) ->
+    case Type of
+	user ->
+	    adduser_to_userlist(Tabacl, AddName, CtrlValue, Object);
+	group ->
+	    addgroup_to_grouplist(Tabacl, Tabgroup, AddName, CtrlValue, Object);
+	Any ->
+            io:format("[Acl:~p]:you can only add user/group:~p~n", [?LINE, Any])
+    end,
+    {ok, addmember_ok}.
+
+adduser_to_userlist(Tabacl, AddName, CtrlValue, Object) ->
+    {FileName, UserList, GroupList, OtherList} = Object,
+    NewList = addmember_to_list(AddName, CtrlValue, UserList),
+    %ets:delete_object(Tabacl, Object),
+    ets:insert(Tabacl, {FileName, NewList, GroupList, OtherList}),
+    io:format("[Acl:~p]:NewUserList is:~p~n", [?LINE, NewList]).
+
+
+addgroup_to_grouplist(Tabacl, Tabgroup, AddName, CtrlValue, Object) ->
+    %%查询这个组在grouptab中是否存在，有则添加,无则返回false
+    {FileName, UserList, GroupList, OtherList} = Object,
+    case ets:lookup(Tabgroup, AddName) of
+	[] ->
+	    io:format("[Acl:~p]:group not in grouptab:~p~n",[?LINE, AddName]),
+	    false;
+	[_GroupObject] ->
+	    NewList = addmember_to_list(AddName, CtrlValue, GroupList),
+	    %ets:delete_object(Tabacl, Object),
+	    ets:insert(Tabacl, {FileName, UserList, NewList, OtherList}),
+	    io:format("[Acl:~p]:NewGroupList is:~p~n", [?LINE, NewList])
+    end.
+
+addmember_to_list(AddName, CtrlValue, List) ->
+    io:format("[Acl:~p]:add member:~p~n",[?LINE, AddName]),
+    %%查询列表中是否有UserName对应的元组，有则替换，无则添加
+    case lists:keymember(AddName, 1, List) of
+	true ->
+	    ListTemp = lists:keydelete(AddName, 1, List),
+	    io:format("[Acl:~p]:new list is:~p~n", [?LINE, ListTemp]);
+	false ->
+	    ListTemp = List
+    end,
+    lists:append(ListTemp, [{AddName, CtrlValue}]).
