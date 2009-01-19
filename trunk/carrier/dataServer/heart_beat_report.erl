@@ -13,25 +13,22 @@ stop() ->
 loop(Time) ->
     receive
 	stop ->
-	    io:format("heart beat stopped ~n")
+	    void
     after Time -> 
-	    io:format("heart beat event~n"),
 	    {ok, HostInfoRec} = boot_report:get_host_info(),
 	    try gen_server:call(?META_SERVER,{heartbeat,HostInfoRec}) of
-		{ok, _} ->
-		    io:format("heart beat report succeeded ~n");
-		{error, _} ->
-		    io:format("heart beat report failed ~n"),
+		{ok, _Any} ->
+		    void;
+		{error, _Any} ->
 		    boot_report:boot_report();
 		_Any ->
-		    io:format("[~p , ~p], ~p ~n", [?MODULE, ?LINE], [_Any])
+		    void
 	    catch
-		exit:X  ->
-		    io:format("Exit caught ~p ~n", [X]),
+		exit:_  ->
 		    toolkit:sleep(?HEART_BEAT_REPORT_WAIT_TIME),
 		    loop(Time);
-		_Any ->
-		    io:format("[~p , ~p], ~p ~n", [?MODULE, ?LINE], [_Any])
+		  _Any ->
+		    void
 	    end,
 	    loop(Time)
     end.
