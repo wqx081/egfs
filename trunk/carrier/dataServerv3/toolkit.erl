@@ -18,7 +18,7 @@
 start_listen() ->
     {ok, Listen} = gen_tcp:listen(?DATA_PORT, ?INET_OP),
     {ok, IP} = get_local_addr(),
-    {ok, Listen, IP, ?DATA_PORT}.
+    {ok, {Listen, IP, ?DATA_PORT}}.
 
 get_file_size(FileName) ->
     case file:read_file_info(FileName) of
