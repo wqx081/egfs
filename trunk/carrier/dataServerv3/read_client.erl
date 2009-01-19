@@ -87,7 +87,7 @@ get_chunk_info(FileID, ChunkIndex) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 generate_new(ChunkIndex, Begin, Size, Context) ->
     {ok, ChunkID, Nodelist} = get_chunk_info(Context#file_context.file_id, ChunkIndex),
-    [H|_T] = Context#file_context.nodelist, 
+    [H|_T] = Nodelist, 
     {ok, IP, Port} = gen_server:call(H, {readchunk, ChunkID, Begin, Size}), 
     {ok, Socket} = gen_tcp:connect(IP, Port, ?INET_OP),
     NewContext = Context#file_context{chunk_index = ChunkIndex,

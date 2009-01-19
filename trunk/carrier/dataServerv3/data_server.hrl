@@ -5,11 +5,6 @@
 
 -record(file_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
 		       socket, timestamp, pid}).
--record(read_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
-		       socket, timestamp, pid}).
--record(write_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
-		       socket, timestamp, pid}).
-
 
 -define(SERVER_NAME, data_server).
 -define(DATA_PORT, 7070).
