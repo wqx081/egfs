@@ -3,6 +3,8 @@
 -record(chunkmeta, {chunk_id, file_id, path, length, create_time, modify_time}).
 -record(garbageinfo, {chunk_id, insert_time}).
 
+-record(file_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
+		       socket, timestamp, pid}).
 -record(read_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
 		       socket, timestamp, pid}).
 -record(write_context, {file_id, file_size, chunk_index, chunk_id, nodelist,
