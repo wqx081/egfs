@@ -8,26 +8,33 @@
 
 -compile(export_all).
 
-do_this_once() ->
-    mnesia:create_schema([node()]),
-    mnesia:start(),
-    mnesia:create_table(chunkmeta, [{attributes, record_info(fields, chunkmeta)}, {disc_copies,[node()]}]),
-    mnesia:create_table(garbageinfo, [{attributes, record_info(fields, garbageinfo)}, {disc_copies,[node()]}]),
-    mnesia:stop().
 
 start()->
     case mnesia:create_schema([node()]) of
 	ok ->
 	    mnesia:start(),
-	    mnesia:create_table(chunkmeta, [{attributes, record_info(fields, chunkmeta)}, {disc_copies,[node()]}]),
-	    mnesia:create_table(garbageinfo, [{attributes, record_info(fields, garbageinfo)}, {disc_copies,[node()]}]),
+
+	    mnesia:create_table(
+	      chunkmeta, 
+	      [
+	       {attributes, record_info(fields, chunkmeta)}, 
+	       {disc_copies,[node()]}
+	      ]
+	     ),
+
+	    mnesia:create_table(
+	      garbageinfo, 
+	      [
+	       {attributes, record_info(fields, garbageinfo)}, 
+	       {disc_copies,[node()]}
+	      ]
+	     ),
+
 	    mnesia:wait_for_tables([chunkmeta, garbageinfo], 5000);
-	_ -> 
+	_Any -> 
 	    mnesia:start(),
 	    mnesia:wait_for_tables([chunkmeta, garbageinfo], 5000)
     end.
-
-    
 
 stop()->
     mnesia:stop().
@@ -35,35 +42,29 @@ stop()->
 clear_tables()->
     mnesia:clear_table(chunkmeta),
     mnesia:clear_table(garbageinfo).
-    
 
 do(Q) ->
     F = fun() -> qlc:e(Q) end,
     {atomic, Val} = mnesia:transaction(F),
     Val.
 
-do_trans(X) ->
+do_write_db(Row) ->
     F = fun() ->
-	    mnesia:write(X)
+	    mnesia:write(Row)
     end,
     {atomic, Val} = mnesia:transaction(F),
     Val.
 
-
-
 insert_chunk_info(Chunkid, Fileid, Path, Size) ->
-    Row = #chunkmeta{file_id=Fileid,
-		     chunk_id=Chunkid, 
-		     path=Path,
-		     length=Size,
-		     create_time=erlang:localtime(), 
-		     modify_time=(erlang:localtime())
-		    },
-    do_trans(Row).
-
-
-
-
+    Row = #chunkmeta{
+      file_id=Fileid,
+      chunk_id=Chunkid, 
+      path=Path,
+      length=Size,
+      create_time=erlang:localtime(), 
+      modify_time=(erlang:localtime())
+     },
+    do_write_db(Row).
 
 remove_chunk_info(Chunkid)->
     Oid = {chunkmeta, Chunkid},
@@ -78,9 +79,6 @@ remove_chunk_infos(ChunkidList) ->
 	end,
     mnesia:transaction(F).
     
-
-
-
 modify_chunk_info(Chunkid, NewPath, NewSize, NewCreatetime, NewModifytime) ->
     [{chunkmeta,Chunkid, Fileid, _, _, _, _ }] = get_chunk_info_by_id(Chunkid),    
     Row = #chunkmeta{chunk_id=Chunkid,
@@ -90,7 +88,7 @@ modify_chunk_info(Chunkid, NewPath, NewSize, NewCreatetime, NewModifytime) ->
 		     create_time=NewCreatetime,
 		     modify_time=NewModifytime      
 		    },
-    do_trans(Row).
+    do_write_db(Row).
 
 modify_chunk_path(Chunkid, NewPath) ->
     [{chunkmeta, Chunkid, Fileid, _, Size, Createtime, Modifytime}] = get_chunk_info_by_id(Chunkid),    
@@ -101,8 +99,7 @@ modify_chunk_path(Chunkid, NewPath) ->
 		      create_time=Createtime,
 		      modify_time=Modifytime      
  		    },
-    do_trans(Row).
-
+    do_write_db(Row).
 
 modify_chunk_length(Chunkid, NewSize) ->
     [{chunkmeta, Chunkid, Fileid, Path, _, Createtime, Modifytime}] = get_chunk_info_by_id(Chunkid),    
@@ -114,7 +111,7 @@ modify_chunk_length(Chunkid, NewSize) ->
 		      modify_time=Modifytime      
  		    },
 
-    do_trans(Row).
+    do_write_db(Row).
 
 modify_chunk_ct(Chunkid, NewCreatetime) ->
     [{chunkmeta, Chunkid, Fileid, Path, Size, _, Modifytime}] = get_chunk_info_by_id(Chunkid),    
@@ -125,8 +122,7 @@ modify_chunk_ct(Chunkid, NewCreatetime) ->
 		      create_time=NewCreatetime,
 		      modify_time=Modifytime      
  		    },
-    do_trans(Row). 
-    
+    do_write_db(Row). 
 
 modify_chunk_mt(Chunkid, NewModifytime) ->
     [{chunkmeta, Chunkid, Fileid, Path, Size, Createtime, _}] = get_chunk_info_by_id(Chunkid),    
@@ -137,8 +133,7 @@ modify_chunk_mt(Chunkid, NewModifytime) ->
 		      create_time=Createtime,
 		      modify_time=NewModifytime      
 		     },
-    do_trans(Row).
-
+    do_write_db(Row).
 
 get_all_from_table(T)->
     do(qlc:q([X || X <- mnesia:table(T)])).
@@ -170,13 +165,11 @@ get_paths_by_chunk_id(ChunkidList) ->
     TmpChunkidList = [get_path_by_chunk_id(X) || X <- ChunkidList],
     [X || [X] <- TmpChunkidList].
 
-
-
 insert_garbage_info(Chunkid) ->
     Row = #garbageinfo{chunk_id=Chunkid,
 		      insert_time=erlang:localtime()
 		      },
-    do_trans(Row).
+    do_write_db(Row).
 
 insert_garbage_infos(ChunkidList) ->
     F = fun() ->
@@ -184,21 +177,18 @@ insert_garbage_infos(ChunkidList) ->
   	end,
     mnesia:transaction(F).
 
-
 remove_garbage_info(Chunkid) ->
     Oid = {garbageinfo, Chunkid},
     F = fun() ->
 		mnesia:delete(Oid)
 	end,
     mnesia:transaction(F).
-
     
 remove_garbage_infos(ChunkidList) ->
     F = fun() ->
 		foreach(fun remove_garbage_info/1, ChunkidList)
 	end,
     mnesia:transaction(F).
-
 
 get_all_garbage_chunk_id() ->
     do(qlc:q([X#garbageinfo.chunk_id || X <- mnesia:table(garbageinfo)
