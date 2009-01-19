@@ -1,8 +1,8 @@
 -module(data_gen_server).
 -behaviour(gen_server).
 %% -import(data_worker, [handle_read/3, handle_write/4]).
--import(data_writer, [handle_write/4]).
--import(data_reader, [handle_read/3]).
+-import(data_writer, [handle_write/6]).
+-import(data_reader, [handle_read/4]).
 -import(chunk_db).
 -include("../include/egfs.hrl").
 -include("data_server.hrl").
@@ -30,9 +30,9 @@ handle_call({readchunk, ChkID, Begin, Size}, _From, Inet) ->
     ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
     Reply = handle_read(ChkID, Begin, Size, Inet),
     {reply, Reply, Inet};
-handle_call({writechunk, FileID, ChunkID, Begin, Size, _Nodelist}, _From, Inet) ->
+handle_call({writechunk, FileID, ChunkID, Begin, Size, Nodelist}, _From, Inet) ->
     ?DEBUG("[data_server]: write request from client, chkID(~p)~n", [ChunkID]),
-    Reply = handle_write(FileID, ChunkIndex, ChunkID, _Nodelist, Inet),
+    Reply = handle_write(FileID, ChunkID, Begin, Size, Nodelist, Inet),
     {reply, Reply, Inet};
 handle_call({echo, Msg}, _From, N) ->
     ?DEBUG("[data_server]: echo ~p~n", [Msg]),
