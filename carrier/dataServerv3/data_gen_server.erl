@@ -24,7 +24,8 @@ init([]) ->
     %% boot_report:boot_report(),
     %% heart_beat_report:start(),
     %% chunk_garbage_collect:start_auto_collect(),
-    toolkit:start_listen().
+    Result = toolkit:start_listen(),
+    Result.
 
 handle_call({readchunk, ChkID, Begin, Size}, _From, Inet) ->
     ?DEBUG("[data_server]: read request from client, chunkID(~p)~n", [ChkID]),
