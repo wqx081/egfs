@@ -8,7 +8,10 @@
 -endif.
 
 %%defien global server name
--define(META_SERVER,{global, metagenserver}).
+-define(META_SERVER,{global, global_metaserver}).
+-define(HOST_SERVER,{global, global_hostserver}).
+
+
 %% define Chunk Size and Strip Size
 -define(CHUNKSIZE, 33554432).%32*1024*1024
 
@@ -33,8 +36,27 @@
 -define(CFILE, "/tmp/ctlfile").
 
 
+-record(chunkmeta, {chunk_id, file_id, path, length, create_time, modify_time}).
+-record(garbageinfo, {chunk_id, insert_time}).
 
-%^% meta server
+
+
+%^% meta server  -------------------------------------------
+
+
+%tables  record to create table.
+
+-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,acl}).
+-record(filemeta_s, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
+-record(chunkmapping, {chunkid, chunklocations}).
+-record(clientinfo, {clientid, modes}).   % maybe fileid?
+
+
+-record(orphanchunk,{chunkid,chunklocation}).
+
+-record(metalog,{logtime,logfunc,logarg}).
+
+
 %% config record
 %% procname={RegName, Node()}; host=IP; health={TimeStamp, HealthDegree}
 -record(hostinfo,{procname,host,freespace,totalspace,health}).
