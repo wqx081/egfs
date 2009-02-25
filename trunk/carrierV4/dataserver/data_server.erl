@@ -35,10 +35,10 @@ init([]) ->
 	{ok, HostName}= inet:gethostname(),
 	case gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), undefined, undefined, uplink}) of
 		ok 	 ->
-		    error_logger:info_msg("[~p, ~p]: dataserver ~p registered~n", [?MODULE, ?LINE, list_to_atom(HostName)]),
+		    error_logger:info_msg("[~p, ~p]: dataserver ~p starting~n", [?MODULE, ?LINE, list_to_atom(HostName)]),
 		   	lib_chan:start_server("./data_config");		    
 		_Any ->
-			error_logger:info_msg("[~p, ~p]: register dataserver failed~n", [?MODULE, ?LINE])
+			error_logger:info_msg("[~p, ~p]: dataserver ~p init failed~n", [?MODULE, ?LINE, list_to_atom(HostName)])
 	end,
     {ok, #state{}}.
 
@@ -51,9 +51,6 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({die}, _From, State) ->
-    Reply = 10/0,
-    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -83,7 +80,8 @@ handle_info(_Info, State) ->
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(Reason, _State) ->
+	error_logger:info_msg("[~p, ~p]: close dataserver ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
     ok.
 
 %%--------------------------------------------------------------------

@@ -9,22 +9,18 @@
 -behaviour(gen_server).
 -include("../include/header.hrl").
 -include_lib("kernel/include/file.hrl").
--export([start_link/0, open/2, write/1, read/1, close/0, generate_chunkmapping_record/2, testw/1,testr/1]).
+-export([	start_link/0, 
+			open/2, 
+			write/2, 
+			read/2, 
+			close/1, 
+			delete/1, 
+			testw/1,
+			testr/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
-%% file context
--record(filecontext, {fileid, 
-					  filename, 
-					  filesize, 
-					  offset,
-					  mode, 
-					  metaworkerpid, 
-					  dataworkerpid, 
-					  chunkid=[],
-					  chunklist=[],
-					  host=[], 
-					  nodelist=[]}).
+
 %%--------------------------------------------------------------------
 %% Function: start_link() -> {ok,Pid} | ignore | {error, Reason}
 %% Description: Starts the server
@@ -34,7 +30,7 @@ start_link() ->
     gen_server:start({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------------------
-%% Function: open(string(),Mode) -> ok | {error, Reason} 
+%% Function: open(string(),Mode) -> {ok, FileContext} | {error, Reason} 
 %% 			 Mode = r | w 
 %% Description: open a file according to the filename and open mode
 %%--------------------------------------------------------------------------------
@@ -42,26 +38,34 @@ open(FileName, Mode) ->
 	gen_server:call(?MODULE, {open, FileName, Mode}).
 
 %% --------------------------------------------------------------------
-%% Function: write(binary()) ->  ok | {error, Reason} 
+%% Function: write(binary()) ->  {ok, FileContext} | {error, Reason} 
 %% Description: write Bytes to dataserver
 %% --------------------------------------------------------------------
-write(Bytes) ->
-	gen_server:call(?MODULE, {write, Bytes},120000).
+write(FileContext, Bytes) ->
+	gen_server:call(?MODULE, {write, FileContext, Bytes},120000).
 
 %% --------------------------------------------------------------------
-%% Function: read(int()) ->  {ok, Data} | eof | {error, Reason} 
+%% Function: read(int()) ->  {ok, FileContext, Data} | {eof, FileContext} | {error, Reason} 
 %% Description: read Number Bytes from Location offset
 %% --------------------------------------------------------------------
-read(Number) ->
-	gen_server:call(?MODULE, {read, Number}, 120000).
+read(FileContext, Number) ->
+	gen_server:call(?MODULE, {read, FileContext, Number}, 120000).
 	
 %% --------------------------------------------------------------------
 %% Function: close/1 ->  ok | {error, Reason} 
 %% Description: close file
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------
-close() ->
-	gen_server:call(?MODULE, {close},120000).
+close(FileContext) ->
+	gen_server:call(?MODULE, {close,FileContext}).
+	
+%% --------------------------------------------------------------------
+%% Function: delete/1 ->  ok | {error, Reason} 
+%% Description: delete file
+%% Returns: ok | {error, Reason}
+%% --------------------------------------------------------------------
+delete(FileName) ->
+	gen_server:call(?MODULE, {delete, FileName}).	
 	
 %%====================================================================
 %% gen_server callbacks
@@ -70,7 +74,7 @@ init([]) ->
 	%process_flag(trap_exit,true),
     {ok, #filecontext{}}.
 
-handle_call({open, FileName, Mode}, _From, _State) ->
+handle_call({open, FileName, Mode}, _From, State) ->
 	error_logger:info_msg("[~p, ~p]: open file ~p mode ~p~n", [?MODULE, ?LINE, FileName, Mode]),	
 	case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
@@ -92,37 +96,37 @@ handle_call({open, FileName, Mode}, _From, _State) ->
 										mode = Mode,
 										metaworkerpid = MetaWorkerPid},
 			link(MetaWorkerPid),
-			{reply, ok, FileContext};
+			{reply, {ok, FileContext}, State};
 		{error, Why} ->
-			{reply, {error, Why}, #filecontext{}}
+			{reply, {error, Why}, State}
 	end;
 
-handle_call({write, Bytes}, _From, State) ->
-%	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, State#filecontext.filename]),
-	case State#filecontext.mode of
+handle_call({write, FileContext, Bytes}, _From, State) ->
+%	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
+	case FileContext#filecontext.mode of
 		w	->
-			{ok, NewState} = write_data(State, Bytes),	
-			{reply, {ok, NewState}, NewState};
+			{ok, NewFileContext} = write_data(FileContext, Bytes),	
+			{reply, {ok, NewFileContext}, State};
 		_Any ->
-			{reply, {error, "file open mode error"}, State}
+			{reply, {error, "write open mode error"}, State}
 	end;
 	
-handle_call({read, Number}, _From, State) ->
-	%error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, State#filecontext.filename]),	
-	case State#filecontext.mode of
+handle_call({read, FileContext, Number}, _From, State) ->
+	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext]),	
+	case FileContext#filecontext.mode of
 		r	->
-			case State#filecontext.offset =:= State#filecontext.filesize of
+			case FileContext#filecontext.offset =:= FileContext#filecontext.filesize of
 			    true ->
-			    	{reply, eof, State};
+			    	{reply, {eof, FileContext} , State};
 		    	false ->
-		    		{ok, NewState, Data} = read_data(State, Number),	
-					{reply, {ok, Data}, NewState}
+		    		{ok, NewFileContext, Data} = read_data(FileContext, Number),	
+					{reply, {ok, NewFileContext, Data}, State}
 			end;			
 		_Any ->
-			{reply, {error, "file open mode error"}, State}
+			{reply, {error, "read open mode error"}, State}
 	end;
 		
-handle_call({close}, _From, State) when State#filecontext.mode=:=w ->
+handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=w ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, State#filecontext.filename]),	
 	#filecontext{	fileid	 = FileID, 
 				 	filename = FileName, 
@@ -132,7 +136,7 @@ handle_call({close}, _From, State) when State#filecontext.mode=:=w ->
 					host	 = Host, 
 					nodelist = PreNodeList,
 					metaworkerpid= MetaWorkerPid,
-					dataworkerpid= DataWorkerPid} = State,
+					dataworkerpid= DataWorkerPid} = FileContext,
 	ChunkList = case ChunkID=:=[] of
 					true ->
 						PreChunkList;
@@ -159,11 +163,11 @@ handle_call({close}, _From, State) when State#filecontext.mode=:=w ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
 	gen_server:cast(MetaWorkerPid, {stop, normal}),	
-	{reply, Reply, #filecontext{}};
-handle_call({close}, _From, State) when State#filecontext.mode=:=r ->
+	{reply, Reply, State};
+handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=r ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, State#filecontext.filename]),	
 	#filecontext{	metaworkerpid= MetaWorkerPid,
-					dataworkerpid= DataWorkerPid} = State,
+					dataworkerpid= DataWorkerPid} = FileContext,
 	gen_server:cast(MetaWorkerPid, {stop, normal}),					
 	case DataWorkerPid =:= undefined of
 		true ->
@@ -171,7 +175,12 @@ handle_call({close}, _From, State) when State#filecontext.mode=:=r ->
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	{reply, ok, #filecontext{}}.		
+	{reply, ok, State};	
+
+handle_call({delete, FileName}, _From, State)  ->
+	error_logger:info_msg("[~p, ~p]: delete ~p ~n", [?MODULE, ?LINE, FileName]),	
+	Reply = gen_server:cast(?META_SERVER, {delete, FileName}),					
+	{reply, Reply, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -279,6 +288,7 @@ read_data(FileContext, Number, L) ->
 			lib_chan:disconnect(DataWorkerPid),	
 			NewFC= FileContext#filecontext{	dataworkerpid=undefined,
 											offset = Offset+ReadLength},
+								
 			read_data(NewFC, Number-ReadLength, L1);	
 		false ->
 			%error_logger:info_msg("[~p, ~p]:E read ~p~n", [?MODULE, ?LINE, Data]),
@@ -313,42 +323,44 @@ generate_chunkmapping_record([CH|CT],[NH|NT]) ->
 
 testw(FileName) ->
 	case open(FileName,w) of
-		ok  ->
-			{ok,Hdl}=file:open("a.rmvb",[binary,raw,read,read_ahead]),
-			write_loop(Hdl),
-			close();
+		{ok, FileContext}  ->
+			{ok,Hdl}=file:open("a",[binary,raw,read,read_ahead]),
+			NewFileContext=write_loop(FileContext, Hdl),
+			close(NewFileContext);
 		{error, Why} ->
 			Why
 	end.
 	
-write_loop(Hdl)->
+write_loop(FileContext, Hdl)->
 	case file:read(Hdl,131072) of % read 128K every time 131072
 		{ok, Data} ->
-			write(Data),
-			write_loop(Hdl);
+			{ok, NewFileContext} = write(FileContext, Data),
+			write_loop(NewFileContext, Hdl);
 		eof ->
-			void;
+			file:close(Hdl),
+			FileContext;	
 		{error,Reason} ->
 			Reason
 	end.	
 
 testr(FileName) ->
 	case open(FileName,r) of
-		ok  ->
-			{ok,Hdl}=file:open("b.rmvb",[binary,raw,write]),
-			read_loop(Hdl),
-			close();
+		{ok, FileContext}   ->
+			{ok,Hdl}=file:open("b",[binary,raw,write]),
+			NewFileContext=read_loop(FileContext,Hdl),
+			close(NewFileContext);
 		{error, Why} ->
 			Why
 	end.
 	
-read_loop(Hdl)->
-	case read(131072) of % read 128K every time 131072
-		{ok, Data} ->
+read_loop(FileContext, Hdl)->
+	case read(FileContext,131072) of % read 128K every time 131072
+		{ok, NewFileContext, Data} ->
 			file:write(Hdl,Data),
-			read_loop(Hdl);
-		eof ->
-			file:close(Hdl);
+			read_loop(NewFileContext, Hdl);
+		{eof,NewFileContext} ->
+			file:close(Hdl),
+			NewFileContext;
 		{error,Reason} ->
 			Reason
 	end.
