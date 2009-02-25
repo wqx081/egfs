@@ -15,9 +15,14 @@ compile: ${MODS:%=%.beam}
 	erl -make	
 
 ## run an application from the makefile
+db: 
+	${ERL} -sname ${HOSTNAME}dataserver -s data_db do_this_once 
+
+cleardb: 
+	${ERL} -sname ${HOSTNAME}dataserver -s data_db clear_tables
 
 ds:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}_dataserver -s lib_ping ping ${METASERVER} -s data_app start 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}dataserver -s lib_ping ping ${METASERVER} -s data_app start 
 
 # remove all the code
 

@@ -17,7 +17,8 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link() ->
-	timer:apply_interval(3000, ?MODULE, heartbeat, []),
+%	timer:apply_interval(3000, ?MODULE, heartbeat, []),
+    data_db:start(),	
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%====================================================================
