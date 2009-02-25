@@ -1,6 +1,6 @@
 -module(supervisor_meta_server).
 -behaviour(supervisor).
--include("../include/egfs.hrl").
+-include("../include/header.hrl").
 -export([start/0, 
 	 start_link/1,
 	 start_in_shell/0,
@@ -22,12 +22,23 @@ start_link(Args) ->
 
 init([]) ->
     ?DEBUG("starting meta server supervisor~n", []),
-    {ok, {{one_for_one, 3, 10},
-	   [{meta_server, 
+    {ok, {
+          {one_for_one, 3, 10},
+	   [
+        {meta_server, 
 	       {metagenserver, start, []},
 	       permanent,
 	       10000,
 	       worker,
-	       [metagenserver]}
-	   ]}}.
+	       [metagenserver]
+        },
+        {tag2,
+         	{meta_hosts,start_link,[]},
+         	permanent,
+         	2000,
+         	worker,
+         	[meta_hosts]
+         }
+       ]}
+    }.
 
