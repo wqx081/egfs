@@ -42,7 +42,7 @@
 -record(orphanchunk,{chunkid,chunklocation}).
 -record(metalog,{logtime,logfunc,logarg}).
 
--record(chunkmeta, {chunk_id, md5}).
+-record(chunkmeta, {chunkid, md5}).
 -record(garbageinfo, {chunk_id, insert_time}).
 -define(GARBAGE_AUTO_COLLECT_PERIOD,	7000).    % 5000 milisecond = 5 second
 -define(BOOT_REPORT_RETRY_PERIOD,	7000).    % 5000 milisecond = 5 second
