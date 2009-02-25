@@ -1,6 +1,6 @@
 -module(data_server).
 -include("../include/header.hrl").
--export([start_link/0]).
+-export([start_link/0, heartbeat/0]).
 
 
 %% gen_server callbacks
@@ -17,6 +17,7 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link() ->
+	timer:apply_interval(3000, ?MODULE, heartbeat, []),
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%====================================================================
@@ -51,6 +52,9 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+handle_call({heartbeat}, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -94,6 +98,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-
+heartbeat() ->
+	io:format("heartbeat!~n").
 
 
