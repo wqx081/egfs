@@ -4,7 +4,7 @@
 
 %% start according to app config file metaserver.app
 start() ->
-    application:start(meta_server). 
+    application:start(app_meta_server).  %% name of app_meta_server.app
 
 start(_Type, StartArgs) ->
     io:format("meta server app is starting~n"),
