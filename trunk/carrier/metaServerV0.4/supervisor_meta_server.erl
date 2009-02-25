@@ -26,7 +26,7 @@ init([]) ->
           {one_for_one, 3, 10},
 	   [
         {meta_server, 
-	       {metagenserver, start, []},
+	       {meta_server, start, []},
 	       permanent,
 	       10000,
 	       worker,
