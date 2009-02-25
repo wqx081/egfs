@@ -30,17 +30,17 @@
 					  host=[], 
 					  nodelist=[]}).
 
+%^% meta server  -------------------------------------------
+
 %% file metadata 
 -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
-
 %% dataserver process info
 -record(hostinfo,{hostname, freespace, totalspace, status}).
-
 %% chunk mapping relationship
 -record(chunkmapping, {chunkid, chunklocations}).
-
- 
-
+-record(clientinfo, {clientid, modes}).   % maybe fileid?
+-record(orphanchunk,{chunkid,chunklocation}).
+-record(metalog,{logtime,logfunc,logarg}).
 
 -record(chunkmeta, {chunk_id, file_id, path, length, create_time, modify_time}).
 -record(garbageinfo, {chunk_id, insert_time}).
