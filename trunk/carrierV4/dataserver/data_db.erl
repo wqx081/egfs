@@ -35,8 +35,12 @@ do(Q) ->
 %% select item from table
 %%====================================================================
 select_item_from_chunkmeta_id(ChunkID) ->    
-    do(qlc:q([X||X<-mnesia:table(filemeta),X#chunkmeta.chunkid =:= ChunkID])).
+    do(qlc:q([X||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).
 
+select_item_from_chunkmeta_id(ChunkID, MD5) ->    
+    do(qlc:q([X||X<-mnesia:table(chunkmeta),
+    			 X#chunkmeta.chunkid =:= ChunkID,
+    			 X#chunkmeta.md5 =:= MD5])).
 %%====================================================================
 %% add item into table
 %%====================================================================
