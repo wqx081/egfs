@@ -38,12 +38,6 @@ do_this_once() ->
                          {disc_copies,[node()]}                         
                         ]
                        ),
-    mnesia:create_table(filemeta_s, 	%table name 
-                        [			
-                         {attributes, record_info(fields, filemeta_s)},%table content
-                         {disc_copies,[node()]}                         
-                        ]
-                       ),
     mnesia:create_table(chunkmapping, [{attributes, record_info(fields, chunkmapping)},
                                        {disc_copies,[node()]}
                                       ]),
@@ -57,8 +51,17 @@ do_this_once() ->
     mnesia:create_table(orphanchunk, [{type,bag},{attributes, record_info(fields,orphanchunk)},
                                       {disc_copies,[node()]}
                                      ]),
+    mnesia:create_table(dirmeta, [{type,bag},{attributes, record_info(fields,dirmeta)},
+                                      {disc_copies,[node()]}
+                                     ]),
+    
+    
+    
+    
+    
 	
     mnesia:stop().
+
 
 start_mnesia()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
@@ -213,10 +216,11 @@ select_attributes_from_filemeta(FileName) ->    %result [L]
               X<-mnesia:table(filemeta),X#filemeta.filename =:= FileName
               ])).
 
-select_all_from_filemeta_s(FileID)->
-    do(qlc:q([
-              X||X<-mnesia:table(filemeta_s),X#filemeta_s.fileid =:= FileID
-              ])).
+
+%% select_all_from_filemeta_s(FileID)->
+%%     do(qlc:q([
+%%               X||X<-mnesia:table(filemeta_s),X#filemeta_s.fileid =:= FileID
+%%               ])).
 
 
 select_from_hostinfo(Hostname)->
@@ -265,12 +269,12 @@ select_fileid_from_filemeta(FileName) ->
                                    X#filemeta.filename =:= FileName                                   
                                    ])).   %result [L]
 
-select_fileid_from_filemeta_s(FileName) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_fileid_from_filemeta_s/1",logarg=[FileName]},
-    logF(LOG),
-    do(qlc:q([X#filemeta_s.fileid || X <- mnesia:table(filemeta_s),
-                                   X#filemeta_s.filename =:= FileName                                   
-                                   ])).   %result [L]
+%% select_fileid_from_filemeta_s(FileName) ->
+%%     LOG = #metalog{logtime = calendar:local_time(),logfunc="select_fileid_from_filemeta_s/1",logarg=[FileName]},
+%%     logF(LOG),
+%%     do(qlc:q([X#filemeta_s.fileid || X <- mnesia:table(filemeta_s),
+%%                                    X#filemeta_s.filename =:= FileName                                   
+%%                                    ])).   %result [L]
 
 select_nodeip_from_chunkmapping(ChunkID) ->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="select_nodeip_from_chunkmapping",logarg=[ChunkID]},
@@ -441,12 +445,12 @@ do_find_orphanchunk()->
     
     
     % filter out used chunks according to filemeta_s table
-	GetUsedChunkIdListInFilemetaS =
-        fun(FileMetaS, AcS) ->                
-                AcS--FileMetaS#filemeta_s.chunklist                
-        end,        
-    DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
-    {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
+%% 	GetUsedChunkIdListInFilemetaS =
+%%         fun(FileMetaS, AcS) ->                
+%%                 AcS--FileMetaS#filemeta_s.chunklist                
+%%         end,        
+%%     DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
+%%     {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
     
     GetOrphanPair = 
         fun(X) ->
@@ -454,7 +458,7 @@ do_find_orphanchunk()->
                 [write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList],
                 delete_from_db({chunkmapping,X})
         end,
-    [GetOrphanPair(X)||X<-OrphanChunk].
+    [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
 
 % delete orphanchunk record in orphanchunk table by host
 do_delete_orphanchunk_byhost(HostProcName)->
@@ -473,18 +477,27 @@ do_get_orphanchunk_byhost(HostProcName) ->
 %% add file info to table: filemeta & chunkmapping
 %%====================================================================
 add_a_file_record(FileRecord, ChunkMappingRecords) ->
-    Row = FileRecord#filemeta{	createT=term_to_binary(erlang:localtime()), 
-			                    modifyT=term_to_binary(erlang:localtime()),
-            			        acl="acl"}, 
+    
+    CurrentT = term_to_binary(erlang:localtime()),    
+    %%TODO: create time & modify time . . mode append,. 
+    Row = FileRecord#filemeta{	createT=CurrentT, 
+			                    modifyT=CurrentT,
+            			        acl="acl"},
+    
+	TODO = todo,
+	DirMetaRow =#dirmeta{
+                                 id = FileRecord#filemeta.fileid,
+                                 filename = FileRecord#filemeta.filename,
+                                 createT = CurrentT,
+                                 modifyT = CurrentT,
+                                 tag = TODO,		
+                                 parent = TODO
+                                 },
 	F = fun() ->
 		mnesia:write(Row),
-		lists:foreach(fun mnesia:write/1, ChunkMappingRecords),
-        
-        %%% TODO : add a record to table : dirmeta
-        
-        
-        
-        
+		lists:foreach(fun mnesia:write/1, ChunkMappingRecords),      
+ %%% TODO : add a record to table : dirmeta
+        mnesia:write(DirMetaRow)        
 	end,
     {atomic, Val} = mnesia:transaction(F),
 	Val.
