@@ -11,7 +11,8 @@
                  do_register_dataserver/2,
                  do_delete_filemeta/1,
                  do_delete_orphanchunk_byhost/1,
-                 select_attributes_from_filemeta/1
+                 select_attributes_from_filemeta/1,
+                  start_mnesia/0
                 ]).
 
 -export([start/0,stop/0]).
@@ -25,11 +26,8 @@ init(_Arg) ->
     %init_mnesia(),
     {ok, []}.
 
-%% die() ->
-%%     1000 div 0.
-
 start() ->
-    meta_db:start_mnesia(),
+    start_mnesia(),
 %%     {ok,Tref} = timer:apply_interval((?HEART_BEAT_TIMEOUT),hostMonitor,checkHostHealth,[]), % check host health every 5 second
     gen_server:start_link(?META_SERVER, meta_server, [], []).
 
