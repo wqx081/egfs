@@ -43,8 +43,11 @@
 -record(metalog,{logtime,logfunc,logarg}).
 
 -record(chunkmeta, {chunkid, md5}).
+
 -record(garbageinfo, {chunk_id, insert_time}).
 -define(GARBAGE_AUTO_COLLECT_PERIOD,	7000).    % 5000 milisecond = 5 second
 -define(BOOT_REPORT_RETRY_PERIOD,	7000).    % 5000 milisecond = 5 second
 -define(HEART_BEAT_REPORT_WAIT_TIME,	3000).    % 5000 milisecond = 5 second
 -define(GARBAGE_AUTO_COLLECT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
+
+-define(MD5CHECK_TIMER,	86400000).    % 5000 milisecond = 5 second
