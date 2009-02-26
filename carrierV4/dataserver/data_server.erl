@@ -1,6 +1,6 @@
 -module(data_server).
 -include("../include/header.hrl").
--export([start_link/0, heartbeat/0]).
+-export([start_link/0]).
 
 
 %% gen_server callbacks
@@ -18,6 +18,8 @@
 %%--------------------------------------------------------------------
 start_link() ->
 %	timer:apply_interval(3000, ?MODULE, heartbeat, []),
+%	timer:apply_interval(86400000, ?MODULE, md5check, []),
+	timer:apply_interval(?MD5CHECK_TIMER, data_md5check, md5check, []),
     data_db:start(),	
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -99,7 +101,5 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-heartbeat() ->
-	io:format("heartbeat!~n").
 
-
+	
