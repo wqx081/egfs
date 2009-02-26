@@ -112,7 +112,7 @@ handle_call({write, FileContext, Bytes}, _From, State) ->
 	end;
 	
 handle_call({read, FileContext, Number}, _From, State) ->
-	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext]),	
+%	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	case FileContext#filecontext.mode of
 		r	->
 			case FileContext#filecontext.offset =:= FileContext#filecontext.filesize of
@@ -127,7 +127,7 @@ handle_call({read, FileContext, Number}, _From, State) ->
 	end;
 		
 handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=w ->
-	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, State#filecontext.filename]),	
+	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	fileid	 = FileID, 
 				 	filename = FileName, 
 					filesize = FileSize, 
@@ -162,10 +162,10 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:call(MetaWorkerPid, {close}),	
+	gen_server:cast(MetaWorkerPid, {stop,normal}),	
 	{reply, Reply, State};
 handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=r ->
-	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, State#filecontext.filename]),	
+	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	metaworkerpid= MetaWorkerPid,
 					dataworkerpid= DataWorkerPid} = FileContext,
 	case DataWorkerPid =:= undefined of
@@ -174,7 +174,7 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:call(MetaWorkerPid, {close}),	
+	gen_server:cast(MetaWorkerPid, {stop,normal}),		
 	{reply, ok, State};	
 
 handle_call({delete, FileName}, _From, State)  ->
@@ -203,11 +203,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 % if the data is null, write finish.
 write_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
-	%error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, Bytes]),
+	error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 	{ok, FileContext};
 % if the data is wrote into a new chunkFileContext#filecontext
 write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined  ->
-	%error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, Bytes]),	
+	error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	ChunkID=lib_uuid:gen(),
 	{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
 	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),
@@ -219,6 +219,10 @@ write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= un
 % if the data is wrote into a existed chunk
 write_data(FileContext, Bytes) ->	
 	#filecontext{	offset = Offset,
+					chunklist=ChunkList,
+					nodelist= NodeList,
+					chunkid=ChunkID,
+					host=Host,
 				 	dataworkerpid = DataWorkerPid} = FileContext,
 	Start		= Offset rem ?CHUNKSIZE,
 	WantLength	= ?CHUNKSIZE-Start,
@@ -226,24 +230,24 @@ write_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->		 
-			%error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, Bytes]),
+			error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			lib_chan:rpc(DataWorkerPid,{write,Right}),
 			% close the data worker and reset the FileContext
 			lib_chan:disconnect(DataWorkerPid),		
-			ChunkList= lists:append(FileContext#filecontext.chunklist, [FileContext#filecontext.chunkid]),			
-			NodeList= lists:append(FileContext#filecontext.nodelist, [FileContext#filecontext.host]),					
+			NewChunkList= ChunkList ++ [ChunkID],			
+			NewNodeList= NodeList ++ [Host],				
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength, 
 											filesize= Offset+ReadLength,
 											dataworkerpid=undefined,
 											chunkid=[],
 											host=[],
-											chunklist=ChunkList,
-											nodelist=NodeList},
+											chunklist=NewChunkList,
+											nodelist=NewNodeList},
 			% write the left data
 			write_data(NewFC, Left);
 		false ->
-			%error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Bytes]),
+			error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
 			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength,
 											filesize=Offset+ReadLength},

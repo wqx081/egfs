@@ -17,13 +17,13 @@ compile: ${MODS:%=%.beam}
 ## run an application from the makefile
 
 cl1:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}_client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
 	
 cl2:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}_client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
 
 cl3:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}_client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
 
 # remove all the code
 
