@@ -1,6 +1,6 @@
 -module(data_server).
 -include("../include/header.hrl").
--export([start_link/0]).
+-export([start_link/0, loop_replica/2]).
 
 
 %% gen_server callbacks
@@ -55,19 +55,25 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({heartbeat}, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
-%% Function: handle_cast(Msg, State) -> {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, State}
-%% Description: Handling cast messages
+%% Function: handle_cast({replica, string(), binary()}, State) -> {noreply, State} 
+%% Description: This message is casted from Meta Server. 
+%%				Ask the local data server writes a new replica to DestHost.
 %%--------------------------------------------------------------------
+handle_cast({replica, DestHost, ChunkID}, State) ->
+	case data_db:select_md5_from_chunkmeta_id(ChunkID) of
+		[MD5] ->
+			{ok, DataWorkPid} = lib_chan:connect(DestHost, 8888, dataworker,?PASSWORD, {replica, ChunkID,MD5}),
+			{ok, ChunkHdl}=	lib_common:get_file_handle({read, ChunkID}),
+			loop_replica(DataWorkPid,ChunkHdl),
+			{noreply, State};
+		[] ->
+			{noreply, State}
+	end;
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -101,5 +107,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-
+loop_replica(DataWorkerPid, ChunkHdl) ->
+	case file:read(ChunkHdl,?STRIP_SIZE) of % read 128K every time 
+		{ok, Data} ->
+			lib_chan:rpc(DataWorkerPid,{replica,Data}), 	
+			loop_replica(DataWorkerPid, ChunkHdl);
+		eof ->
+			lib_chan:disconnect(DataWorkerPid),
+			file:close(ChunkHdl);	
+		{error,Reason} ->
+			lib_chan:disconnect(DataWorkerPid),
+			file:close(ChunkHdl)
+	end.	
 	
