@@ -203,11 +203,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 % if the data is null, write finish.
 write_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
-	error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+	%error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 	{ok, FileContext};
 % if the data is wrote into a new chunkFileContext#filecontext
 write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined  ->
-	error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
+	%error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	ChunkID=lib_uuid:gen(),
 	{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
 	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),
@@ -230,7 +230,7 @@ write_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->		 
-			error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+			%error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			lib_chan:rpc(DataWorkerPid,{write,Right}),
 			% close the data worker and reset the FileContext
@@ -247,7 +247,7 @@ write_data(FileContext, Bytes) ->
 			% write the left data
 			write_data(NewFC, Left);
 		false ->
-			error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
+			%error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
 			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength,
 											filesize=Offset+ReadLength},
@@ -328,7 +328,7 @@ generate_chunkmapping_record([CH|CT],[NH|NT]) ->
 testw(FileName) ->
 	case open(FileName,w) of
 		{ok, FileContext}  ->
-			{ok,Hdl}=file:open("a",[binary,raw,read,read_ahead]),
+			{ok,Hdl}=file:open("a.rmvb",[binary,raw,read,read_ahead]),
 			NewFileContext=write_loop(FileContext, Hdl),
 			close(NewFileContext);
 		{error, Why} ->
@@ -336,7 +336,7 @@ testw(FileName) ->
 	end.
 	
 write_loop(FileContext, Hdl)->
-	case file:read(Hdl,131072) of % read 128K every time 131072
+	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
 		{ok, Data} ->
 			{ok, NewFileContext} = write(FileContext, Data),
 			write_loop(NewFileContext, Hdl);
@@ -350,7 +350,7 @@ write_loop(FileContext, Hdl)->
 testr(FileName) ->
 	case open(FileName,r) of
 		{ok, FileContext}   ->
-			{ok,Hdl}=file:open("b",[binary,raw,write]),
+			{ok,Hdl}=file:open("b.rmvb",[binary,raw,write]),
 			NewFileContext=read_loop(FileContext,Hdl),
 			close(NewFileContext);
 		{error, Why} ->
@@ -358,7 +358,7 @@ testr(FileName) ->
 	end.
 	
 read_loop(FileContext, Hdl)->
-	case read(FileContext,131072) of % read 128K every time 131072
+	case read(FileContext,?STRIP_SIZE) of % read 128K every time 
 		{ok, NewFileContext, Data} ->
 			file:write(Hdl,Data),
 			read_loop(NewFileContext, Hdl);
