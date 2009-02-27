@@ -34,7 +34,7 @@ get_file_handle({read, ChunkID}) ->
     
 get_file_handle({write, ChunkID}) ->
     {ok, Name} = get_file_name(ChunkID),
-    Result = file:open(Name, [binary, raw, append]),
+    Result = file:open(Name, [binary, raw, write]),
     Result.
     
 get_file_name(ChunkID) ->
