@@ -5,9 +5,8 @@
 	erlc -W $<
 
 HOSTNAME = $(shell hostname)
-METASERVER= ms@hxm
 
-ERL = erl -boot start_sasl -config ../elog -setcookie carrier 
+ERL = erl -boot start_sasl -config ../carrier -setcookie carrier 
 
 all: compile
 
@@ -22,7 +21,7 @@ cleardb:
 	${ERL} -sname ${HOSTNAME}dataserver -s data_db clear_tables
 
 ds:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}dataserver -s lib_ping ping ${METASERVER} -s data_app start 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}dataserver -s data_app start 
 
 # remove all the code
 

@@ -116,6 +116,7 @@ loop_replica(DataWorkerPid, ChunkHdl) ->
 			lib_chan:disconnect(DataWorkerPid),
 			file:close(ChunkHdl);	
 		{error,Reason} ->
+			error_logger:error_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE, Reason]),	 
 			lib_chan:disconnect(DataWorkerPid),
 			file:close(ChunkHdl)
 	end.	
