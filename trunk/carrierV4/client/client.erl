@@ -27,7 +27,7 @@
 %%--------------------------------------------------------------------
 start_link() ->
     error_logger:info_msg("[~p, ~p]: client ~p starting ~n", [?MODULE, ?LINE, node()]),
-    gen_server:start({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------------------
 %% Function: open(string(),Mode) -> {ok, FileContext} | {error, Reason} 

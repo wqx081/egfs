@@ -5,9 +5,8 @@
 	erlc -W $<
 
 HOSTNAME = $(shell hostname)
-METASERVER= ms@hxm
 
-ERL = erl -boot start_sasl -config ../elog -setcookie carrier 
+ERL = erl -boot start_sasl -config ../carrier -setcookie carrier 
 
 all: compile
 
@@ -17,13 +16,13 @@ compile: ${MODS:%=%.beam}
 ## run an application from the makefile
 
 cl1:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start 
 	
 cl2:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start 
 
 cl3:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s lib_ping ping ${METASERVER} -s client start_link 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start 
 
 # remove all the code
 
