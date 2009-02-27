@@ -7,7 +7,7 @@
 %-define(CHUNKSIZE, 33554432). % 32Mbytes, 32*1024*1024
 %-define(STRIP_SIZE, 8192).
 -define(CHUNKSIZE, 33554432). % 32Mbytes, 32*1024*1024
-
+-define(STRIP_SIZE, 131072). % 128Kbytes, 128*1024
 
 -define(DATA_PORT, 7777).
 -define(MAX_CONN, 100).
