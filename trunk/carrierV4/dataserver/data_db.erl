@@ -37,10 +37,19 @@ do(Q) ->
 select_item_from_chunkmeta_id(ChunkID) ->    
     do(qlc:q([X||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).
 
-select_item_from_chunkmeta_id(ChunkID, MD5) ->    
-    do(qlc:q([X||X<-mnesia:table(chunkmeta),
+select_md5_from_chunkmeta_id(ChunkID) ->    
+    do(qlc:q([X#chunkmeta.md5||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).
+
+is_exsit_in_chunkmeta(ChunkID, MD5) ->    
+	R = do(qlc:q([X||X<-mnesia:table(chunkmeta),
     			 X#chunkmeta.chunkid =:= ChunkID,
-    			 X#chunkmeta.md5 =:= MD5])).
+    			 X#chunkmeta.md5 =:= MD5])),
+    case R of
+		[] ->
+			false;
+		[_Any] ->
+			true
+	end.	
 %%====================================================================
 %% add item into table
 %%====================================================================

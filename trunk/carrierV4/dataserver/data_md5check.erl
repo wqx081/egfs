@@ -32,12 +32,13 @@ checkdir({file, FilePath}) ->
 	Root = getrootpath()++"/",
 	[D1,D2,D3,D4,Fn] = lists:map(fun(X) -> list_to_integer(X) end, filename:split(FilePath--Root)),
 	ChunkID = <<D1:4, D2:4, D3:4, D4:4, Fn:112>>,
-	case data_db:select_item_from_chunkmeta_id(ChunkID, MD5) of
+	case data_db:is_exsit_in_chunkmeta(ChunkID, MD5) of
 		[] ->
-			%file:delete(File);
+			data_db:delete_chunkmeta_item(ChunkID),
+			file:delete(FilePath),
 			error_logger:info_msg("[~p, ~p]: delete file:~p ~n", [?MODULE, ?LINE, FilePath]),
 			io:format("delete file:~p ~n",[FilePath])
 	end.
 
 getrootpath() ->
-	"./Chunks." ++ atom_to_list(node()).
+	?DATA_PREFIX ++ atom_to_list(node()).
