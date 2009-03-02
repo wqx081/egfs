@@ -76,6 +76,13 @@ handle_call({delete,FileName},{From,_},State) ->
 	Reply = do_delete(FileName, From),
     {reply, Reply, State};
 
+
+handle_call({register_replica,ChunkID,Host},{From, _}, State)->
+    %TODO.
+    Reply = todo,
+    {reply,Reply,State}.
+
+
 handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
     io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
 	Reply = do_dataserver_bootreport(HostInfoRec, ChunkList),
