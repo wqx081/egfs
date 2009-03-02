@@ -21,7 +21,7 @@ start_link(Args) ->
     supervisor:start_link(?NAME, ?MODULE, Args).
 
 init([]) ->
-    ?DEBUG("starting meta server supervisor~n", []),
+%%    ?DEBUG("starting meta server supervisor~n", []),
     {ok, {
           {one_for_one, 3, 10},
 	   [
