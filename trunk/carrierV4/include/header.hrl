@@ -30,6 +30,16 @@
 					  host=[], 
 					  nodelist=[]}).
 
+
+%%%
+-record(bloom, {
+    m      = 0,       % The size of the bitmap in bits.
+    bitmap = <<>>,    % The bitmap.
+    k      = 0,       % The number of hashes.
+    n      = 0,       % The maximum number of keys.
+    keys   = 0        % The current number of keys.
+}).
+
 %^% meta server  -------------------------------------------
 
 
