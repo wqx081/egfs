@@ -9,7 +9,7 @@ start(_Type, StartArgs) ->
 	{ok, Hosts} = application:get_env(client_app, metaserver),
 	{ok, WaitTime} = application:get_env(client_app, waittime),	
 	net_adm:world_list(Hosts),
-	timer:sleep(WaitTime),
+	timer:sleep(timer:seconds(WaitTime)),
     client_supervisor:start_link(StartArgs).
 
 stop(_State) ->	

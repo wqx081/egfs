@@ -6,7 +6,7 @@
 
 HOSTNAME = $(shell hostname)
 
-ERL = erl -boot start_sasl -config ../carrier -setcookie carrier 
+ERL = erl -boot start_sasl -config system -setcookie carrier 
 
 all: compile
 
