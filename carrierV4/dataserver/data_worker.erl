@@ -13,7 +13,13 @@ run(MM, ArgC, _ArgS) ->
 		    loop_read(MM, ChunkHdl);
 	    {replica, ChunkID, MD5} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
-			loop_replica(MM, ChunkID, MD5, ChunkHdl)
+			loop_replica(MM, ChunkID, MD5, ChunkHdl);
+	    {garbagecheck, []} ->
+			loop_garbagecheck(MM, <<>> );			
+	    {garbagecheck, HostList} ->
+	    	[NextHost|THosts]=HostList,
+			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, THosts}),
+			loop_garbagecheck(MM, NextDataworkPid, <<>> )			
 	end.
 
 
@@ -70,3 +76,42 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
+
+loop_garbagecheck(MM, Bin) ->
+    receive
+	{chan, MM, {garbagecheck, BFBytes}} ->
+		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
+		Bin1 = list_to_binary(binary_to_list(Bin) ++ binary_to_list(BFBytes)),
+	    loop_garbagecheck(MM, Bin1);
+	{chan_closed, MM} ->
+		BloomFilter = binary_to_term(Bin),
+		ChunkList = data_db:select_chunklist_from_chunkmeta(),
+		lists:foreach(fun(X) -> check_element(X, BloomFilter) end, ChunkList),		
+		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+	    exit(normal)
+    end.
+loop_garbagecheck(MM, NextDataworkPid, Bin) ->
+    receive
+	{chan, MM, {garbagecheck, BFBytes}} ->
+		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
+		lib:rpc(NextDataworkPid,{garbagecheck, BFBytes}),
+		Bin1 = list_to_binary(binary_to_list(Bin) ++ binary_to_list(BFBytes)),
+	    loop_garbagecheck(MM, NextDataworkPid, Bin1);
+	{chan_closed, MM} ->
+		lib_chan:disconnect(NextDataworkPid),		
+		BloomFilter = binary_to_term(Bin),
+		ChunkList = data_db:select_chunklist_from_chunkmeta(),
+		lists:foreach(fun(X) -> check_element(X, BloomFilter) end, ChunkList),		
+		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+	    exit(normal)
+    end.    
+
+check_element(ChunkID, BloomFilter) ->
+	case bloom:is_element(ChunkID, BloomFilter) of
+		true ->
+			void;
+		false ->
+			{ok, FileName} 	= lib_common:get_file_name(ChunkID),
+			file:delete(FileName),
+			data_db:delete_chunkmeta_item(ChunkID)
+	end.
