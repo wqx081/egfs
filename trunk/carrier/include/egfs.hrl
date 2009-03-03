@@ -8,10 +8,9 @@
 -endif.
 
 %%defien global server name
+-define(ACL_SERVER, {global, acl}).
 -define(META_SERVER,{global, global_metaserver}).
 -define(HOST_SERVER,{global, global_hostserver}).
-
-
 %% define Chunk Size and Strip Size
 -define(CHUNKSIZE, 33554432).%32*1024*1024
 
@@ -26,6 +25,12 @@
 -define(CODE_OTHERROR,            16#0004).
 -define(CODE_SERVERROR,           16#0005).
 -define(CODE_NOKEY,               16#0006).
+
+%%acl value definition
+-define(ACL_rwd,                  2#111).
+-define(ACL_rw_,                  2#110).
+-define(ACL_r__,                  2#100).
+
 
 %% type definition
 
