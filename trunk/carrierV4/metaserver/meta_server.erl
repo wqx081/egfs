@@ -8,15 +8,17 @@
                  select_from_hostinfo/1,
                  select_chunkid_from_orphanchunk/1,
                  detach_from_chunk_mapping/1,
+                  select_item_from_chunkmapping_id/1,
                  do_register_dataserver/2,
                  do_delete_filemeta/1,
                  do_delete_orphanchunk_byhost/1,
                  select_attributes_from_filemeta/1,
-                  start_mnesia/0
+                  start_mnesia/0,
+                  write_to_db/1
                 ]).
 
 -export([start/0,stop/0]).
--export([init/1, handle_call/3, handle_cast/2,handle_info/2,terminate/2, code_change/3]).
+-export([init/1,handle_call/3,handle_cast/2,handle_cast/3,handle_info/2,terminate/2, code_change/3]).
 -export([open/2,writeAllocate/1,locateChunk/2,registerChunk/4,close/1]).
 -compile(export_all).
 
@@ -28,8 +30,8 @@ init(_Arg) ->
 
 start() ->
     start_mnesia(),
-    {ok,Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
-    {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
+    {ok,_Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
+ %%   {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
     
     gen_server:start_link(?META_SERVER, meta_server, [], []).
 
@@ -124,7 +126,7 @@ handle_call(_, {_From, _}, State)->
 handle_cast({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
     io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
 	do_dataserver_bootreport(HostInfoRec, ChunkList),
-    {noreply,State};
+    {noreply,State}.
 
 handle_cast(stop, State) ->
     io:format("meta server stopping~n"),
@@ -303,10 +305,10 @@ do_delete(FileName, _From)->
 do_register_replica(ChunkID,Host) ->
     case select_item_from_chunkmapping_id(ChunkID) of
         []->            
-        	mnesia:write(ChunkMapping#chunkmapping{chunkid = ChunkID,chunklocations = [Host]}),
-        X ->
+            write_to_db(#chunkmapping{chunkid = ChunkID,chunklocations = [Host]});
+        [X]->
             New = X#chunkmapping{chunklocations = X#chunkmapping.chunklocations++[Host]},
-            mnesia:write(New)
+            write_to_db(New)
     end.
 
 %% 
