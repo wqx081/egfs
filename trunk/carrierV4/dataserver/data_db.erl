@@ -13,18 +13,21 @@
 %%====================================================================
 %% API
 %%====================================================================
-do_this_once() ->
-    mnesia:create_schema([node()]),
-    mnesia:start(),
-    mnesia:create_table(chunkmeta,	[{type, set}, {attributes, record_info(fields, chunkmeta)},     {disc_copies,[node()]}]),
+clear_tables() ->
+	mnesia:start(),
+    mnesia:clear_table(chunkmeta),
     mnesia:stop().
 
-clear_tables() ->
-    mnesia:clear_table(chunkmeta).
-
 start() ->
-    mnesia:start(),    
-    mnesia:wait_for_tables([chunkmeta], 20000).
+	case mnesia:create_schema([node()]) of
+		ok ->
+			mnesia:start(),
+			mnesia:create_table(chunkmeta,	[{type, set}, {attributes, record_info(fields, chunkmeta)}, {disc_copies,[node()]}]);
+		_ ->
+			mnesia:start()			
+	end,
+	mnesia:wait_for_tables([chunkmeta], 20000).
+
 
 do(Q) ->
     F = fun() -> qlc:e(Q) end,
@@ -39,6 +42,9 @@ select_item_from_chunkmeta_id(ChunkID) ->
 
 select_md5_from_chunkmeta_id(ChunkID) ->    
     do(qlc:q([X#chunkmeta.md5||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).
+    
+select_chunklist_from_chunkmeta() ->    
+    do(qlc:q([X#chunkmeta.chunkid||X<-mnesia:table(chunkmeta)])). 
 
 is_exsit_in_chunkmeta(ChunkID, MD5) ->    
 	R = do(qlc:q([X||X<-mnesia:table(chunkmeta),

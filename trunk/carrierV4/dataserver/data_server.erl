@@ -19,8 +19,9 @@
 start_link() ->
 %	timer:apply_interval(3000, ?MODULE, heartbeat, []),
 %	timer:apply_interval(86400000, ?MODULE, md5check, []),
-	timer:apply_interval(?MD5CHECK_TIMER, data_md5check, md5check, []),
     data_db:start(),	
+	timer:apply_interval(?MD5CHECK_TIMER, data_md5check, md5check, []),
+	timer:apply_after(1, data_bootreport, bootreport, []),	
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%====================================================================
@@ -120,4 +121,5 @@ loop_replica(DataWorkerPid, ChunkHdl) ->
 			lib_chan:disconnect(DataWorkerPid),
 			file:close(ChunkHdl)
 	end.	
+	
 	
