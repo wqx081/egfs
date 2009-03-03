@@ -210,8 +210,8 @@ write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= un
 	%error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	ChunkID=lib_uuid:gen(),
 	{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
-	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),
-	
+	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),   
+    
 	NewFC= FileContext#filecontext{	dataworkerpid  = DataWorkPid, 
 									chunkid = ChunkID,
 									host    = SelectedHost},

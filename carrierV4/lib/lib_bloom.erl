@@ -2,17 +2,19 @@
 %% @reference [http://en.wikipedia.org/wiki/Bloom_filter]
 
 -module(lib_bloom).
+-include("../include/header.hrl").
 -export([new/1, new/2, is_bloom/1, is_element/2, add_element/2]).
 -import(math, [log/1, pow/2]).
 -import(erlang, [phash2/2]).
 
--record(bloom, {
-    m      = 0,       % The size of the bitmap in bits.
-    bitmap = <<>>,    % The bitmap.
-    k      = 0,       % The number of hashes.
-    n      = 0,       % The maximum number of keys.
-    keys   = 0        % The current number of keys.
-}).
+%% 
+%% -record(bloom, {
+%%     m      = 0,       % The size of the bitmap in bits.
+%%     bitmap = <<>>,    % The bitmap.
+%%     k      = 0,       % The number of hashes.
+%%     n      = 0,       % The maximum number of keys.
+%%     keys   = 0        % The current number of keys.
+%% }).
 
 %% @spec new(capacity) -> bloom()
 %% @equiv new(capacity, 0.001)

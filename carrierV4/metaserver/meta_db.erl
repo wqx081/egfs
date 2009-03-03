@@ -358,7 +358,7 @@ mnesia:transaction(F).
 
 %%		TODO:  log of all function. 
 
-modifyHostLocation() ->
+todomodifyHostLocation() ->
     ModifyLoc =
         fun(ChunkMapping, Acc) when is_atom(ChunkMapping#chunkmapping.chunklocations)->
                 ChunkLoc = ChunkMapping#chunkmapping.chunklocations,
@@ -378,6 +378,7 @@ do_register_dataserver(HostRecord,ChunkList)->
     case X of
         []->
             %% TODO: 
+            
             F = fun() ->
                         mnesia:write(HostRecord#hostinfo{status = up})
                         end,
