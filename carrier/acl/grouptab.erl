@@ -7,20 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(grouptab).
 %-include("../include/egfs.hrl").
--export([set_grouptab/0]).
+%-export([set_grouptab/0]).
 -compile(export_all).
-
-%%----------------------------------------------------------------------
-%% client_api,can be used for application progamming
-%%----------------------------------------------------------------------
-
-%% --------------------------------------------------------------------
-%% Function: new_grouptab/0
-%% Description: to new a ets table
-%% Returns: tid()                  |
-%% --------------------------------------------------------------------
-new_grouptab() ->
-    ets:new(tabgroup, []).
 
 %% --------------------------------------------------------------------
 %% Function: addgroup_to_grouptab/2
@@ -28,12 +16,14 @@ new_grouptab() ->
 %% Returns: true                        |
 %%          {ok, group_has_exist}       |
 %% --------------------------------------------------------------------
-addgroup_to_grouptab(Tabgroup, GroupName) ->
-    case ets:lookup(Tabgroup, GroupName) of
+addgroup_to_grouptab(GroupName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
 	[] ->
-	    ets:insert(Tabgroup, {GroupName, []});
+        acldb:add_grouprecord_item(GroupName, []),
+        ok;
+	    %ets:insert(Tabgroup, {GroupName, []});
 	[_Object] ->
-	    {ok, group_has_exist}
+	    {error, group_has_exist}
     end.
 
 %% --------------------------------------------------------------------
@@ -42,12 +32,14 @@ addgroup_to_grouptab(Tabgroup, GroupName) ->
 %% Returns: true                         |
 %%          {ok, no_this_group}          |
 %% --------------------------------------------------------------------
-delgroup_from_grouptab(Tabgroup, GroupName) ->
-    case ets:lookup(Tabgroup, GroupName) of
+delgroup_from_grouptab(GroupName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
 	[] ->
-	    {ok, no_this_group};
+	    {error, no_this_group};
 	[Object] ->
-	    ets:delete_object(Tabgroup, Object)
+        acldb:delete_object_from_db(Object),
+        ok
+	    %ets:delete_object(Tabgroup, Object)
     end.
 
 %% --------------------------------------------------------------------
@@ -56,19 +48,21 @@ delgroup_from_grouptab(Tabgroup, GroupName) ->
 %% Returns: {ok, NewGroupMemberList}     |
 %%	    {ok, no_this_group}          |
 %% --------------------------------------------------------------------
-adduser_to_group(Tabgroup, GroupName, UserName) ->
-    case ets:lookup(Tabgroup, GroupName) of
+adduser_to_group(GroupName, UserName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
 	[] ->
-	    {ok, no_this_group};
+	    {error, no_this_group};
 	[Object] ->
-	    {_GroupName1, GroupMemberList} = Object,
+	    {_, _GroupName1, GroupMemberList} = Object,
 	    case lists:member(UserName, GroupMemberList) of
-		true ->
-		    {ok, user_has_exist_in_this_group};
-		false ->
-		    NewGroupMemberList = [UserName|GroupMemberList],
-		    ets:insert(Tabgroup, {GroupName, NewGroupMemberList}),
-		    {ok, NewGroupMemberList}
+            true ->
+                {error, user_has_exist_in_this_group};
+            false ->
+                NewGroupMemberList = [UserName|GroupMemberList],
+                acldb:delete_object_from_db(GroupName),
+                acldb:add_grouprecord_item(GroupName, NewGroupMemberList),
+                %ets:insert(Tabgroup, {GroupName, NewGroupMemberList}),
+                ok
 	    end
     end.
 
@@ -79,57 +73,56 @@ adduser_to_group(Tabgroup, GroupName, UserName) ->
 %%          {ok, no_this_group}                  |
 %%          {ok, user_not_exist_in_this_group}}  |
 %% --------------------------------------------------------------------
-deluser_from_group(Tabgroup, GroupName, UserName) ->
-    case ets:lookup(Tabgroup, GroupName) of
+deluser_from_group(GroupName, UserName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
 	[] ->
-	    {ok, no_this_group};
+	    {error, no_this_group};
 	[Object] ->
-	    {_GroupName1, GroupMemberList} = Object,
+	    {_, _GroupName1, GroupMemberList} = Object,
 	    case lists:member(UserName, GroupMemberList) of
-		true ->
-		    NewGroupMemberList = lists:delete(UserName, GroupMemberList),
-		    ets:insert(Tabgroup, {GroupName, NewGroupMemberList}),
-		    {ok, NewGroupMemberList};
-		false ->
-		    {ok, user_not_exist_in_this_group}
+            true ->
+                acldb:delete_object_from_db(GroupName),
+                NewGroupMemberList = lists:delete(UserName, GroupMemberList),
+                acldb:add_grouprecord_item(GroupName, NewGroupMemberList),
+                ok;
+            false ->
+                {ok, user_not_exist_in_the_group}
 	    end
     end.
 
-%% --------------------------------------------------------------------
-%% Function: getgroups_from_grouptab/1
-%% Description: transfrom grouptab to a group name list
-%% Returns: {ok, List}                           |
-%% --------------------------------------------------------------------
-getgroups_from_grouptab(Tabgroup) ->
-    Object = ets:tab2list(Tabgroup),
-    grouplist_to_groupnamelist(Object, []).
+lookup_grouptab(GroupName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
+        [] ->
+            %io:format("[Acl:~p]:group not in grouptab:~p~n",[?LINE, GroupName]),
+            false;
+        [_GroupObject] ->
+            true
+    end.
+    
+lookup_grouptab(GroupName, UserName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
+        [] ->
+            %io:format("[Acl:~p]:group not in grouptab:~p~n",[?LINE, GroupName]),
+            false;
+        [GroupObject] ->
+            {grouprecord, _GroupNameTemp, GroupMembers} = GroupObject,
+            %io:format("[Acl:~p]GroupObject:~p~n",[?LINE, GroupObject]),
+            lists:member(UserName, GroupMembers)
+    end.
 
-grouplist_to_groupnamelist(Object, List) when Object =:= [] ->
-    {ok, List};
-grouplist_to_groupnamelist(Object, List) ->
-    [{GroupName, _GroupMemberList}|T] = Object,
-    ListTemp = [GroupName|List],
-    io:format("[Group, ~p]:ListTemp is:~p~n", [?LINE, ListTemp]),
-    grouplist_to_groupnamelist(T, ListTemp).
 
-%% --------------------------------------------------------------------
-%% Function: set_grouptab/0
-%% Description: new a grouptab and creat groups(user1\user2\user3)
-%% Returns:tid()                           |
-%% --------------------------------------------------------------------
-set_grouptab() ->
-    Tabgroup = new_grouptab(),
-    addgroup_to_grouptab(Tabgroup, user1),
-    addgroup_to_grouptab(Tabgroup, user2),
-    addgroup_to_grouptab(Tabgroup, user3),
-    adduser_to_group(Tabgroup, user1, hxm),
-    adduser_to_group(Tabgroup, user1, llk),
-    adduser_to_group(Tabgroup, user1, xpz),
-    adduser_to_group(Tabgroup, user2, xcc),
-    adduser_to_group(Tabgroup, user2, lsb),
-    adduser_to_group(Tabgroup, user2, pyy),
-    adduser_to_group(Tabgroup, user3, zyb),
-    adduser_to_group(Tabgroup, user3, njr),
-    adduser_to_group(Tabgroup, user3, zm),
-    ets:i(Tabgroup),
-    Tabgroup.
+ls_table(TableName) ->
+    acldb:select_all_from_Table(TableName).
+
+ls_groups() ->
+    acldb:select_all_from_grouptab(grouprecord).
+
+ls_groupmembers(GroupName) ->
+    case acldb:select_all_from_grouprecord(GroupName) of
+        [] ->
+            false;
+        [GroupObject] ->
+            {grouprecord, _GroupNameTemp, GroupMembers} = GroupObject,
+            %io:format("[Acl:~p]GroupObject:~p~n",[?LINE, GroupObject]),
+            GroupMembers
+    end.
