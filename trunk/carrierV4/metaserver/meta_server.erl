@@ -28,7 +28,9 @@ init(_Arg) ->
 
 start() ->
     start_mnesia(),
-%%     {ok,Tref} = timer:apply_interval((?HEART_BEAT_TIMEOUT),hostMonitor,checkHostHealth,[]), % check host health every 5 second
+    {ok,Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
+    {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
+    
     gen_server:start_link(?META_SERVER, meta_server, [], []).
 
 stop() ->
@@ -77,16 +79,12 @@ handle_call({delete,FileName},{From,_},State) ->
     {reply, Reply, State};
 
 
-handle_call({register_replica,ChunkID,Host},{From, _}, State)->
-    %TODO.
-    Reply = todo,
-    {reply,Reply,State}.
+handle_call({register_replica,ChunkID,Host},{_From, _}, State)->    
+    Reply = do_register_replica(ChunkID,Host),
+    {reply,Reply,State};
 
 
-handle_call({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
-    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
-	Reply = do_dataserver_bootreport(HostInfoRec, ChunkList),
-    {reply, Reply, State};
+
 
 handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
@@ -105,6 +103,14 @@ handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
     {reply, Reply, State};
 
 
+handle_call({nodedown,NodeName},{_From,_},State) ->
+	io:format("somenode down know ~p~n",[NodeName]),
+%	%Reply = do_delete_node(NodeName),
+	Reply = todo,
+	{reply,Reply,State};
+
+
+
 handle_call({debug,Arg},{_From,_},State) ->
     Reply = do_debug(Arg),
     {reply,Reply,State};
@@ -114,6 +120,11 @@ handle_call(_, {_From, _}, State)->
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 
+
+handle_cast({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
+    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
+	do_dataserver_bootreport(HostInfoRec, ChunkList),
+    {noreply,State};
 
 handle_cast(stop, State) ->
     io:format("meta server stopping~n"),
@@ -275,7 +286,8 @@ do_detach_one_host(HostName)->
 
 
 do_dataserver_bootreport(HostRecord, ChunkList)->
-     do_register_dataserver(HostRecord, ChunkList). %metaDB fun
+    erlang:monitor_node(HostRecord#hostinfo.hostname,true,[]), %% monitor_node.
+    do_register_dataserver(HostRecord, ChunkList). %metaDB fun
 
 %% 
 %%delete 
@@ -288,6 +300,15 @@ do_delete(FileName, _From)->
     end.
 
 %%
+do_register_replica(ChunkID,Host) ->
+    case select_item_from_chunkmapping_id(ChunkID) of
+        []->            
+        	mnesia:write(ChunkMapping#chunkmapping{chunkid = ChunkID,chunklocations = [Host]}),
+        X ->
+            New = X#chunkmapping{chunklocations = X#chunkmapping.chunklocations++[Host]},
+            mnesia:write(New)
+    end.
+
 %% 
 %%
 do_collect_orphanchunk(HostProcName)->
@@ -373,7 +394,7 @@ call_meta_copy(_FileID) ->
     {ok, <<1:64>>}
 .
 
-call_meta_check(list,[]) ->
+call_meta_check(list,[]) ->    
     {ok,"no file conflict"};
 call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
     io:format("aaa,~p~n",[FileIDList]),
