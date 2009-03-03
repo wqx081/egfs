@@ -32,6 +32,10 @@
 
 %^% meta server  -------------------------------------------
 
+
+%%naming server.
+-record(dirmeta,{id, filename, createT, modifyT,tag,parent}).
+
 %% file metadata 
 -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
 %% dataserver process info
@@ -51,3 +55,5 @@
 -define(GARBAGE_AUTO_COLLECT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
 
 -define(MD5CHECK_TIMER,	86400000).    % 5000 milisecond = 5 second
+
+-define(NODE_CHECK_INTERVAL,10000). %% 10second. chech monitor_node result.
