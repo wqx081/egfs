@@ -20,8 +20,8 @@
 
 %%%%%  Part1 Naming Server
 
-do_open(FilePathName, Mode, UserName) ->
-    %% gen_server:call(?ACL_SERVER, {Mode, FilePathName, UserName})
+do_open(FilePathName, Mode, _UserName) ->
+    %% gen_server:call(?ACL_SERVER, {Mode, FilePathName, _UserName})
     case get_acl() of
         true ->
             case meta_db:get_tag(FilePathName) of
@@ -35,7 +35,7 @@ do_open(FilePathName, Mode, UserName) ->
                     {error, "you are opening a dir"};
                 _Any ->
                     ParentDir = filename:dirname(FilePathName),
-                    %%gen_server:call(?ACL_SERVER, {write, ParentDir, UserName})
+                    %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
                     
                     io:format("parentdir: ~p~n",[ParentDir]),
@@ -53,10 +53,10 @@ do_open(FilePathName, Mode, UserName) ->
 .
 
 
-do_delete(FilePathName, UserName)->
-    %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, UserName})
+do_delete(FilePathName, _UserName)->
+    %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=dir) and get_acl()),
-    %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, UserName})
+    %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteFile = ((meta_db:get_tag(FilePathName)=:=file) and get_acl()),
     if
         DeleteDir or DeleteFile->
@@ -78,15 +78,15 @@ do_delete(FilePathName, UserName)->
 .
 
 
-do_copy(FullSrc, FullDst, UserName)->
+do_copy(FullSrc, FullDst, _UserName)->
     CheckResult = check_op_type(FullSrc, FullDst),    
     case CheckResult of
-        {ok,Case,DirToAcl,RealDst} ->
+        {ok,Case,_DirToAcl,RealDst} ->
             %% 冗余，待整理                       
-            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,UserName})
+            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,_UserName})
             CopyDir = ((Case=:=caseDirToDir) or (Case=:=caseDirToUnDir))
             and get_acl(),
-            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,UserName})
+            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,_UserName})
             CopyFile = ((Case=:=caseFileToDir) or (Case=:=caseFileToUnFile))
             and get_acl(),
             if
@@ -125,15 +125,15 @@ do_copy(FullSrc, FullDst, UserName)->
 
 
 
-do_move(FullSrc, FullDst, UserName)->
+do_move(FullSrc, FullDst, _UserName)->
     CheckResult = check_op_type(FullSrc, FullDst),
     case CheckResult of
         {ok, _,_,_} ->
             %% 冗余，待整理
-            {ok,Case,DirToAcl,RealDst} = CheckResult,
-            %%gen_server:call(?ACL_SERVER, {copyfoder, FullSrc, DirToAcl, UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, UserName})
+            {ok,Case,_DirToAcl,RealDst} = CheckResult,
+            %%gen_server:call(?ACL_SERVER, {copyfoder, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
             CopyDirAcl = get_acl(),
-            %%gen_server:call(?ACL_SERVER, {copyfile, FullSrc, DirToAcl, UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, UserName})
+            %%gen_server:call(?ACL_SERVER, {copyfile, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
             CopyFileAcl = get_acl(),
             case Case of
                 caseDirToUnDir when CopyDirAcl->
@@ -174,9 +174,8 @@ do_move(FullSrc, FullDst, UserName)->
 .
 
 
-
-do_list(FilePathName,UserName)->
-    %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), UserName})
+do_list(FilePathName,_UserName)->
+    %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
     case get_acl() and (meta_db:get_tag(FilePathName)=:=dir) of
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
@@ -189,11 +188,11 @@ do_list(FilePathName,UserName)->
 
 
 
-do_mkdir(PathName, UserName)->
+do_mkdir(PathName, _UserName)->
     case meta_db:get_tag(PathName) of
         null ->
             ParentDirName = filename:dirname(PathName),
-            %%gen_server:call(?ACL_SERVER, {write, ParentDirName, UserName})
+            %%gen_server:call(?ACL_SERVER, {write, ParentDirName, _UserName})
             case get_acl()  and (meta_db:get_tag(ParentDirName)=:=dir) of
                 true ->
                     meta_db:add_new_dir(lib_uuid:gen(),PathName,meta_db:get_id(ParentDirName));
@@ -207,12 +206,12 @@ do_mkdir(PathName, UserName)->
 
 
 
-do_chmod(FileName, UserName, UserType, CtrlACL) ->
+do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
     case meta_db:get_tag(FileName) of
         null ->
             {error, "file not exists"};
         _Any ->
-            %            gen_server:call(?ACL_SERVER, {setacl, FileName, UserName, UserType, CtrlACL})
+            %            gen_server:call(?ACL_SERVER, {setacl, FileName, _UserName, UserType, CtrlACL})
             get_acl()
     end
 .
@@ -229,7 +228,7 @@ get_acl() ->
 .
 
 
-
+%%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
 check_op_type(SrcFullPath, DstFullPath) ->
     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),
     DstParent = filename:dirname(DstFullPath),
@@ -256,13 +255,6 @@ check_op_type(SrcFullPath, DstFullPath) ->
             {error, "wrong input"}
     end
 .
-
-
-
-
-
-
-
 
 
 %%%%%%%%%%%%%%%%
@@ -293,7 +285,7 @@ call_meta_delete(FileID)->
 
 
 
-call_meta_copy(list,S,D)->
+call_meta_copy(list,_S,_D)->
     %%TODO.
     todo.
 

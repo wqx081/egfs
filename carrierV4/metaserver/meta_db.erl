@@ -223,8 +223,8 @@ select_items_from_dirandfile(FileName)->
     do(qlc:q([
               X||X<-mnesia:table(filemeta),
                  Y<-mnesia:table(dirmeta),
-                 Y#dirmeta.filename = FileName,
-                 X#filemeta.fileid =:=Y#dirmeta.fileid                 
+                 Y#dirmeta.filename =:= FileName,
+                 X#filemeta.fileid =:=Y#dirmeta.id                 
               ])).
 
 select_attributes_from_filemeta(FileName) ->    %result [L]
