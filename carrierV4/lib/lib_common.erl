@@ -11,7 +11,29 @@
 		 get_local_ip/0,
 		 get_file_handle/1,
 		 get_file_name/1,
-		 generate_dirs/2]).
+		 generate_dirs/2,
+         for/3,
+         idToAtom/2
+        ]).
+
+
+
+for(Max, Max, F) -> [F(Max)];
+for(I, Max, F)   -> [F(I)|for(I+1, Max, F)].
+
+idToAtom(Bin,Mode)->
+    List = binary_to_list(Bin),
+%%     ModePreFix = binary_to_list(term_to_binary(Mode)),
+    case Mode of 
+        r ->
+            ModePreFix = $r;
+        w ->
+            ModePreFix = $w;
+        _ ->
+            ModePreFix = $?    
+    end,    
+    ModeList = lists:append([ModePreFix],List),
+    list_to_atom(ModeList).
 
 generate_processname(Filename,Mode)->
     ModePreFix= case Mode of 
