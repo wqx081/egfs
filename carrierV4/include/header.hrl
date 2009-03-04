@@ -45,10 +45,10 @@
 
 
 %%naming server.
--record(dirmeta,{id, filename, createT, modifyT,tag,parent}).
+%%-record(dirmeta,{id, filename, createT, modifyT,tag,parent}).
 
 %% file metadata 
--record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT}).
+-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
 %% dataserver process info
 -record(hostinfo,{hostname, freespace, totalspace, status}).
 %% chunk mapping relationship
