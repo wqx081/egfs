@@ -19,7 +19,7 @@
 	 terminate/2, code_change/3]).
 
 
--record(metaWorkerState,{filemeta,mod,clients=[]}).
+-record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).
 
 
 %%====================================================================
@@ -41,9 +41,9 @@ handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
 	Reply = meta_db:select_hosts_from_chunkmapping_id(ChunkID),
 	{reply, Reply, State};
 	
-handle_call({getfileinfo}, {_From, _}, State) ->
-    %%TODO
-    Reply = todo,
+handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
+	
+    Reply  = meta_db:select_items_from_dirandfile(FileName),
 	{reply, Reply, State};
 
 

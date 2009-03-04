@@ -16,7 +16,7 @@
 %%
 %% Exported Functions
 %%
-%%-export([hello/0,checkHostHealth/0,test/0]).
+-export([hello/0,test/0]).
 -export([checkNodes/0,broadcast/0]).
 
 %%
@@ -30,7 +30,7 @@
 %% Local Functions
 %%
 test() ->
-    {ok,Tref} = timer:apply_interval(1000,hostMonitor,hello,[]).
+    {ok,_Tref} = timer:apply_interval(1000,hostMonitor,hello,[]).
 
 
 hello() ->
@@ -66,9 +66,9 @@ broadcast() ->
         (MappingsNum =< 0) ->
             {erroe, "no chunkid in chunkmapping table"};
         true ->
-            ChunkIdList = get_chunkid_from_chunkmapping(Mappings),
+            _ChunkIdList = get_chunkid_from_chunkmapping(Mappings),
             ChunkMapping = lists:nth(1,Mappings),
-            FirstHost =lists:nth(1,ChunkMapping#chunkmapping.chunklocations), 
+            _FirstHost =lists:nth(1,ChunkMapping#chunkmapping.chunklocations), 
             %% use lib_chan & lib_bloom
             
             todo

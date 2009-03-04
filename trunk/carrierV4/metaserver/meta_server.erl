@@ -3,19 +3,8 @@
 
 -include("../include/header.hrl").
 
--import(meta_db,[
-                  select_fileid_from_filemeta/1,
-                 select_from_hostinfo/1,
-                 select_chunkid_from_orphanchunk/1,
-                 detach_from_chunk_mapping/1,
-                  select_item_from_chunkmapping_id/1,
-                 do_register_dataserver/2,
-                 do_delete_filemeta/1,
-                 do_delete_orphanchunk_byhost/1,
-                 select_attributes_from_filemeta/1,
-                  start_mnesia/0,
-                  write_to_db/1
-                ]).
+
+
 
 -export([start/0,stop/0]).
 -export([init/1,handle_call/3,handle_cast/2,handle_cast/3,handle_info/2,terminate/2, code_change/3]).
@@ -29,7 +18,7 @@ init(_Arg) ->
     {ok, []}.
 
 start() ->
-    start_mnesia(),
+    meta_db:start_mnesia(),
     {ok,_Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
  %%   {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
     
@@ -42,13 +31,100 @@ terminate(_Reason, _State) ->
     io:format("meta server terminating~n").
 
 
-%"metaserver" methods
-% write step 1: open file
-handle_call({open, FileName, Mode}, {From, _}, State) ->
-    io:format("inside handle_call_open, FileName:~p,Mode:~p,From:~p~n",[FileName,Mode,From]),
-    Reply = do_open(FileName, Mode, From),
+
+
+%%% from name server.
+
+%%"name server" methods
+%% 1: open file
+%% FilePathName->string().
+%% Mode -> w|r|a
+%% UserName -> <<integer():64>>
+%% return -> {ok, FileID} | {error, []}
+handle_call({open, FilePathName, Mode, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,UserName]),
+    Reply = meta_common:do_open(FilePathName, Mode, UserName),
     {reply, Reply, State};
 
+
+
+%%"name server" methods
+%% 2: delete file
+%% FilePathName->string().
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+handle_call({delete, FilePathName, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_delete, FilePathName:~p,UserName:~p~n",[FilePathName,UserName]),
+    Reply = meta_common:do_delete(FilePathName, UserName),
+    {reply, Reply, State};
+
+
+
+
+%%"name server" methods
+%% 3: copy file/directory
+%% SrcFilePathName->string().
+%% DstFilePathName->string().
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+handle_call({copy, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_copy, SrcFilePathName:~p, DstFilePathName:~p, UserName:~p~n",[SrcFilePathName, DstFilePathName, UserName]),
+    Reply = meta_common:do_copy(SrcFilePathName, DstFilePathName, UserName),
+    {reply, Reply, State};
+
+
+
+
+%%"name server" methods
+%% 4: move file/directory
+%% SrcFilePathName->string().
+%% DstFilePathName->string().
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+handle_call({move, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_move, SrcFilePathName:~p, DstFilePathName:~p, UserName:~p~n",[SrcFilePathName, DstFilePathName, UserName]),
+    Reply = meta_common:do_move(SrcFilePathName, DstFilePathName, UserName),
+    {reply, Reply, State};
+
+
+
+
+
+%%"name server" methods
+%% 5: list file/directory
+%% FilePathName->string().
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+handle_call({list, FilePathName, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_list, FilePathName:~p,UserName:~p~n",[FilePathName, UserName]),
+    Reply = meta_common:do_list(FilePathName, UserName),
+    {reply, Reply, State};
+%%"name server" methods
+%% 6: mkdir file/directory
+%% PathName->string().
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+
+
+handle_call({mkdir, PathName, UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_mkdir, PathName:~p,UserName:~p~n",[PathName, UserName]),
+    Reply = meta_common:do_mkdir(PathName, UserName),
+    {reply, Reply, State};
+
+
+
+%%"name server" methods
+%% 7: change mod
+%% FileName->string().
+%% UserName->string().
+%% UserType->user/group
+%%CtrlACL->0~7
+%% UserName -> <<integer():64>>
+%% return -> {ok, []} | {error, []}
+handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) ->
+    io:format("inside handle_call_chmod, FileName:~p~n UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, UserName, UserType, CtrlACL]),
+    Reply = meta_common:do_chmod(FileName, UserName, UserType, CtrlACL),
+    {reply, Reply, State};
 %% function moved to meta_worker.------------------->
 
 %% handle_call({allocatechunk, FileID}, {From, _}, State) ->
@@ -214,216 +290,9 @@ debug(Arg) ->
     gen_server:call(?META_SERVER,{debug,Arg}).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-%%from old meta_server ;   handle these function.
-
-do_open(FileID,Mod,_From)-> 
-    case Mod of
-        r->            
-            do_read_open(FileID);
-        w->
-            do_write_open(FileID);
-        _->
-            {error,"unkown open mode"}
-    end.
-
-do_write_open(FileID)->
-    ProcessName = util:idToAtom(FileID,w),
-    case whereis(ProcessName) of
-        undefined -> % no meta worker , create one worker to server this writing request.
-			case meta_db:select_all_from_filemeta(FileID) of
-				[] ->
-					% if the target file is not exist, then generate a new fileid.
-                    Filename = todo,  %%TODO                 
-				    FileRecord = #filemeta{	fileid=FileID, 
-											filename=Filename, 
-											filesize=0, 
-											chunklist=[], 
-				                 			createT=erlang:localtime(), 
-											modifyT=erlang:localtime(),
-											acl="acl"},
-					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileRecord], []),
-					{ok, FileID, 0, [], MetaWorkerPid};	  
-				[_FileMeta] ->	
-					{error, "the same file name has existed in database."}
-			end;
-        _Pid->			% pid exist, write error
-            {error, "other client is writing the same file."}  
-    end.
-
-do_read_open(FileID)->
-    ProcessName = util:idToAtom(FileID,r),
-    case whereis(ProcessName) of
-        undefined ->		% no meta worker , create one worker to server this writing request.
-			case meta_db:select_all_from_filemeta(FileID) of
-				[] ->
-					% if the target file is not exist, then report error .		
-					{error, "the target file is not exist."};  
-				[FileMeta] ->	 %%%%%%%%%%%%%%%%%%%%% wait for modifying 
-					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileMeta], []),
-					{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, MetaWorkerPid}
-			end;
-        Pid->			% pid exist, set this pid process as the meta worker
-        	FileMeta = gen_server:call(Pid, {getfileinfo}),
-       		{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, Pid}
-   end.
-
-
-
-%% read file attribute step 1: open file
-%% read file attribute step 2: get chunk for 
-do_get_fileattr(FileName)->
-    [AttributeList] =select_attributes_from_filemeta(FileName),
-    {ok, AttributeList}.
-
-%%
-%% 
-%% host drop.
-%% update chunkmapping and delete chunks
-%% arg -  that host
-%% return ---
-do_detach_one_host(HostName)->
-    detach_from_chunk_mapping(HostName). %metaDB fun
-
-
-do_dataserver_bootreport(HostRecord, ChunkList)->
-    erlang:monitor_node(HostRecord#hostinfo.hostname,true,[]), %% monitor_node.
-    do_register_dataserver(HostRecord, ChunkList). %metaDB fun
-
-%% 
-%%delete 
-do_delete(FileName, _From)->
-    case select_fileid_from_filemeta(FileName) of
-        [] -> {error, "filename does not exist"};
-        % get fileid sucessfull	
-        [FileID] ->
-            do_delete_filemeta(FileID)
-    end.
-
-%%
-do_register_replica(ChunkID,Host) ->
-    case select_item_from_chunkmapping_id(ChunkID) of
-        []->            
-            write_to_db(#chunkmapping{chunkid = ChunkID,chunklocations = [Host]});
-        [X]->
-            New = X#chunkmapping{chunklocations = X#chunkmapping.chunklocations++[Host]},
-            write_to_db(New)
-    end.
-
-%% 
-%%
-do_collect_orphanchunk(HostProcName)->
-    % get orphanchunk from orphanchunk table
-    OrphanChunkList = select_chunkid_from_orphanchunk(HostProcName),
-    % delete notified orphanchunk from orphanchunk table
-    do_delete_orphanchunk_byhost(HostProcName),
-    OrphanChunkList.
-
-do_register_heartbeat(_HostInfoRec)->
-    %%TODO:
-    
-    {ok,"heartbeat Ok"}
-    .
-%%     
-%%     Res = select_from_hostinfo(HostInfoRec#hostinfo.hostname),
-%%     Host = HostInfoRec#hostinfo.host,
-%%     case Res of
-%%         [{hostinfo,_Proc,Host,_TotalSpace,_FreeSpace,_Health}]->
-%%             {_,TimeTick,_} = now(),
-%%             NewInfo = HostInfoRec#hostinfo{health = {TimeTick,10}}, %%   ?INIT_NODE_HEALTH = 10 , TODO, 
-%%             write_to_db(NewInfo),
-%%             {ok,"heartbeat ok"};                
-%%         _-> {error,"chunk does not exist"}
-%%     end.
-
-rpc(Pid, Request) ->
-    Pid ! {self(), Request},
-    receive
-	Response ->
-	    Response
-    end.
-
-
-%% 
-%% debug 
-%% 
-do_debug(Arg) ->
-    io:format("in func do_debug~n"),
-    case Arg of
-        wait ->
-            io:format("111 ,~n"),
-            timer:sleep(2000),
-			io:format("222 ,~n");
-        clearShadow ->
-            mnesia:clear_table(filemeta_s);
-        show ->
-            io:format("u wana show, i give u show ,~n");
-        die ->
-            io:format("u wna die ,i let u die.~n")
-%%             1000 div 0;
-            ;
-        _ ->
-            io:format("ohter~n")
-    end.
 
 
 
 
-%% --------------------------------------------------------------------------------------------------
-%% for name_server 
-%% 
-call_meta_open(FileID, Mode)->
-    do_open(FileID, Mode,[]).
 
-
-call_meta_new() ->
-    {_, HighTime, LowTime}=now(),
-    FileID = <<HighTime:32, LowTime:32>>,
-    {ok, FileID}.
-
-
-
-
-call_meta_delete(FileID)->
-    do_delete_filemeta(FileID).
-
-
-call_meta_copy(_FileID) ->
- 
-%%     gen_server:call(?CHUNK_SERVER,{chunkCopy,[From],[To1,To2]}),
-    
-    {ok, <<1:64>>}
-.
-
-call_meta_check(list,[]) ->    
-    {ok,"no file conflict"};
-call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
-    io:format("aaa,~p~n",[FileIDList]),
-    [FileID|T] = FileIDList,
-    case call_meta_check(FileID) of
-        {ok,_}->
-            call_meta_check(list,T);
-        {error,_}->
-            {error,FileID}
-    end.
-
-call_meta_check(FileID)->
-    WA = meta_util:idToAtom(FileID,w),
-    RA = meta_util:idToAtom(FileID,r),
-    
-    case whereis(WA) of
-        undefined->
-            case whereis(RA) of
-                undefined->
-                    {ok,FileID};
-                _->
-                    {error,"someone reading this file."}
-            end;
-        _->
-            {error,"someone writing this file."}
-    end.
-
-
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
