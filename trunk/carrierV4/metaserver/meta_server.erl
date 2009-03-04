@@ -151,14 +151,14 @@ handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) -
 %%     {reply, Reply, State};
 %% <-------------------    function moved to meta_worker.
 
-handle_call({delete,FileName},{From,_},State) ->
-    io:format("inside handle_call_delete,FileName:~p~n",[FileName]),
-	Reply = do_delete(FileName, From),
-    {reply, Reply, State};
+%% handle_call({delete,FileName},{From,_},State) ->
+%%     io:format("inside handle_call_delete,FileName:~p~n",[FileName]),
+%% 	Reply = do_delete(FileName, From),
+%%     {reply, Reply, State};
 
 
 handle_call({register_replica,ChunkID,Host},{_From, _}, State)->    
-    Reply = do_register_replica(ChunkID,Host),
+    Reply = meta_common:do_register_replica(ChunkID,Host),
     {reply,Reply,State};
 
 
@@ -166,18 +166,18 @@ handle_call({register_replica,ChunkID,Host},{_From, _}, State)->
 
 handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
-	Reply = do_collect_orphanchunk(HostRegName),
+	Reply = meta_common:do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
 handle_call({getfileattr, FileName},{_From,_},State) ->
     io:format("inside handle_call_getfileattr,FileName:~p~n",[FileName]),
-	Reply = do_get_fileattr(FileName),
+	Reply = meta_common:do_get_fileattr(FileName),
     {reply, Reply, State};
 
 
 handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
   %  io:format("inside handle_call_heartbeat,HostRegName:~p~n",[HostInfoRec]),
-	Reply = do_register_heartbeat(HostInfoRec),
+	Reply = meta_common:do_register_heartbeat(HostInfoRec),
     {reply, Reply, State};
 
 
@@ -190,7 +190,7 @@ handle_call({nodedown,NodeName},{_From,_},State) ->
 
 
 handle_call({debug,Arg},{_From,_},State) ->
-    Reply = do_debug(Arg),
+    Reply = meta_common:do_debug(Arg),
     {reply,Reply,State};
 
 handle_call(_, {_From, _}, State)->
@@ -201,7 +201,7 @@ handle_call(_, {_From, _}, State)->
 
 handle_cast({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
     io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
-	do_dataserver_bootreport(HostInfoRec, ChunkList),
+	meta_common:do_dataserver_bootreport(HostInfoRec, ChunkList),
     {noreply,State}.
 
 handle_cast(stop, State) ->
