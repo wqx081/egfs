@@ -23,8 +23,7 @@
 %% API Functions
 %%
 
-for(Max, Max, F) -> [F(Max)];
-for(I, Max, F)   -> [F(I)|for(I+1, Max, F)].
+
 
 %%
 %% Local Functions
@@ -40,19 +39,7 @@ getNthList(I, Max, List)   ->  [_| Tail] = List,
                                     getNthList(I+1, Max, Tail).
 
 
-idToAtom(Bin,Mode)->
-    List = binary_to_list(Bin),
-%%     ModePreFix = binary_to_list(term_to_binary(Mode)),
-    case Mode of 
-        r ->
-            ModePreFix = $r;
-        w ->
-            ModePreFix = $w;
-        _ ->
-            ModePreFix = $?    
-    end,    
-    ModeList = lists:append([ModePreFix],List),
-    list_to_atom(ModeList).
+
 
 generate_processname(Filename,Mode)->
     ModePreFix= case Mode of 
