@@ -1,4 +1,5 @@
 %%defien global server name
+
 -define(META_SERVER,{global, global_metaserver}).
 -define(HOST_SERVER,{global, global_hostserver}).
 
@@ -47,7 +48,7 @@
 -record(dirmeta,{id, filename, createT, modifyT,tag,parent}).
 
 %% file metadata 
--record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT, acl}).
+-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT}).
 %% dataserver process info
 -record(hostinfo,{hostname, freespace, totalspace, status}).
 %% chunk mapping relationship
