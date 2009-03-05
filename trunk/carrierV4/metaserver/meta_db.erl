@@ -51,14 +51,12 @@ do_this_once() ->
     mnesia:create_table(orphanchunk, [{type,bag},{attributes, record_info(fields,orphanchunk)},
                                       {disc_copies,[node()]}
                                      ]),
-    mnesia:create_table(dirmeta, [{type,bag},{attributes, record_info(fields,dirmeta)},
-                                      {disc_copies,[node()]}
-                                     ]),
+    
     
     reset_example_tables(),
 
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
-    mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk,dirmeta], 14000),
+    mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
     logF(LOG).
 
 
@@ -70,7 +68,7 @@ start_mnesia()->
         _ ->
             LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
             mnesia:start(),
-            mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk,dirmeta], 14000),
+            mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
             logF(LOG)
     end,
     
@@ -88,15 +86,14 @@ do(Q) ->
 example_tables() ->
     [
      %%{hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}},
-     {dirmeta,lib_uuid:gen(),"/",any,any,dir,[]}
+     {filemeta,lib_uuid:gen(),"/",0,[],erlang:localtime(),erlang:localtime(),dir,[]}
     ].
 
 clear_tables()->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="cleart_tables/0",logarg=[]},
     logF(LOG),
 
-    mnesia:clear_table(filemeta),
-    mnesia:clear_table(filemeta_s),
+    mnesia:clear_table(filemeta),    
     mnesia:clear_table(hostinfo),
     mnesia:clear_table(chunkmapping).
 
@@ -213,32 +210,15 @@ select_all_from_Table(T)->
               X||X<-mnesia:table(T)
               ])).  %result [L]
 
-select_all_from_filemeta(FileID) ->    %result [L]
+select_all_from_filemeta_byID(FileID) ->    %result [L]
     do(qlc:q([
               X||X<-mnesia:table(filemeta),X#filemeta.fileid =:= FileID
               ])).
 
-
-select_items_from_dirandfile(FileName)->
-    do(qlc:q([
-              X||X<-mnesia:table(filemeta),
-                 Y<-mnesia:table(dirmeta),
-                 Y#dirmeta.filename =:= FileName,
-                 X#filemeta.fileid =:=Y#dirmeta.id                 
+select_all_from_filemeta_byName(FileName) ->
+  do(qlc:q([
+              X||X<-mnesia:table(filemeta),X#filemeta.filename =:= FileName
               ])).
-
-select_attributes_from_filemeta(FileName) ->    %result [L]
-    do(qlc:q([
-              {X#filemeta.filesize,X#filemeta.chunklist,X#filemeta.createT, X#filemeta.modifyT}||
-              X<-mnesia:table(filemeta),X#filemeta.filename =:= FileName
-              ])).
-
-
-%% select_all_from_filemeta_s(FileID)->
-%%     do(qlc:q([
-%%               X||X<-mnesia:table(filemeta_s),X#filemeta_s.fileid =:= FileID
-%%               ])).
-
 
 select_from_hostinfo(Hostname)->
     do(qlc:q([
@@ -495,26 +475,16 @@ do_get_orphanchunk_byhost(HostProcName) ->
 %% add file info to table: filemeta & chunkmapping
 %%====================================================================
 add_a_file_record(FileRecord, ChunkMappingRecords) ->
-    
-    CurrentT = term_to_binary(erlang:localtime()),    
+    CurrentT = erlang:localtime(),
     %%TODO: create time & modify time . . mode append,. 
     Row = FileRecord#filemeta{	createT=CurrentT, 
-			                    modifyT=CurrentT},
-    
-	TODO = todo,
-	DirMetaRow =#dirmeta{
-                                 id = FileRecord#filemeta.fileid,
-                                 filename = FileRecord#filemeta.filename,
-                                 createT = CurrentT,
-                                 modifyT = CurrentT,
-                                 tag = TODO,		
-                                 parent = TODO
-                                 },
+			                    modifyT=CurrentT,
+                                tag = file,
+                                parent = filename:dirname(FileRecord#filemeta.filename)
+                             },
 	F = fun() ->
 		mnesia:write(Row),
-		lists:foreach(fun mnesia:write/1, ChunkMappingRecords),      
- %%% TODO : add a record to table : dirmeta
-        mnesia:write(DirMetaRow)        
+		lists:foreach(fun mnesia:write/1, ChunkMappingRecords)   
 	end,
     {atomic, Val} = mnesia:transaction(F),
 	Val.
@@ -558,7 +528,7 @@ select_random_one_from_hostinfo()->
 
 
 get_tag(Dir) ->
-    Result = do(qlc:q([X#dirmeta.tag||X<-mnesia:table(dirmeta), X#dirmeta.filename=:=Dir])),
+    Result = do(qlc:q([X#filemeta.tag||X<-mnesia:table(filemeta), X#filemeta.filename=:=Dir])),
     case Result of
         [] ->
             null;
@@ -567,7 +537,7 @@ get_tag(Dir) ->
     end
 .
 get_tag_by_id(ID) ->
-    Result = do(qlc:q([X#dirmeta.tag||X<-mnesia:table(dirmeta), X#dirmeta.id=:=ID])),
+    Result = do(qlc:q([X#filemeta.tag||X<-mnesia:table(filemeta), X#filemeta.fileid=:=ID])),
     case Result of
         [] ->
             null;
@@ -576,7 +546,7 @@ get_tag_by_id(ID) ->
     end
 .
 get_name(ID) ->
-    Result = do(qlc:q([X#dirmeta.filename||X<-mnesia:table(dirmeta), X#dirmeta.id=:=ID])),
+    Result = do(qlc:q([X#filemeta.filename||X<-mnesia:table(filemeta), X#filemeta.fileid=:=ID])),
     case Result of
         [] ->
             null;
@@ -586,10 +556,10 @@ get_name(ID) ->
 .
 
 get_id_from_dirmeta(FileName)->
-    do(qlc:q([X#dirmeta.id||X<-mnesia:table(dirmeta), X#dirmeta.filename=:=FileName])).
+    do(qlc:q([X#filemeta.fileid||X<-mnesia:table(filemeta), X#filemeta.filename=:=FileName])).
 
 get_id(Dir) ->
-    Result = do(qlc:q([X#dirmeta.id||X<-mnesia:table(dirmeta), X#dirmeta.filename=:=Dir])),
+    Result = do(qlc:q([X#filemeta.fileid||X<-mnesia:table(filemeta), X#filemeta.filename=:=Dir])),
     case Result of
         [] ->
             null;
@@ -598,7 +568,7 @@ get_id(Dir) ->
     end
 .
 get_time(ID) ->
-    Result = do(qlc:q([{X#dirmeta.createT,X#dirmeta.modifyT}||X<-mnesia:table(dirmeta), X#dirmeta.id=:=ID])),
+    Result = do(qlc:q([{X#filemeta.createT,X#filemeta.modifyT}||X<-mnesia:table(filemeta), X#filemeta.fileid=:=ID])),
     case Result of
         [] ->
             null;
@@ -614,19 +584,22 @@ delete_rows(IDList) ->
     delete_rows(Left)
 .
 delete_one_row(ID) ->
-    Row = {dirmeta, ID},
+    Row = {filemeta, ID},
     F = fun() ->
                 mnesia:delete(Row)
         end,
     mnesia:transaction(F)
 .
+
+%%%%TODO.
 add_one_row(ID,FileName,CreateTime,ModifyTime,Tag,ParentID) ->
-    Row = #dirmeta{id=ID,filename=FileName,tag=Tag,createT=CreateTime,modifyT=ModifyTime,parent=ParentID},
+    Row = #filemeta{fileid=ID,filename=FileName,tag=Tag,createT=CreateTime,modifyT=ModifyTime,parent=ParentID,filesize = todo,chunklist = todo},
     F = fun() ->
                 mnesia:write(Row)
         end,
     mnesia:transaction(F)
 .
+
 get_all_sub_files(FileID) ->
     case meta_db:get_tag_by_id(FileID) of
         file ->
@@ -647,7 +620,7 @@ get_all_sub_files(list, FileIDList) ->
 .
 
 get_direct_sub_files(FileID) ->
-    Result = do(qlc:q([{X#dirmeta.tag,X#dirmeta.id}||X<-mnesia:table(dirmeta), X#dirmeta.parent=:=FileID])),
+    Result = do(qlc:q([{X#filemeta.tag,X#filemeta.fileid}||X<-mnesia:table(filemeta), X#filemeta.parent=:=FileID])),
     seperate_file_dir(Result)
 .
 seperate_file_dir([]) ->
@@ -682,10 +655,10 @@ add_copyed_files(SrcFileIDList,DstFileIDList,Src,AimDst) ->
     [SrcHead|SrcLeft] = SrcFileIDList,
     [DstHead|DstLeft] = DstFileIDList,
     NewPath = get_modifyed_path(SrcHead,Src,AimDst),
-    [{NewCT,NewMT,NewTag}|_T] = do(qlc:q([{X#dirmeta.createT,X#dirmeta.modifyT,X#dirmeta.tag}
-        ||X<-mnesia:table(dirmeta),X#dirmeta.id=:=SrcHead])),
+    [{NewCT,NewMT,NewTag}|_T] = do(qlc:q([{X#filemeta.createT,X#filemeta.modifyT,X#filemeta.tag}
+        ||X<-mnesia:table(filemeta),X#filemeta.fileid=:=SrcHead])),
     NewParent = get_id(filename:dirname(NewPath)),
-    Row = #dirmeta{id=DstHead,filename=NewPath,createT=NewCT,modifyT=NewMT,tag=NewTag,parent=NewParent},
+    Row = #filemeta{fileid=DstHead,filename=NewPath,createT=NewCT,modifyT=NewMT,tag=NewTag,parent=NewParent},
     F = fun() ->
                 mnesia:write(Row)
         end,
@@ -693,14 +666,14 @@ add_copyed_files(SrcFileIDList,DstFileIDList,Src,AimDst) ->
     [NewPath|add_copyed_files(SrcLeft,DstLeft,Src,AimDst)]
 .
 add_new_dir(ID,DirName,ParentID) ->
-    Row = #dirmeta{id=ID,filename=DirName,createT = calendar:local_time(),modifyT = calendar:local_time(),tag=dir,parent=ParentID},
+    Row = #filemeta{fileid=ID,filename=DirName,createT = calendar:local_time(),modifyT = calendar:local_time(),tag=dir,parent=ParentID,chunklist=todo},
     F = fun() ->
                 mnesia:write(Row)
         end,
     mnesia:transaction(F)
 .
 add_new_file(ID,FileName,ParentID) ->
-    Row = #dirmeta{id=ID,filename=FileName,tag=file,createT=term_to_binary(erlang:localtime()),modifyT=term_to_binary(erlang:localtime()),parent=ParentID},
+    Row = #filemeta{fileid=ID,filename=FileName,tag=file,createT=term_to_binary(erlang:localtime()),modifyT=term_to_binary(erlang:localtime()),parent=ParentID},
     F = fun() ->
                 mnesia:write(Row)
         end,
