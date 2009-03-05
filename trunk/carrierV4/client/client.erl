@@ -162,7 +162,7 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:cast(MetaWorkerPid, {stop,normal}),	
+	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
 	{reply, Reply, State};
 handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=read ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
@@ -174,7 +174,7 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:cast(MetaWorkerPid, {stop,normal}),		
+	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),		
 	{reply, ok, State};	
 
 handle_call({delete, FileName}, _From, State)  ->

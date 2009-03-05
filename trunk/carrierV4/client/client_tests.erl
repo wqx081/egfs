@@ -84,7 +84,7 @@ write_loop(FileContext, Hdl)->
 			Reason
 	end.	
 
-testr({FileName,FileSize, MD5}) ->
+testr({FileName,_FileSize, MD5}) ->
 	TargetFile = "./outfiles/"++FileName,
 	case gen_server:call(client,{open,FileName,read}) of
 		{ok, FileContext}   ->
