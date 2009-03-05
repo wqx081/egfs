@@ -52,7 +52,6 @@ do_open(FilePathName, Mode, _UserName) ->
     end
 .
 
-
 do_delete(FilePathName, _UserName)->
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=dir) and get_acl()),
@@ -61,9 +60,9 @@ do_delete(FilePathName, _UserName)->
     if
         DeleteDir or DeleteFile->
             FileID = meta_db:get_id(FilePathName),
-            [FileIDList, DirIDList] = meta_db:get_all_sub_files(FileID),
+            [FileIDList, DirIDList,FileNameList,DirNameList] = meta_db:get_all_sub_files(FileID),
             AllDirIDList = lists:append(DirIDList,[FileID]),
-            case call_meta_delete(list, FileIDList) of
+            case call_meta_delete(list, FileNameList) of
                 {ok,_} ->
                     meta_db:delete_rows(FileIDList),
                     meta_db:delete_rows(AllDirIDList),
@@ -179,14 +178,11 @@ do_list(FilePathName,_UserName)->
     case get_acl() and (meta_db:get_tag(FilePathName)=:=dir) of
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
-            meta_db:get_direct_sub_files(ParentDirID);
+            []meta_db:get_direct_sub_files(ParentDirID);
         false ->
             {error, "not a dir or you are not authorized to do this operation "}
     end 
 .
-
-
-
 
 do_mkdir(PathName, _UserName)->
     case meta_db:get_tag(PathName) of
@@ -310,8 +306,9 @@ call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
     end.
 
 call_meta_check(FileID)->
-    WA = meta_util:idToAtom(FileID,w),
-    RA = meta_util:idToAtom(FileID,r),
+    FileName = meta_db:get_name(FileID),
+    WA = lib_common:generate_processname(FileName,write),
+    RA = lib_common:generate_processname(FileName,read),
     
     case whereis(WA) of
         undefined->
@@ -326,17 +323,11 @@ call_meta_check(FileID)->
     end.
 
 
-
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%meta_server
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 %%from old meta_server ;   handle these function.
-
-
 
 do_file_open(FileName,Mod)-> 
     case Mod of

@@ -87,9 +87,6 @@ handle_call({move, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, Stat
     {reply, Reply, State};
 
 
-
-
-
 %%"name server" methods
 %% 5: list file/directory
 %% FilePathName->string().
@@ -125,36 +122,7 @@ handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) -
     io:format("inside handle_call_chmod, FileName:~p~n UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, UserName, UserType, CtrlACL]),
     Reply = meta_common:do_chmod(FileName, UserName, UserType, CtrlACL),
     {reply, Reply, State};
-%% function moved to meta_worker.------------------->
 
-%% handle_call({allocatechunk, FileID}, {From, _}, State) ->
-%%     io:format("inside handle_call_allocatechunk, FileID:~p,From:~p~n",[FileID,From]),
-%%     Reply = do_allocate_chunk(FileID, From),
-%%     {reply, Reply, State};
-
-%% handle_call({registerchunk, FileID, ChunkID, ChunkUsedSize, NodeList},
-%%             _From, State) ->    
-%%     io:format("~p",[time()]),
-%%     io:format("inside handle_call_registerchunk,FileID:~p,ChunkID:~p,ChunkUsedSize:~p~n",[FileID,ChunkID,ChunkUsedSize]),
-%%     io:format("NodeList~p~n",[list_to_tuple(NodeList)]),
-%%     Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
-%%     {reply, Reply, State};
-
-%% handle_call({locatechunk, FileID, ChunkIndex}, _From, State) ->
-%%     io:format("inside handle_call_locatechunk,FileID:~p,ChunkIndex:~p~n",[FileID,ChunkIndex]),
-%%     Reply = do_get_chunk(FileID, ChunkIndex),
-%%     {reply, Reply, State};
-
-%% handle_call({close, FileID}, {From, _}, State)->
-%%     io:format("inside handle_call_close,FileID:~p,From:~p~n",[FileID,From]),
-%% 	Reply = do_close(FileID, From),
-%%     {reply, Reply, State};
-%% <-------------------    function moved to meta_worker.
-
-%% handle_call({delete,FileName},{From,_},State) ->
-%%     io:format("inside handle_call_delete,FileName:~p~n",[FileName]),
-%% 	Reply = do_delete(FileName, From),
-%%     {reply, Reply, State};
 
 
 handle_call({register_replica,ChunkID,Host},{_From, _}, State)->    
@@ -162,17 +130,15 @@ handle_call({register_replica,ChunkID,Host},{_From, _}, State)->
     {reply,Reply,State};
 
 
-
-
 handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
 	Reply = meta_common:do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
-handle_call({getfileattr, FileName},{_From,_},State) ->
-    io:format("inside handle_call_getfileattr,FileName:~p~n",[FileName]),
-	Reply = meta_common:do_get_fileattr(FileName),
-    {reply, Reply, State};
+%% handle_call({getfileattr, FileName},{_From,_},State) ->
+%%     io:format("inside handle_call_getfileattr,FileName:~p~n",[FileName]),
+%% 	Reply = meta_common:do_get_fileattr(FileName),
+%%     {reply, Reply, State};
 
 
 handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
