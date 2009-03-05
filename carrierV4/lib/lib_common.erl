@@ -37,9 +37,9 @@ idToAtom(Bin,Mode)->
 
 generate_processname(Filename,Mode)->
     ModePreFix= case Mode of 
-					r -> r@@@;
-					w -> w@@@;
-					a -> a@@@		    
+					read -> r@@@;
+					write -> w@@@;
+					append -> a@@@		    
 				end,    
     ModeList = lists:append(atom_to_list(ModePreFix),Filename),
     list_to_atom(ModeList).
