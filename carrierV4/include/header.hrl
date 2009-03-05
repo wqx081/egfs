@@ -50,7 +50,7 @@
 %% file metadata 
 -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
 %% dataserver process info
--record(hostinfo,{hostname, freespace, totalspace, status}).
+-record(hostinfo,{hostname, freespace, totalspace, status,life}).
 %% chunk mapping relationship
 -record(chunkmapping, {chunkid, chunklocations}).
 -record(clientinfo, {clientid, modes}).   % maybe fileid?
@@ -69,3 +69,5 @@
 -define(HEARTBEAT_TIMER,	5000).
 -define(NODE_CHECK_INTERVAL,10000). %% 10second. chech monitor_node result.
 -define(CHUNKMAPPING_BROADCAST_INTERVAL,86400000).  %%1day = 24h = 24*3600s = 1000*24*3600 = 86,400,000
+-define(HOSTLIFE_AUTO_DECREASE,5000).
+-define(HOST_INIT_LIFE,120000).
