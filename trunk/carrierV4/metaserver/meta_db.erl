@@ -153,11 +153,8 @@ write_to_db(X)->
     F = fun() ->
 		mnesia:write(X)
 	end,
-    mnesia:transaction(F).
-
-
-
-
+    {atomic,Val}=mnesia:transaction(F),
+    Val.
 
 %% delete a record 
 %%
@@ -376,29 +373,11 @@ todomodifyHostLocation() ->
 
 
 
-%% 
-do_register_dataserver(HostRecord,ChunkList)->
-	X = select_from_hostinfo(HostRecord#hostinfo.hostname),
-    case X of
-        []->
-            %% TODO: 
-            
-            F = fun() ->
-                        mnesia:write(HostRecord#hostinfo{status = up})
-                        end,
-            mnesia:transaction(F),
-        	do_register_boot_chunks(HostRecord#hostinfo.hostname,ChunkList),
-            erlang:monitor_node(,true,[])
-            ;
-        
-        _->	% host existed.
-            {error, "host collision"}
-    end.
     
 %% add this node'chunklocation to chunk mapping table. 
 %% if chunkID in this node don't exist in table chunk mapping,  this chunkid is not added. (why?) 
 %% 
-do_register_boot_chunks(HostName,ChunkList)->
+do_register_dataserver(HostName,ChunkList)->
    AddHost =
         fun(ChunkMapping, Acc) ->
                 ChunkID = ChunkMapping#chunkmapping.chunkid,                
@@ -498,25 +477,26 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
     {atomic, Val} = mnesia:transaction(F),
 	Val.
 
+
+
+
 add_hostinfo_item(HostName, FreeSpace, TotalSpace, Status,From) ->
-	Row = #hostinfo{hostname=HostName, freespace=FreeSpace, totalspace=TotalSpace, status=Status},
-    erlang:monitor_node(From, true,[]),
+    io:format("in side add_hostiofo_item.~n"),
+	Row = #hostinfo{hostname=HostName, freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
+	io:format("From : ~p~n",[From]),
+    
 	case select_from_hostinfo(HostName) of
 		[] -> 
-			F = fun() ->
-					mnesia:write(Row)
-				end,
-		    {atomic, Val} = mnesia:transaction(F),
-			Val;
+            io:format("first time register of this host: ~p~n",[HostName]),    
+			write_to_db(Row);
 		[_Any] ->
-			F = fun() ->
-					Oid = {hostinfo, HostName},
-					mnesia:delete(Oid),
-					mnesia:write(Row)
-				end,
-			{atomic, Val} = mnesia:transaction(F),
-			Val
+            io:format("host with same name was deleted first,~p~n",[HostName]),
+            delete_from_db({hostinfo,HostName}),            
+            io:format("delete ok , begin to write,~n"),
+            write_to_db(Row)
 	end.
+
+
 
 select_random_one_from_hostinfo()->
     Hosts = do(qlc:q([X#hostinfo.hostname||X<-mnesia:table(hostinfo)])),
@@ -690,4 +670,14 @@ add_new_dir(ID,DirName,ParentID) ->
 .
 
 
-    
+%% spec add_heartbeat_info(HostName,State) -> {ok,_} |{error,_}
+update_heartbeat(HostName,State) ->
+    case select_from_hostinfo(HostName) of
+        [Host]-> %%update            
+            Row = Host#hostinfo{status = State,life = ?HOST_INIT_LIFE},
+            write_to_db(Row),
+            {ok};
+        []->
+            {error,discarded_host}
+    end.
+            

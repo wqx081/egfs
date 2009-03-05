@@ -42,6 +42,13 @@ handle_call({allocate_dataserver}, {_From, _}, State) ->
 			{reply, {ok, SelectedHost}, State}
 	end.
 
+
+handle_cast({heartbeat,HostName,S},State) ->
+%%     io:format("inside handle_cast_heartbeat,HostRegName:~p,~p~n",[HostName,State]),
+    Reply = meta_db:update_heartbeat(HostName,S),
+%%     io:format("Reply : ~p~n",[Reply]),
+    {noreply,State};
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
