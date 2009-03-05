@@ -20,7 +20,7 @@ init(_Arg) ->
 start() ->
     meta_db:start_mnesia(),
     {ok,_Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
- %%   {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
+%%    {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
     
     gen_server:start_link(?META_SERVER, meta_server, [], []).
 

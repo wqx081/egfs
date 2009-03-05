@@ -387,7 +387,9 @@ do_register_dataserver(HostRecord,ChunkList)->
                         mnesia:write(HostRecord#hostinfo{status = up})
                         end,
             mnesia:transaction(F),
-        	do_register_boot_chunks(HostRecord#hostinfo.hostname,ChunkList);
+        	do_register_boot_chunks(HostRecord#hostinfo.hostname,ChunkList),
+            erlang:monitor_node(,true,[])
+            ;
         
         _->	% host existed.
             {error, "host collision"}
@@ -496,8 +498,9 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
     {atomic, Val} = mnesia:transaction(F),
 	Val.
 
-add_hostinfo_item(HostName, FreeSpace, TotalSpace, Status) ->
+add_hostinfo_item(HostName, FreeSpace, TotalSpace, Status,From) ->
 	Row = #hostinfo{hostname=HostName, freespace=FreeSpace, totalspace=TotalSpace, status=Status},
+    erlang:monitor_node(From, true,[]),
 	case select_from_hostinfo(HostName) of
 		[] -> 
 			F = fun() ->
