@@ -178,7 +178,8 @@ do_list(FilePathName,_UserName)->
     case get_acl() and (meta_db:get_tag(FilePathName)=:=dir) of
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
-            []meta_db:get_direct_sub_files(ParentDirID);
+            %%TODO:
+            meta_db:get_direct_sub_files(ParentDirID);
         false ->
             {error, "not a dir or you are not authorized to do this operation "}
     end 
@@ -397,8 +398,7 @@ do_detach_one_host(HostName)->
     meta_db:detach_from_chunk_mapping(HostName). %metaDB fun
 
 
-do_dataserver_bootreport(HostRecord, ChunkList)->
-    erlang:monitor_node(HostRecord#hostinfo.hostname,true,[]), %% monitor_node.
+do_dataserver_bootreport(HostRecord, ChunkList)->    
     meta_db:do_register_dataserver(HostRecord, ChunkList). %metaDB fun
 
 %% 
@@ -430,11 +430,9 @@ do_collect_orphanchunk(HostProcName)->
     meta_db:do_delete_orphanchunk_byhost(HostProcName),
     OrphanChunkList.
 
-do_register_heartbeat(_HostInfoRec)->
-    %%TODO:
-    
-    {ok,"heartbeat Ok"}
-    .
+%% do_register_heartbeat(HostName,State)->
+%%     meta_db:add_heartbeat_info(HostName,State).
+
 %%     
 %%     Res = select_from_hostinfo(HostInfoRec#hostinfo.hostname),
 %%     Host = HostInfoRec#hostinfo.host,

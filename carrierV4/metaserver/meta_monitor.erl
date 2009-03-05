@@ -1,7 +1,7 @@
 %% Author: zyb@fit
 %% Created: 2009-1-4
 %% Description: TODO: Add description to hostMonitor
--module(hostMonitor).
+-module(meta_monitor).
 
 %%
 %% Include files
@@ -16,8 +16,10 @@
 %%
 %% Exported Functions
 %%
--export([hello/0,test/0]).
--export([checkNodes/0,broadcast/0]).
+%% -export([hello/0,test/0]).
+%% -export([checkNodes/0,broadcast/0]).
+
+-compile(export_all).
 
 %%
 %% API Functions
@@ -38,26 +40,40 @@ hello() ->
 %%     timeCheck(4),
 	io:format("hello,,~p~n",[now()]).
 
+decrease() ->
+%%     io:format("in decrease function .~n"),
+    Life_minus =
+        fun(Hostinfo,Acc)->					%%Acc must return, to be the args of next function
+%%                 io:format("in life minus fuction.~n"),                
+                Newlife = Hostinfo#hostinfo.life-1,
+                io:format("Newlife: ,~p~n",[Newlife]),
+                if Newlife =:= 0 ->
+                       delete_object_from_db(Hostinfo),
+                       detach_from_chunk_mapping(Hostinfo#hostinfo.hostname),
+                       Acc;                   
+                   true->
+                       mnesia:write(Hostinfo#hostinfo{life = Newlife }),
+                       Acc
+                end
+		end,
+    OldAcc =[],
+    Minus_All = fun() -> mnesia:foldl(Life_minus,OldAcc,hostinfo, write) end,
+    mnesia:transaction(Minus_All).
+    
+%%     case meta_db:select_all_from_Table(hostinfo) of
+%%         []->
+%%             {no_host_yet};
+%%         [_Any]->
+%%             io:format("case have hostinfo"),
+%%             case mnesia:transaction(Minus_All) of
+%%                 {atomic, NewAcc} ->
+%%                     {ok,NewAcc};
+%%                 {aborted, _} ->
+%%                     {error, "Mnesia Transaction Abort!"}
+%%    			end
+%% 	end.
 
-
-%%% check node status
-checkNodes() ->
-    receive 
-        {nodedown,Node} ->			%%TODO, Maybe we shall improve this.
-            X = select_from_hostinfo(Node),
-            delete_object_from_db(X),
-            detach_from_chunk_mapping(X#hostinfo.hostname),
-            {nodedown_deleted,X};
-        Any ->
-            Any
-    after 0 ->
-            {all_node_ok,[]}
-    end.            
-
-
-%% broadcast metainfo.
-%% metaserver choose one host , let him do the rest
-%%%%%%%
+                                                        
 
 broadcast() ->
     Mappings = select_all_from_Table(chunkmapping),
@@ -76,9 +92,6 @@ broadcast() ->
             %%{ok, DataWorkPid} = lib_chan:connect(FirstHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbageCollect})
             %%TODO:
             
-            
-
-            
     end.
             
             
@@ -89,7 +102,7 @@ get_chunkid_from_chunkmapping(Nodes) ->
     [H#chunkmapping.chunkid]++get_chunkid_from_chunkmapping(T).
 
 
-%%old.
+%% old.
 %% 
 %% checkHostHealth()->    
 %%     X = select_all_from_Table(hostinfo),
@@ -123,6 +136,25 @@ get_chunkid_from_chunkmapping(Nodes) ->
 %%     end.
 
     
-    
+%% check node status
+%% checkNodes() ->
+%%     io:format("check,nodes,every 10s.~n"),
+%%     receive 
+%%         {nodedown,Node} ->			%%TODO, Maybe we shall improve this.
+%%             io:format("node down ,node: ~p~n,",[Node]),           
+%%             X = select_from_hostinfo(Node),
+%%             delete_object_from_db(X),
+%%             detach_from_chunk_mapping(X#hostinfo.hostname),
+%%             {nodedown_deleted,X};
+%%         Any ->
+%%             Any
+%%     after 0 ->
+%%             {all_node_ok,[]}
+%%     end.            
+
+
+%% broadcast metainfo.
+%% metaserver choose one host , let him do the rest
+%%%%%%%
     
 

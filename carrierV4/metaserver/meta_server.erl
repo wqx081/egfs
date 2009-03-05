@@ -7,7 +7,7 @@
 
 
 -export([start/0,stop/0]).
--export([init/1,handle_call/3,handle_cast/2,handle_cast/3,handle_info/2,terminate/2, code_change/3]).
+-export([init/1,handle_call/3,handle_cast/2,handle_info/2,terminate/2, code_change/3]).
 -export([open/2,writeAllocate/1,locateChunk/2,registerChunk/4,close/1]).
 -compile(export_all).
 
@@ -19,7 +19,7 @@ init(_Arg) ->
 
 start() ->
     meta_db:start_mnesia(),
-    {ok,_Tref} = timer:apply_interval((?NODE_CHECK_INTERVAL),hostMonitor,checkNodes,[]), % check host health every 5 second
+    {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,decrease,[]), % check host health every 5 second
 %%    {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
     
     gen_server:start_link(?META_SERVER, meta_server, [], []).
@@ -28,7 +28,7 @@ stop() ->
     gen_server:cast(?META_SERVER, stop).
 
 terminate(_Reason, _State) ->
-    io:format("meta server terminating~n").
+    io:format("meta server terminating.abc.~n").
 
 
 
@@ -42,7 +42,7 @@ terminate(_Reason, _State) ->
 %% UserName -> <<integer():64>>
 %% return -> {ok, FileID} | {error, []}
 handle_call({open, FilePathName, Mode, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,UserName]),
+%%     io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,UserName]),
     Reply = meta_common:do_open(FilePathName, Mode, UserName),
     {reply, Reply, State};
 
@@ -135,25 +135,6 @@ handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
 	Reply = meta_common:do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
-%% handle_call({getfileattr, FileName},{_From,_},State) ->
-%%     io:format("inside handle_call_getfileattr,FileName:~p~n",[FileName]),
-%% 	Reply = meta_common:do_get_fileattr(FileName),
-%%     {reply, Reply, State};
-
-
-handle_call({heartbeat,HostInfoRec},{_From,_},State) ->
-  %  io:format("inside handle_call_heartbeat,HostRegName:~p~n",[HostInfoRec]),
-	Reply = meta_common:do_register_heartbeat(HostInfoRec),
-    {reply, Reply, State};
-
-
-handle_call({nodedown,NodeName},{_From,_},State) ->
-	io:format("somenode down know ~p~n",[NodeName]),
-%	%Reply = do_delete_node(NodeName),
-	Reply = todo,
-	{reply,Reply,State};
-
-
 
 handle_call({debug,Arg},{_From,_},State) ->
     Reply = meta_common:do_debug(Arg),
@@ -168,11 +149,11 @@ handle_call(_, {_From, _}, State)->
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 
-
-handle_cast({bootreport,HostInfoRec, ChunkList},{_From,_},State) ->
-    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostInfoRec]),
-	meta_common:do_dataserver_bootreport(HostInfoRec, ChunkList),
-    {noreply,State}.
+handle_cast({bootreport,HostName, ChunkList},State) ->
+    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostName]),
+%% 	meta_common:do_dataserver_bootreport(HostInfoRec, ChunkList),
+    meta_db:do_register_dataserver(HostName,ChunkList),
+    {noreply,State};
 
 handle_cast(stop, State) ->
     io:format("meta server stopping~n"),
