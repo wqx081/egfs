@@ -30,6 +30,13 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%--------------------------------------------------------------------------------
+%% Function: list(string(),Mode) -> {ok, FileNames} | {error, Reason} 
+%% Description: list sub files and directories
+%%--------------------------------------------------------------------------------
+list_dir(FileName) ->
+	gen_server:call(?MODULE, {listdir, FileName}).
+
+%%--------------------------------------------------------------------------------
 %% Function: open(string(),Mode) -> {ok, FileContext} | {error, Reason} 
 %% 			 Mode = r | w 
 %% Description: open a file according to the filename and open mode
@@ -72,7 +79,7 @@ delete(FileName) ->
 %%====================================================================
 init([]) ->
 	%process_flag(trap_exit,true),
-    {ok, #filecontext{}}.
+    {ok, []}.
 
 handle_call({open, FileName, Mode}, _From, State) ->
 	error_logger:info_msg("[~p, ~p]: open file ~p mode ~p~n", [?MODULE, ?LINE, FileName, Mode]),	
