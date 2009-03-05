@@ -66,6 +66,6 @@
 -define(GARBAGE_AUTO_COLLECT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
 
 -define(MD5CHECK_TIMER,	86400000).    % 5000 milisecond = 5 second
-
+-define(HEARTBEAT_TIMER,	5000).
 -define(NODE_CHECK_INTERVAL,10000). %% 10second. chech monitor_node result.
 -define(CHUNKMAPPING_BROADCAST_INTERVAL,86400000).  %%1day = 24h = 24*3600s = 1000*24*3600 = 86,400,000
