@@ -25,6 +25,7 @@ start_link() ->
 %%====================================================================
 init([]) ->
 	process_flag(trap_exit,false),
+    {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,decrease,[]), % check host health every 5 second
     {ok, []}.
 
 handle_call({register_dataserver, HostName, FreeSpace, TotalSpace, Status}, {From, _}, State) ->
@@ -40,14 +41,17 @@ handle_call({allocate_dataserver}, {_From, _}, State) ->
 			{reply, {error, "seek dataserver failed"}, State};
 		[SelectedHost] ->
 			{reply, {ok, SelectedHost}, State}
-	end.
+	end;
 
-
-handle_cast({heartbeat,HostName,S},State) ->
+handle_call({heartbeat,HostName,S}, {_From, _},State) ->
+%%     error_logger:info_msg("[~p, ~p]: inside handle_cast_heartbeat,HostRegName:~p,~p~n", [?MODULE, ?LINE,HostName,S]),
 %%     io:format("inside handle_cast_heartbeat,HostRegName:~p,~p~n",[HostName,State]),
     Reply = meta_db:update_heartbeat(HostName,S),
 %%     io:format("Reply : ~p~n",[Reply]),
-    {noreply,State};
+    {reply,Reply,State}.
+
+
+
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
