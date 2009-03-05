@@ -237,6 +237,13 @@ select_all_from_orphanchunk(Host) ->
               X||X<-mnesia:table(orphanchunk),X#orphanchunk.chunklocation =:= Host
               ])).
 
+
+select_all_from_filemeta_ofDir(Dir)->
+     do(qlc:q([
+              X||X<-mnesia:table(filemeta),
+                 string:str(X#filemeta.filename, Dir)>0
+              ])).
+
 %FileName - > fileid
 % @spec select_fileid_from_filemeta(FileName) ->  fileid
 % fileid -> binary().
@@ -416,7 +423,7 @@ do_register_boot_chunks(HostName,ChunkList)->
 
 
 
-do_delete_filemeta(FileID)->
+do_delete_filemeta_byID(FileID)->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="do_delete_filemeta/1",logarg=[FileID]},
     logF(LOG),
     delete_from_db({filemeta,FileID}),				%return {atomic,ok} . always
@@ -619,22 +626,27 @@ get_all_sub_files(list, FileIDList) ->
     [lists:append(HeadSubFile, LeftSubFile),lists:append(HeadSubDir, LeftSubDir)]
 .
 
+
 get_direct_sub_files(FileID) ->
-    Result = do(qlc:q([{X#filemeta.tag,X#filemeta.fileid}||X<-mnesia:table(filemeta), X#filemeta.parent=:=FileID])),
+    Result = do(qlc:q([{X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+                      		||X<-mnesia:table(filemeta), X#filemeta.parent=:=FileID
+                      ])),
     seperate_file_dir(Result)
 .
+
 seperate_file_dir([]) ->
-    [[],[]];
+    [[],[],[],[]];
 seperate_file_dir(FileList) ->
-    [{Tag, ID}|Left] = FileList,
-    [LeftFiles,LeftDirs] = seperate_file_dir(Left),
+    [{Tag, ID,Name}|Left] = FileList,
+    [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
     case Tag of
         file ->
-            [lists:append([ID],LeftFiles),LeftDirs];
+            [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
         dir ->
-            [LeftFiles,lists:append([ID],LeftDirs)]
+            [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
     end
 .
+
 get_modifyed_path(ID, SrcHead, DstHead) ->
     SrcPath = get_name(ID),
     Path = string:substr(SrcPath,string:len(SrcHead)+1,string:len(SrcPath)),
@@ -665,18 +677,14 @@ add_copyed_files(SrcFileIDList,DstFileIDList,Src,AimDst) ->
     mnesia:transaction(F),
     [NewPath|add_copyed_files(SrcLeft,DstLeft,Src,AimDst)]
 .
+
 add_new_dir(ID,DirName,ParentID) ->
-    Row = #filemeta{fileid=ID,filename=DirName,createT = calendar:local_time(),modifyT = calendar:local_time(),tag=dir,parent=ParentID,chunklist=todo},
-    F = fun() ->
-                mnesia:write(Row)
-        end,
-    mnesia:transaction(F)
-.
-add_new_file(ID,FileName,ParentID) ->
-    Row = #filemeta{fileid=ID,filename=FileName,tag=file,createT=term_to_binary(erlang:localtime()),modifyT=term_to_binary(erlang:localtime()),parent=ParentID},
+    Row = #filemeta{fileid=ID,filename=DirName,filesize = -1 ,createT = calendar:local_time(),modifyT = calendar:local_time(),tag=dir,parent=ParentID,chunklist=[]},
     F = fun() ->
                 mnesia:write(Row)
         end,
     mnesia:transaction(F)
 .
 
+
+    

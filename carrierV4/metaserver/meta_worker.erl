@@ -56,7 +56,7 @@ handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
 	
 handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
 	
-    Reply  = meta_db:select_items_from_dirandfile(FileName),
+    Reply  = meta_db:select_all_from_filemeta_byName(FileName),
 	{reply, Reply, State};
 
 
@@ -85,8 +85,10 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'EXIT', _Pid, Why}, State) ->
-	{stop, Why, State};	
+    io:format("EXiT.~n"),
+	{stop, normal, State};	
 handle_info(_Info, State) ->
+    io:format("handle_info.~n"),
     {noreply, State}.
 
 terminate(Reason, _State) ->
