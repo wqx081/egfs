@@ -193,6 +193,10 @@ handle_call({debug,Arg},{_From,_},State) ->
     Reply = meta_common:do_debug(Arg),
     {reply,Reply,State};
 
+handle_call({showWorker,WorkerFileName,EasyMod},{_From,_},State) ->
+    Reply = meta_common:do_showWorker(WorkerFileName,EasyMod),
+    {reply,Reply,State};
+
 handle_call(_, {_From, _}, State)->
     io:format("inside handle_call_error~n"),
 	Reply = {error, "undefined handler"},

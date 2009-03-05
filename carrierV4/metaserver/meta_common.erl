@@ -29,18 +29,18 @@ do_open(FilePathName, Mode, _UserName) ->
                     FileID = meta_db:get_id(FilePathName),
                     io:format("show FileID ~p~n",[FileID]),
                     io:format("call_meta_open:"),
-                    do_file_open(FileID, Mode);
+                    do_file_open(FilePathName,Mode);
                 
                 dir ->
                     {error, "you are opening a dir"};
-                _Any ->
+                _Any ->                    
                     ParentDir = filename:dirname(FilePathName),
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
                     
                     io:format("parentdir: ~p~n",[ParentDir]),
-                    
-                    case true of 
+                    %%%%%%%%%%%%TODO:
+                    case true  of 
                         true ->
                             do_file_open(FilePathName, Mode);
                         false ->
@@ -64,13 +64,13 @@ do_delete(FilePathName, _UserName)->
             [FileIDList, DirIDList] = meta_db:get_all_sub_files(FileID),
             AllDirIDList = lists:append(DirIDList,[FileID]),
             case call_meta_delete(list, FileIDList) of
-                true ->
+                {ok,_} ->
                     meta_db:delete_rows(FileIDList),
                     meta_db:delete_rows(AllDirIDList),
                     %%gen_server:call(?ACL_SERVER, {delete_aclrecord, FilePathName});
                     get_acl();
-                false ->
-                    {error, "sorry, someone is using this file, unable to delete it now"}
+                {error,FileID}->
+                    {error, "sorry, someone is using this file, unable to delete it now .~n FileID: ~p~n",[FileID]}
             end;
         true ->
             {error, "file does not exist or you are not authorized to do this operation"}
@@ -259,29 +259,30 @@ check_op_type(SrcFullPath, DstFullPath) ->
 
 %%%%%%%%%%%%%%%%
 
-
-call_meta_new() ->
-    {_, HighTime, LowTime}=now(),
-    FileID = <<HighTime:32, LowTime:32>>,
-    {ok, FileID}.
-
-
-call_meta_delete(list,[]) ->    
-    {ok,"no file conflict"};
-call_meta_delete(list,FileIDList)->   %% return ok || ThatFileID
-    io:format("aaa,~p~n",[FileIDList]),
-    [FileID|T] = FileIDList,
-    case call_meta_delete(FileID) of
-        {ok,_}->
-            call_meta_delete(list,T);
-        {error,_}->
+call_meta_delete(list,FileIDList) ->
+    case call_meta_check(list,FileIDList) of
+        {ok,_} ->
+            call_meta_do_delete(list,FileIDList);
+        {error,FileID} ->
             {error,FileID}
     end.
 
 
+call_meta_do_delete(list,[]) ->    
+    {ok,"success"};
+call_meta_do_delete(list,FileIDList)->   %% return ok || ThatFileID    
+    [FileID|T] = FileIDList,
+    case call_meta_do_delete(FileID) of
+        {ok,_}->
+            call_meta_do_delete(list,T);
+        {error,_}->
+            {error,FileID}
+    end.
 
-call_meta_delete(FileID)->
+call_meta_do_delete(FileID)->
     meta_db:do_delete_filemeta(FileID).
+
+
 
 
 
@@ -335,6 +336,8 @@ call_meta_check(FileID)->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 %%from old meta_server ;   handle these function.
 
+
+
 do_file_open(FileName,Mod)-> 
     case Mod of
         read ->            
@@ -346,7 +349,7 @@ do_file_open(FileName,Mod)->
     end.
 
 do_write_open(FileName)->    
-    ProcessName = meta_util:generate_processname(FileName,w),
+    ProcessName = lib_common:generate_processname(FileName,w),
     io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
         undefined -> % no meta worker , create one worker to server this writing request.
@@ -369,14 +372,14 @@ do_write_open(FileName)->
 					{ok, FileID, 0, [], MetaWorkerPid};	  
 				[_FileMeta] ->
                     io:format("B...~n"),
-					{error, "the same file name has existed in database."}
+					{error, "Cant Write! The same file name has existed in database."}
 			end;
         _Pid->			% pid exist, write error
             {error, "other client is writing the same file."}  
     end.
 
 do_read_open(FileName)->
-    ProcessName = meta_util:generate_processname(FileName,r),
+    ProcessName = lib_common:generate_processname(FileName,r),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
             case meta_db:select_items_from_dirandfile(FileName) of			
@@ -392,13 +395,6 @@ do_read_open(FileName)->
        		{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, Pid}
    end.
 
-
-
-%% read file attribute step 1: open file
-%% read file attribute step 2: get chunk for 
-do_get_fileattr(FileName)->
-    [AttributeList] =meta_db:select_attributes_from_filemeta(FileName),
-    {ok, AttributeList}.
 
 %%
 %% 
@@ -490,3 +486,14 @@ do_debug(Arg) ->
             io:format("ohter~n")
     end.
 
+do_showWorker(FileName,EasyMod)->
+    ProcessName = lib_common:generate_processname(FileName,EasyMod),
+    case whereis(ProcessName) of
+        undefined ->		% no meta worker , create one worker to server this writing request.
+            io:format(" no this file worker exist."),
+            {result,nofileexist};
+        Pid->			% pid exist, set this pid process as the meta worker
+        	{state,gen_server:call(Pid, {debug})}
+   end.
+
+    
