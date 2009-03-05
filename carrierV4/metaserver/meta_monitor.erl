@@ -46,7 +46,7 @@ decrease() ->
         fun(Hostinfo,Acc)->					%%Acc must return, to be the args of next function
 %%                 io:format("in life minus fuction.~n"),                
                 Newlife = Hostinfo#hostinfo.life-1,
-                io:format("Newlife: ,~p~n",[Newlife]),
+%%                 io:format("Newlife: ,~p~n",[Newlife]),
                 if Newlife =:= 0 ->
                        delete_object_from_db(Hostinfo),
                        detach_from_chunk_mapping(Hostinfo#hostinfo.hostname),

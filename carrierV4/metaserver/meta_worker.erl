@@ -39,7 +39,7 @@ init([FileRecord,Mod]) ->
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
-    
+    error_logger:info_msg("~~~~ in registerchunk~~~~n"),
     io:format("checking...~n"),
     io:format("worker state:~n"),
     io:format("mod:    ~p~n",[State#metaWorkerState.mod]),
@@ -123,16 +123,20 @@ do_get_chunk(FileID, ChunkIdx)->
 
 
 do_close(From,State) ->
+    error_logger:info_msg("-- meta_worker  do_close"),
     case State#metaWorkerState.mod of
-        r->
+        read->
+            
             Clients = State#metaWorkerState.clients--[From],
+            error_logger:info_msg("mod = r , Clients = ",[Clients]),
             case Clients of
                 []->
                     exit(normal);    %%use handle_info instead of handle_cast, avoid crash
                 _ ->
                     nil
             end;
-        w->
+        write->
+            error_logger:info_msg("mod = w"),
             exit(normal)
     end.
 

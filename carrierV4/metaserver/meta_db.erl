@@ -463,6 +463,7 @@ do_get_orphanchunk_byhost(HostProcName) ->
 %% add file info to table: filemeta & chunkmapping
 %%====================================================================
 add_a_file_record(FileRecord, ChunkMappingRecords) ->
+    error_logger:info_msg("~~~~ in add_a_file_record~~~~n"),
     CurrentT = erlang:localtime(),
     %%TODO: create time & modify time . . mode append,. 
     Row = FileRecord#filemeta{	createT=CurrentT, 
@@ -475,6 +476,7 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
 		lists:foreach(fun mnesia:write/1, ChunkMappingRecords)   
 	end,
     {atomic, Val} = mnesia:transaction(F),
+    error_logger:info_msg("write into db success"),
 	Val.
 
 
@@ -676,8 +678,10 @@ update_heartbeat(HostName,State) ->
         [Host]-> %%update            
             Row = Host#hostinfo{status = State,life = ?HOST_INIT_LIFE},
             write_to_db(Row),
-            {ok};
+            ok;
         []->
-            {error,discarded_host}
+            error_logger:error_msg("no info of this host, neeeedreport,"),
+            needreport
+    
     end.
             

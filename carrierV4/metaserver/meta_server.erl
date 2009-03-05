@@ -18,8 +18,7 @@ init(_Arg) ->
     {ok, []}.
 
 start() ->
-    meta_db:start_mnesia(),
-    {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,decrease,[]), % check host health every 5 second
+    meta_db:start_mnesia(),    
 %%    {ok,Tref} = timer:apply_interval((?CHUNKMAPPING_BROADCAST_INTERVAL),hostMonitor,broadcast,[]), % check host health every 5 second
     
     gen_server:start_link(?META_SERVER, meta_server, [], []).
@@ -41,9 +40,9 @@ terminate(_Reason, _State) ->
 %% Mode -> w|r|a
 %% UserName -> <<integer():64>>
 %% return -> {ok, FileID} | {error, []}
-handle_call({open, FilePathName, Mode, UserName}, {_From, _}, State) ->
-%%     io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,UserName]),
-    Reply = meta_common:do_open(FilePathName, Mode, UserName),
+handle_call({open, FilePathName, Mode, _UserName}, {_From, _}, State) ->
+%%     io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,_UserName]),
+    Reply = meta_common:do_open(FilePathName, Mode, _UserName),
     {reply, Reply, State};
 
 
@@ -51,25 +50,23 @@ handle_call({open, FilePathName, Mode, UserName}, {_From, _}, State) ->
 %%"name server" methods
 %% 2: delete file
 %% FilePathName->string().
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
-handle_call({delete, FilePathName, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_delete, FilePathName:~p,UserName:~p~n",[FilePathName,UserName]),
-    Reply = meta_common:do_delete(FilePathName, UserName),
+handle_call({delete, FilePathName, _UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_delete, FilePathName:~p,_UserName:~p~n",[FilePathName,_UserName]),
+    Reply = meta_common:do_delete(FilePathName, _UserName),
     {reply, Reply, State};
-
-
 
 
 %%"name server" methods
 %% 3: copy file/directory
 %% SrcFilePathName->string().
 %% DstFilePathName->string().
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
-handle_call({copy, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_copy, SrcFilePathName:~p, DstFilePathName:~p, UserName:~p~n",[SrcFilePathName, DstFilePathName, UserName]),
-    Reply = meta_common:do_copy(SrcFilePathName, DstFilePathName, UserName),
+handle_call({copy, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_copy, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
+    Reply = meta_common:do_copy(SrcFilePathName, DstFilePathName, _UserName),
     {reply, Reply, State};
 
 
@@ -79,33 +76,33 @@ handle_call({copy, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, Stat
 %% 4: move file/directory
 %% SrcFilePathName->string().
 %% DstFilePathName->string().
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
-handle_call({move, SrcFilePathName, DstFilePathName, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_move, SrcFilePathName:~p, DstFilePathName:~p, UserName:~p~n",[SrcFilePathName, DstFilePathName, UserName]),
-    Reply = meta_common:do_move(SrcFilePathName, DstFilePathName, UserName),
+handle_call({move, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_move, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
+    Reply = meta_common:do_move(SrcFilePathName, DstFilePathName, _UserName),
     {reply, Reply, State};
 
 
 %%"name server" methods
 %% 5: list file/directory
 %% FilePathName->string().
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
-handle_call({list, FilePathName, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_list, FilePathName:~p,UserName:~p~n",[FilePathName, UserName]),
-    Reply = meta_common:do_list(FilePathName, UserName),
+handle_call({list, FilePathName, _UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_list, FilePathName:~p,_UserName:~p~n",[FilePathName, _UserName]),
+    Reply = meta_common:do_list(FilePathName, _UserName),
     {reply, Reply, State};
 %%"name server" methods
 %% 6: mkdir file/directory
 %% PathName->string().
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 
 
-handle_call({mkdir, PathName, UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_mkdir, PathName:~p,UserName:~p~n",[PathName, UserName]),
-    Reply = meta_common:do_mkdir(PathName, UserName),
+handle_call({mkdir, PathName, _UserName}, {_From, _}, State) ->
+    io:format("inside handle_call_mkdir, PathName:~p,_UserName:~p~n",[PathName, _UserName]),
+    Reply = meta_common:do_mkdir(PathName, _UserName),
     {reply, Reply, State};
 
 
@@ -113,14 +110,14 @@ handle_call({mkdir, PathName, UserName}, {_From, _}, State) ->
 %%"name server" methods
 %% 7: change mod
 %% FileName->string().
-%% UserName->string().
+%% _UserName->string().
 %% UserType->user/group
 %%CtrlACL->0~7
-%% UserName -> <<integer():64>>
+%% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
-handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) ->
-    io:format("inside handle_call_chmod, FileName:~p~n UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, UserName, UserType, CtrlACL]),
-    Reply = meta_common:do_chmod(FileName, UserName, UserType, CtrlACL),
+handle_call({chmod, FileName, _UserName, UserType, CtrlACL}, {_From, _}, State) ->
+    io:format("inside handle_call_chmod, FileName:~p~n _UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, _UserName, UserType, CtrlACL]),
+    Reply = meta_common:do_chmod(FileName, _UserName, UserType, CtrlACL),
     {reply, Reply, State};
 
 

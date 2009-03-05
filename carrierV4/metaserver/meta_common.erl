@@ -374,7 +374,7 @@ do_read_open(FileName)->
     ProcessName = lib_common:generate_processname(FileName,r),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
-            case meta_db:select_items_from_dirandfile(FileName) of			
+            case meta_db:select_all_from_filemeta_byName(FileName) of			
 				[] ->
 					% if the target file is not exist, then report error .		
 					{error, "the target file is not exist."};  
