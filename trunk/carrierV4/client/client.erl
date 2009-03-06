@@ -10,13 +10,11 @@
 -include("../include/header.hrl").
 -include_lib("kernel/include/file.hrl").
 -export([	start_link/0, 
-			open/2, 
+			open/3, 
 			write/2, 
 			read/2, 
 			close/1, 
-			delete/1, 
-			testw/1,
-			testr/1]).
+			delete/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
@@ -41,8 +39,8 @@ list_dir(FileName) ->
 %% 			 Mode = r | w 
 %% Description: open a file according to the filename and open mode
 %%--------------------------------------------------------------------------------
-open(FileName, Mode) ->
-	gen_server:call(?MODULE, {open, FileName, Mode}).
+open(FileName, Mode, UserName) ->
+	gen_server:call(?MODULE, {open, FileName, Mode, UserName}).
 
 %% --------------------------------------------------------------------
 %% Function: write(binary()) ->  {ok, FileContext} | {error, Reason} 
@@ -71,7 +69,7 @@ close(FileContext) ->
 %% Description: delete file
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------
-delete(FileName) ->
+delete(FileName,UserName) ->
 	gen_server:call(?MODULE, {delete, FileName}).	
 	
 %%====================================================================
@@ -81,9 +79,9 @@ init([]) ->
 	%process_flag(trap_exit,true),
     {ok, []}.
 
-handle_call({open, FileName, Mode}, _From, State) ->
+handle_call({open, FileName, Mode, UserName}, _From, State) ->
 	error_logger:info_msg("[~p, ~p]: open file ~p mode ~p~n", [?MODULE, ?LINE, FileName, Mode]),	
-	case gen_server:call(?META_SERVER, {open, FileName, Mode}) of
+	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
 			% set the correct position of FileContext 	
 			Offset = case Mode of 
@@ -109,7 +107,7 @@ handle_call({open, FileName, Mode}, _From, State) ->
 	end;
 
 handle_call({write, FileContext, Bytes}, _From, State) ->
-%	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
+	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
 	case FileContext#filecontext.mode of
 		write ->
 			{ok, NewFileContext} = write_data(FileContext, Bytes),	
@@ -184,9 +182,9 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),		
 	{reply, ok, State};	
 
-handle_call({delete, FileName}, _From, State)  ->
+handle_call({delete, FileName, UserName}, _From, State)  ->
 	error_logger:info_msg("[~p, ~p]: delete ~p ~n", [?MODULE, ?LINE, FileName]),	
-	Reply = gen_server:cast(?META_SERVER, {delete, FileName}),					
+	Reply = gen_server:cast(?META_SERVER, {delete, FileName, UserName}),					
 	{reply, Reply, State}.
 
 handle_cast(_Msg, State) ->
@@ -210,18 +208,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 % if the data is null, write finish.
 write_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
-	%error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+	error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 	{ok, FileContext};
 % if the data is wrote into a new chunkFileContext#filecontext
 write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined  ->
-	%error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
+	error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	ChunkID=lib_uuid:gen(),
 	{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
+	error_logger:info_msg("[~p, ~p]:B1 SelectedHost ~p~n", [?MODULE, ?LINE, SelectedHost]),	
 	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),
-	
+	error_logger:info_msg("[~p, ~p]:B2 write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	NewFC= FileContext#filecontext{	dataworkerpid  = DataWorkPid, 
 									chunkid = ChunkID,
 									host    = SelectedHost},
+		error_logger:info_msg("[~p, ~p]:B3 write ~p~n", [?MODULE, ?LINE, size(Bytes)]),								
 	write_data(NewFC, Bytes);
 % if the data is wrote into a existed chunk
 write_data(FileContext, Bytes) ->	
@@ -237,7 +237,7 @@ write_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->		 
-			%error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+			error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			lib_chan:rpc(DataWorkerPid,{write,Right}),
 			% close the data worker and reset the FileContext
@@ -254,7 +254,7 @@ write_data(FileContext, Bytes) ->
 			% write the left data
 			write_data(NewFC, Left);
 		false ->
-			%error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
+			error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
 			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength,
 											filesize=Offset+ReadLength},
@@ -332,47 +332,47 @@ generate_chunkmapping_record([CH|CT],[NH|NT]) ->
 %% test function
 %% --------------------------------------------------------------------
 
-testw(FileName) ->
-	case open(FileName,w) of
-		{ok, FileContext}  ->
-			{ok,Hdl}=file:open("a.rmvb",[binary,raw,read,read_ahead]),
-			NewFileContext=write_loop(FileContext, Hdl),
-			close(NewFileContext);
-		{error, Why} ->
-			Why
-	end.
-	
-write_loop(FileContext, Hdl)->
-	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
-		{ok, Data} ->
-			{ok, NewFileContext} = write(FileContext, Data),
-			write_loop(NewFileContext, Hdl);
-		eof ->
-			file:close(Hdl),
-			FileContext;	
-		{error,Reason} ->
-			Reason
-	end.	
+%testw(FileName) ->
+%	case open(FileName,w) of
+%		{ok, FileContext}  ->
+%			{ok,Hdl}=file:open("a.rmvb",[binary,raw,read,read_ahead]),
+%			NewFileContext=write_loop(FileContext, Hdl),
+%			close(NewFileContext);
+%		{error, Why} ->
+%			Why
+%	end.
+%	
+%write_loop(FileContext, Hdl)->
+%	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
+%		{ok, Data} ->
+%			{ok, NewFileContext} = write(FileContext, Data),
+%			write_loop(NewFileContext, Hdl);
+%		eof ->
+%			file:close(Hdl),
+%			FileContext;	
+%		{error,Reason} ->
+%			Reason
+%	end.	
 
-testr(FileName) ->
-	case open(FileName,r) of
-		{ok, FileContext}   ->
-			{ok,Hdl}=file:open("b.rmvb",[binary,raw,write]),
-			NewFileContext=read_loop(FileContext,Hdl),
-			close(NewFileContext);
-		{error, Why} ->
-			Why
-	end.
-	
-read_loop(FileContext, Hdl)->
-	case read(FileContext,?STRIP_SIZE) of % read 128K every time 
-		{ok, NewFileContext, Data} ->
-			file:write(Hdl,Data),
-			read_loop(NewFileContext, Hdl);
-		{eof,NewFileContext} ->
-			file:close(Hdl),
-			NewFileContext;
-		{error,Reason} ->
-			Reason
-	end.
-	
+%testr(FileName) ->
+%	case open(FileName,r) of
+%		{ok, FileContext}   ->
+%			{ok,Hdl}=file:open("b.rmvb",[binary,raw,write]),
+%			NewFileContext=read_loop(FileContext,Hdl),
+%			close(NewFileContext);
+%		{error, Why} ->
+%			Why
+%	end.
+%	
+%read_loop(FileContext, Hdl)->
+%	case read(FileContext,?STRIP_SIZE) of % read 128K every time 
+%		{ok, NewFileContext, Data} ->
+%			file:write(Hdl,Data),
+%			read_loop(NewFileContext, Hdl);
+%		{eof,NewFileContext} ->
+%			file:close(Hdl),
+%			NewFileContext;
+%		{error,Reason} ->
+%			Reason
+%	end.
+%	

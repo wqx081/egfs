@@ -14,7 +14,6 @@ ping(Host) ->
 generate_files() ->
 	file:make_dir(?INPUTDIR),
 	file:make_dir(?OUTPUTDIR),	
-	file:make_dir(?OUTPUTDIR++?INPUTDIR),		
     generate_file(2, 1024),
     generate_file(2, 1048576),
     generate_file(2, 104857600).      
@@ -23,11 +22,13 @@ generate_file(0, _) ->
 	ok;
 generate_file(FileNum, FileSize) ->
     {ok, ListHdl} = file:open(?FILELIST, [raw,append]), 
-    FileName=?INPUTDIR ++ lib_uuid:to_string(lib_uuid:gen()),
-    {ok, Hdl} = file:open(FileName, [raw,write]),	
+    FileName = lib_uuid:to_string(lib_uuid:gen()),
+    FilePath= ?INPUTDIR ++ FileName,
+    {ok, Hdl} = file:open(FilePath, [raw,write]),	
     loop_gen_write(FileSize,Hdl),
-    {ok,MD5}=lib_md5:file(FileName),
-    Str=io_lib:format("{~p,~p,~p}.~n",[FileName,FileSize,MD5]),
+    {ok,MD5}=lib_md5:file(FilePath),
+    NewFileName="/"++FileName,
+    Str=io_lib:format("{~p,~p,~p}.~n",[NewFileName,FileSize,MD5]),
 	file:write(ListHdl, Str),   
 	file:close(ListHdl),	 
 	generate_file(FileNum-1, FileSize).  
@@ -62,9 +63,9 @@ test_read_all() ->
 		
 	
 testw({FileName,_FileSize, _MD5}) ->
-	case gen_server:call(client, {open,FileName,write}) of
+	case gen_server:call(client, {open,FileName,write, any}) of
 		{ok, FileContext}  ->
-			{ok,Hdl}=file:open(FileName,[binary,raw,read,read_ahead]),
+			{ok,Hdl}=file:open(?INPUTDIR++FileName,[binary,raw,read,read_ahead]),
 			NewFileContext=write_loop(FileContext, Hdl),
 			gen_server:call(client,{close,NewFileContext});
 		{error, Why} ->
@@ -85,8 +86,8 @@ write_loop(FileContext, Hdl)->
 	end.	
 
 testr({FileName,_FileSize, MD5}) ->
-	TargetFile = "./outfiles/"++FileName,
-	case gen_server:call(client,{open,FileName,read}) of
+	TargetFile = "./outfiles"++FileName,
+	case gen_server:call(client,{open,FileName, read, any}) of
 		{ok, FileContext}   ->
 			{ok,Hdl}=file:open(TargetFile, [binary,raw,write]),
 			NewFileContext=read_loop(FileContext,Hdl),
