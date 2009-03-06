@@ -20,8 +20,9 @@ start_link() ->
 %	timer:apply_interval(3000, ?MODULE, heartbeat, []),
 %	timer:apply_interval(86400000, ?MODULE, md5check, []),
     data_db:start(),	
-	timer:apply_interval(?MD5CHECK_TIMER, data_md5check, md5check, []),
-	timer:apply_after(1, data_bootreport, bootreport, []),	
+	timer:apply_interval(?HEARTBEAT_TIMER, data_timer, heartbeat, []),    
+	timer:apply_interval(?MD5CHECK_TIMER, data_timer, md5check, []),
+	timer:apply_after(1, data_timer, bootreport, []),	
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%====================================================================
@@ -75,6 +76,9 @@ handle_cast({replica, DestHost, ChunkID}, State) ->
 		[] ->
 			{noreply, State}
 	end;
+
+handle_cast({stop, Reason,_}, State) ->
+	{stop, Reason, State};	
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -84,6 +88,9 @@ handle_cast(_Msg, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
+handle_info({'EXIT', Pid, Why}, State) ->
+	error_logger:info_msg("[~p, ~p]: receive EXIT message from ~p since ~p~n", [?MODULE, ?LINE, Pid,Why]),	
+	{stop, Why, State};	    
 handle_info(_Info, State) ->
     {noreply, State}.
 
