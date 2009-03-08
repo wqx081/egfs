@@ -469,7 +469,7 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
     Row = FileRecord#filemeta{	createT=CurrentT, 
 			                    modifyT=CurrentT,
                                 tag = file,
-                                parent = filename:dirname(FileRecord#filemeta.filename)
+                                parent = get_id(filename:dirname(FileRecord#filemeta.filename))
                              },
 	F = fun() ->
 		mnesia:write(Row),
