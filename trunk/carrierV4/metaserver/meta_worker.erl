@@ -124,9 +124,10 @@ do_get_chunk(FileID, ChunkIdx)->
 
 do_close(From,State) ->
     error_logger:info_msg("-- meta_worker  do_close"),
+    error_logger:info_msg(" metaworkerstate: 
     case State#metaWorkerState.mod of
-        read->
-            
+        read->            
+            error_logger:info_msg("mod = r , Clients = ",[Clients]),
             Clients = State#metaWorkerState.clients--[From],
             error_logger:info_msg("mod = r , Clients = ",[Clients]),
             case Clients of

@@ -684,4 +684,19 @@ update_heartbeat(HostName,State) ->
             needreport
     
     end.
+
+
+dofix()->
+    X = select_all_from_Table(filemeta),%%[{},{},{}]
+    dofix(X).
+dofix(X) when X =:= [] ->
+    ture;
+dofix(X) ->
+    [H|T] = X,
+    New = H#filemeta{parent = get_id(filename:dirname(H#filemeta.filename))},
+    write_to_db(New),
+    dofix(T).
+     
+    
+    
             
