@@ -34,10 +34,10 @@ public class CreateFiles extends Configured implements TestCase {
 		// TODO Auto-generated constructor stub
 	}
 
-/*	public CreateFiles(Configuration conf) {
+	/*public CreateFiles(Configuration conf) {
 		super(conf);
-	}
-*/
+	}*/
+
 
 	void touchz(String src) throws IOException {
 		Path f = new Path(src);
