@@ -2,15 +2,12 @@ package cn.edu.thuhpc.hdfsmark.cases;
 
 import java.io.IOException;
 
-import javax.security.auth.login.Configuration;
-
-import org.ini4j.Ini.Section;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FsShell;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.ini4j.Ini.Section;
 
 public class CreateFiles extends Configured implements TestCase {
 
