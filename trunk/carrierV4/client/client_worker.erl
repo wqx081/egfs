@@ -1,85 +1,27 @@
 %%%-------------------------------------------------------------------
-%%% File    : client.erl
+%%% File    : client_worker.erl
 %%% Author  : Xiaomeng Huang
 %%% Description : the client offer open/write/read/del functions
 %%%
-%%% Created :  30 Jan 2009 by Xiaomeng Huang 
+%%% Created :  9 Mar 2009 by Xiaomeng Huang 
 %%%-------------------------------------------------------------------
--module(client).
+-module(client_worker).
 -behaviour(gen_server).
 -include("../include/header.hrl").
 -include_lib("kernel/include/file.hrl").
--export([	start_link/0, 
-			open/3, 
-			write/2, 
-			read/2, 
-			close/1, 
-			delete/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
-
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error, Reason}
-%% Description: Starts the server
-%%--------------------------------------------------------------------
-start_link() ->
-    error_logger:info_msg("[~p, ~p]: client ~p starting ~n", [?MODULE, ?LINE, node()]),
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-%%--------------------------------------------------------------------------------
-%% Function: list(string(),Mode) -> {ok, FileNames} | {error, Reason} 
-%% Description: list sub files and directories
-%%--------------------------------------------------------------------------------
-list_dir(FileName) ->
-	gen_server:call(?MODULE, {listdir, FileName}).
-
-%%--------------------------------------------------------------------------------
-%% Function: open(string(),Mode) -> {ok, FileContext} | {error, Reason} 
-%% 			 Mode = r | w 
-%% Description: open a file according to the filename and open mode
-%%--------------------------------------------------------------------------------
-open(FileName, Mode, UserName) ->
-	gen_server:call(?MODULE, {open, FileName, Mode, UserName}).
-
-%% --------------------------------------------------------------------
-%% Function: write(binary()) ->  {ok, FileContext} | {error, Reason} 
-%% Description: write Bytes to dataserver
-%% --------------------------------------------------------------------
-write(FileContext, Bytes) ->
-	gen_server:call(?MODULE, {write, FileContext, Bytes},120000).
-
-%% --------------------------------------------------------------------
-%% Function: read(int()) ->  {ok, FileContext, Data} | {eof, FileContext} | {error, Reason} 
-%% Description: read Number Bytes from Location offset
-%% --------------------------------------------------------------------
-read(FileContext, Number) ->
-	gen_server:call(?MODULE, {read, FileContext, Number}, 120000).
-	
-%% --------------------------------------------------------------------
-%% Function: close/1 ->  ok | {error, Reason} 
-%% Description: close file
-%% Returns: ok | {error, Reason}
-%% --------------------------------------------------------------------
-close(FileContext) ->
-	gen_server:call(?MODULE, {close,FileContext}).
-	
-%% --------------------------------------------------------------------
-%% Function: delete/1 ->  ok | {error, Reason} 
-%% Description: delete file
-%% Returns: ok | {error, Reason}
-%% --------------------------------------------------------------------
-delete(FileName,UserName) ->
-	gen_server:call(?MODULE, {delete, FileName}).	
-	
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
+% do open operation
 init([]) ->
-	%process_flag(trap_exit,true),
-    {ok, []}.
-
-handle_call({open, FileName, Mode, UserName}, _From, State) ->
+	process_flag(trap_exit,true),
+	error_logger:info_msg("[~p, ~p]: client worker ~p starting~n", [?MODULE, ?LINE, self()]),	
+	{ok, #filecontext{}}.
+	
+handle_call({open, FileName, Mode, UserName}, _From, FileContext) ->
 	error_logger:info_msg("[~p, ~p]: open file ~p mode ~p~n", [?MODULE, ?LINE, FileName, Mode]),	
 	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
@@ -88,50 +30,48 @@ handle_call({open, FileName, Mode, UserName}, _From, State) ->
 					  	read ->
 							0;
 						write ->
-							FileSize;
-						append ->
-							FileSize									
+							FileSize								
 					  end,		
 			% construct the FileContext based on the FileRecord and MetaWorkerPid
-			FileContext = #filecontext{	fileid = FileID, 
-										filename = FileName, 
-				                 		filesize = FileSize,
-										offset = Offset,
-										chunklist= ChunkList,
-										mode = Mode,
-										metaworkerpid = MetaWorkerPid},
+			NewFileContext = #filecontext{	fileid = FileID, 
+											filename = FileName, 
+				                 			filesize = FileSize,
+											offset = Offset,
+											chunklist= ChunkList,
+											mode = Mode,
+											metaworkerpid = MetaWorkerPid},
 			link(MetaWorkerPid),
-			{reply, {ok, FileContext}, State};
+			{reply, {ok, self()}, NewFileContext};
 		{error, Why} ->
-			{reply, {error, Why}, State}
+			{reply, {error, Why}, FileContext}
 	end;
 
-handle_call({write, FileContext, Bytes}, _From, State) ->
-	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
+handle_call({write, Bytes}, _From, FileContext) ->
+%	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
 	case FileContext#filecontext.mode of
 		write ->
 			{ok, NewFileContext} = write_data(FileContext, Bytes),	
-			{reply, {ok, NewFileContext}, State};
+			{reply, ok, NewFileContext};
 		_Any ->
-			{reply, {error, "write open mode error"}, State}
+			{reply, {error, "write open mode error"}, FileContext}
 	end;
 	
-handle_call({read, FileContext, Number}, _From, State) ->
+handle_call({read, Number}, _From, FileContext) ->
 %	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	case FileContext#filecontext.mode of
 		read ->
 			case FileContext#filecontext.offset =:= FileContext#filecontext.filesize of
 			    true ->
-			    	{reply, {eof, FileContext} , State};
+			    	{reply, eof , FileContext};
 		    	false ->
 		    		{ok, NewFileContext, Data} = read_data(FileContext, Number),	
-					{reply, {ok, NewFileContext, Data}, State}
+					{reply, {ok, Data}, NewFileContext}
 			end;			
 		_Any ->
-			{reply, {error, "read open mode error"}, State}
+			{reply, {error, "read open mode error"}, FileContext}
 	end;
 		
-handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=write ->
+handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=write ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	fileid	 = FileID, 
 				 	filename = FileName, 
@@ -154,7 +94,6 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 					false ->
 					 	PreNodeList++[Host]
 				end, 				
-
  	FileRecord = #filemeta{	fileid = FileID,
 							filename = FileName,
 							filesize = FileSize,
@@ -168,8 +107,8 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 			lib_chan:disconnect(DataWorkerPid)
 	end,
 	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
-	{reply, Reply, State};
-handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mode=:=read ->
+	{stop, normal, Reply, #filecontext{}};
+handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=read ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	metaworkerpid= MetaWorkerPid,
 					dataworkerpid= DataWorkerPid} = FileContext,
@@ -180,48 +119,40 @@ handle_call({close, FileContext}, _From, State) when FileContext#filecontext.mod
 			lib_chan:disconnect(DataWorkerPid)
 	end,
 	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),		
-	{reply, ok, State};	
+	{stop, normal, ok, #filecontext{}}.
 
-handle_call({delete, FileName, UserName}, _From, State)  ->
-	error_logger:info_msg("[~p, ~p]: delete ~p ~n", [?MODULE, ?LINE, FileName]),	
-	Reply = gen_server:cast(?META_SERVER, {delete, FileName, UserName}),					
-	{reply, Reply, State}.
+handle_cast(_Msg, FileContext) ->
+    {noreply, FileContext}.
 
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info({'EXIT', Pid, Why}, State) ->
+handle_info({'EXIT', Pid, Why}, FileContext) ->
 	error_logger:info_msg("[~p, ~p]: receive EXIT message from ~p since ~p~n", [?MODULE, ?LINE, Pid,Why]),	
-	{stop, Why, State};	    
-handle_info(_Info, State) ->
-    {noreply, State}.
+	{stop, Why, FileContext};	    
+handle_info(_Info, FileContext) ->
+    {noreply, FileContext}.
 
-terminate(Reason, _State) ->
-	error_logger:info_msg("[~p, ~p]: close client ~p  since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
+terminate(Reason, _FileContext) ->
+	error_logger:info_msg("[~p, ~p]: close client worker ~p  since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
     ok.
 
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+code_change(_OldVsn, FileContext, _Extra) ->
+    {ok, FileContext}.
 
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
 % if the data is null, write finish.
 write_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
-	error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+	%error_logger:info_msg("[~p, ~p]:A write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 	{ok, FileContext};
 % if the data is wrote into a new chunkFileContext#filecontext
 write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined  ->
-	error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
+	%error_logger:info_msg("[~p, ~p]:B write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	ChunkID=lib_uuid:gen(),
 	{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
-	error_logger:info_msg("[~p, ~p]:B1 SelectedHost ~p~n", [?MODULE, ?LINE, SelectedHost]),	
 	{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {write, ChunkID}),
-	error_logger:info_msg("[~p, ~p]:B2 write ~p~n", [?MODULE, ?LINE, size(Bytes)]),	
 	NewFC= FileContext#filecontext{	dataworkerpid  = DataWorkPid, 
 									chunkid = ChunkID,
 									host    = SelectedHost},
-		error_logger:info_msg("[~p, ~p]:B3 write ~p~n", [?MODULE, ?LINE, size(Bytes)]),								
 	write_data(NewFC, Bytes);
 % if the data is wrote into a existed chunk
 write_data(FileContext, Bytes) ->	
@@ -237,7 +168,7 @@ write_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->		 
-			error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+			%error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			lib_chan:rpc(DataWorkerPid,{write,Right}),
 			% close the data worker and reset the FileContext
@@ -254,10 +185,10 @@ write_data(FileContext, Bytes) ->
 			% write the left data
 			write_data(NewFC, Left);
 		false ->
-			error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
+			%error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
 			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
-			NewFC= FileContext#filecontext{	offset = Offset+ReadLength,
-											filesize=Offset+ReadLength},
+			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
+											filesize=Offset + ReadLength},
 			{ok, NewFC}			
 	end.
 
@@ -311,68 +242,4 @@ generate_chunkmapping_record([],[]) ->
 	[];
 generate_chunkmapping_record([CH|CT],[NH|NT]) ->
 	[#chunkmapping{chunkid=CH, chunklocations=[NH]}] ++ generate_chunkmapping_record(CT,NT).
-	
-% --------------------------------------------------------------------
-%% Function: pread/3
-%% Description: read Bytes from dataserver
-%% Returns: {ok, Binary} | {error, Reason}          |
-%% --------------------------------------------------------------------
-%pread(FileDevice, Start, Length) ->
-%    do_pread(FileDevice, Start, Length).
 
-%% --------------------------------------------------------------------
-%% Function: close/1
-%% Description: delete file which at dataserver
-%% Returns: ok | {error, Reason}
-%% --------------------------------------------------------------------
-%close(FileDevice) ->
-%    do_close(FileDevice).
-
-%% --------------------------------------------------------------------
-%% test function
-%% --------------------------------------------------------------------
-
-%testw(FileName) ->
-%	case open(FileName,w) of
-%		{ok, FileContext}  ->
-%			{ok,Hdl}=file:open("a.rmvb",[binary,raw,read,read_ahead]),
-%			NewFileContext=write_loop(FileContext, Hdl),
-%			close(NewFileContext);
-%		{error, Why} ->
-%			Why
-%	end.
-%	
-%write_loop(FileContext, Hdl)->
-%	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
-%		{ok, Data} ->
-%			{ok, NewFileContext} = write(FileContext, Data),
-%			write_loop(NewFileContext, Hdl);
-%		eof ->
-%			file:close(Hdl),
-%			FileContext;	
-%		{error,Reason} ->
-%			Reason
-%	end.	
-
-%testr(FileName) ->
-%	case open(FileName,r) of
-%		{ok, FileContext}   ->
-%			{ok,Hdl}=file:open("b.rmvb",[binary,raw,write]),
-%			NewFileContext=read_loop(FileContext,Hdl),
-%			close(NewFileContext);
-%		{error, Why} ->
-%			Why
-%	end.
-%	
-%read_loop(FileContext, Hdl)->
-%	case read(FileContext,?STRIP_SIZE) of % read 128K every time 
-%		{ok, NewFileContext, Data} ->
-%			file:write(Hdl,Data),
-%			read_loop(NewFileContext, Hdl);
-%		{eof,NewFileContext} ->
-%			file:close(Hdl),
-%			NewFileContext;
-%		{error,Reason} ->
-%			Reason
-%	end.
-%	
