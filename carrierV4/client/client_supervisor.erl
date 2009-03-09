@@ -14,10 +14,8 @@ start_in_shell() ->
 start_link(Args) ->
     supervisor:start_link( {local, ?MODULE}, ?MODULE, Args).
 
-
-
 init([]) ->
-    AChild = {tag1,{client,start_link,[]}, permanent,2000,worker,[client_server]},
+    AChild = {tag1,{client_server,start_link,[]}, permanent,2000,worker,[client_server]},
     {ok,{{one_for_one, 3, 10}, [AChild]}}.
 
 

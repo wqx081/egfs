@@ -63,35 +63,34 @@ test_read_all() ->
 		
 	
 testw({FileName,_FileSize, _MD5}) ->
-	case gen_server:call(client, {open,FileName,write, any}) of
-		{ok, FileContext}  ->
+	case gen_server:call(client_server, {open,FileName,write, any}) of
+		{ok, ClientWorkerPid}  ->
 			{ok,Hdl}=file:open(?INPUTDIR++FileName,[binary,raw,read,read_ahead]),
-			NewFileContext=write_loop(FileContext, Hdl),
-			gen_server:call(client,{close,NewFileContext});
+			write_loop(ClientWorkerPid, Hdl),
+			gen_server:call(client_server,{close,ClientWorkerPid});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)
 	end.
 	
-write_loop(FileContext, Hdl)->
+write_loop(ClientWorkerPid, Hdl)->
 	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
 		{ok, Data} ->
-			{ok, NewFileContext} = gen_server:call(client,{write,FileContext,Data}),
-			write_loop(NewFileContext, Hdl);
+			gen_server:call(client_server,{write,ClientWorkerPid,Data}),
+			write_loop(ClientWorkerPid, Hdl);
 		eof ->
-			file:close(Hdl),
-			FileContext;	
+			file:close(Hdl);	
 		{error,Reason} ->
 			Reason
 	end.	
 
 testr({FileName,_FileSize, MD5}) ->
 	TargetFile = "./outfiles"++FileName,
-	case gen_server:call(client,{open,FileName, read, any}) of
-		{ok, FileContext}   ->
+	case gen_server:call(client_server,{open,FileName, read, any}) of
+		{ok, ClientWorkerPid}   ->
 			{ok,Hdl}=file:open(TargetFile, [binary,raw,write]),
-			NewFileContext=read_loop(FileContext,Hdl),
-			gen_server:call(client,{close,NewFileContext});
+			read_loop(ClientWorkerPid,Hdl),
+			gen_server:call(client_server,{close,ClientWorkerPid});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)
@@ -105,14 +104,13 @@ testr({FileName,_FileSize, MD5}) ->
 			exit(normal)
 	end.
 	
-read_loop(FileContext, Hdl) ->
-	case  gen_server:call(client,{read,FileContext,?STRIP_SIZE}) of % read 128K every time 
-		{ok, NewFileContext, Data} ->
+read_loop(ClientWorkerPid, Hdl) ->
+	case  gen_server:call(client_server,{read,ClientWorkerPid,?STRIP_SIZE}) of % read 128K every time 
+		{ok, Data} ->
 			file:write(Hdl,Data),
-			read_loop(NewFileContext, Hdl);
-		{eof,NewFileContext} ->
-			file:close(Hdl),
-			NewFileContext;
+			read_loop(ClientWorkerPid, Hdl);
+		eof ->
+			file:close(Hdl);
 		{error,Reason} ->
 			Reason
 	end.
