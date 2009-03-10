@@ -1,5 +1,39 @@
 package cn.edu.thuhpc.hdfsmark.cases;
 
+import org.ini4j.Ini.Section;
+
+public class CreateFiles implements TestCase {
+	
+	int count = 10000;
+
+	@Override
+	public void setup(Section sec) {
+		count = Integer.parseInt(sec.fetch("number"));
+	}
+	
+	@Override
+	public String getDesc() {
+		return "create "+count+" files";
+	}
+
+	@Override
+	public void run() {
+		
+		System.out.println("doing create... done!");
+	}
+
+}
+
+
+
+
+
+
+
+
+
+/*package cn.edu.thuhpc.hdfsmark.cases;
+
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configured;
@@ -31,9 +65,9 @@ public class CreateFiles extends Configured implements TestCase {
 		// TODO Auto-generated constructor stub
 	}
 
-	/*public CreateFiles(Configuration conf) {
+	public CreateFiles(Configuration conf) {
 		super(conf);
-	}*/
+	}
 
 
 	void touchz(String src) throws IOException {
@@ -68,3 +102,4 @@ public class CreateFiles extends Configured implements TestCase {
 		System.out.println("doing create... done!");
 	}
 }
+*/
