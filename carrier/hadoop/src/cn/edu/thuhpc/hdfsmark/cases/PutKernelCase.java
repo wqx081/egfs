@@ -7,7 +7,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
 
-public class CopyKernelToLocalCase extends Configured implements TestCase {
+public class PutKernelCase extends Configured implements TestCase {
 
 	String src = null;
 	String dst = null;
@@ -30,7 +30,7 @@ public class CopyKernelToLocalCase extends Configured implements TestCase {
 	    
 	    try {
 			FileSystem dstFS = dstp.getFileSystem(getConf());
-		    dstFS.copyToLocalFile(false, srcp, dstp);
+		    dstFS.copyFromLocalFile(false, false, srcp, dstp);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
