@@ -13,7 +13,7 @@ public class CreateCase implements TestCase {
 	
 	@Override
 	public String getDesc() {
-		return "create "+count+" files";
+		return "create "+count+" cases";
 	}
 
 	@Override
