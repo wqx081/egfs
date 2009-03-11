@@ -58,23 +58,57 @@ do_delete(FilePathName, _UserName)->
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteFile = ((meta_db:get_tag(FilePathName)=:=file) and get_acl()),
     if
-        DeleteDir or DeleteFile->
+        DeleteDir or DeleteFile->            
+            ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
+            %% acl.
+            call_meta_delete(list,ResList),
             FileID = meta_db:get_id(FilePathName),
-            [FileIDList, DirIDList,FileNameList,DirNameList] = meta_db:get_all_sub_files(FileID),
-            AllDirIDList = lists:append(DirIDList,[FileID]),
-            case call_meta_delete(list, FileNameList) of
-                {ok,_} ->
-                    meta_db:delete_rows(FileIDList),
-                    meta_db:delete_rows(AllDirIDList),
-                    %%gen_server:call(?ACL_SERVER, {delete_aclrecord, FilePathName});
-                    get_acl();
-                {error,FileID}->
-                    {error, "sorry, someone is using this file, unable to delete it now .~n FileID: ~p~n",[FileID]}
-            end;
+            meta_db:do_delete_filemeta_byID(FileID);            
         true ->
             {error, "file does not exist or you are not authorized to do this operation"}
     end
 .
+
+call_meta_delete(list,FileIDList) ->
+    case call_meta_check(list,FileIDList) of
+        {ok,_} ->
+            call_meta_do_delete(list,FileIDList);
+        {error,FileID} ->
+            {error, "sorry, someone is using this file, unable to delete it now .~n FileID: ~p~n",[FileID]}
+    end.
+
+
+%% really, do_delete,
+call_meta_do_delete(list,[]) ->    
+    {ok,"success"};
+call_meta_do_delete(list,FileList)->   %% return ok || ThatFileID    
+    [FileHead|T] = FileList,
+    case call_meta_do_delete(FileHead) of
+        {ok,_}->
+            call_meta_do_delete(list,T);
+        {error,_}->
+            {error,FileHead}
+    end.
+call_meta_do_delete(File)->
+    error_logger:info_msg("deleting file: ~p~n",[File]),
+    {_Tag,FileID,_FileName} = File, 
+    meta_db:do_delete_filemeta_byID(FileID).
+
+%% checking.
+call_meta_check(list,[]) ->    
+    {ok,"no file conflict"};
+
+call_meta_check(list,File)->   %% return ok || ThatFileID    
+    [HFile|T] = File,
+    {_Tag,FileID,_FileName} = HFile,    
+    error_logger:info_msg("call_meta_CHAECK,CHECK File: ,~p~n",[HFile]),
+    case check_process_byID(FileID) of
+        {ok,_}->
+            call_meta_check(list,T);
+        {error,_}->
+            {error,FileID}
+    end.
+
 
 %% -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}). 
 
@@ -84,6 +118,8 @@ do_delete(FilePathName, _UserName)->
 %%	SrcUnderDst: file name of that Creating
 %%	DesDir : a dir name , checked , 
 copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
+    error_logger:info_msg("copying a file.~n"),
+    error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
     {filemeta,_ID,_N,FileSize,Chunklist,_CreateT,_ModifyT,_Tag,_Parent} = SrcFile#filemeta{},
     NewFileID = lib_uuid:gen(),
@@ -98,7 +134,7 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
                          parent = ParentID
                          },
 %%	check before write.     
-    case check_process_byname(NewfileMeta) of
+    case check_process_byName(NewFileMeta) of
         {ok,_}->
             meta_db:write_to_db(NewFileMeta),            
             {ok,"copy finished"};
@@ -114,78 +150,86 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
 %%	SrcUnderDst: file name of that Creating dir.
 %%	DesDir : a dir name , checked , 
 %%	should be recursive , call itself to resolve copy sub dirs
+%%	0 check and make new dir. 
 %%  1 get file/dir list
 %%	2 file: copy_a_file
 %% 	3 dir: copy_a_dir
 %%	4 TODO: mass acl and collision problems. 
 copy_a_dir(Fullsrc,SrcUnderDst,DesDir) ->
+    error_logger:info_msg("copying a dir.~n"),
+    error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     %% 1 
-    ResList = get_all_sub_files(Fullsrc),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}
+    ParentFileID = meta_db:get_id(Fullsrc),
+    ResList = meta_db:get_direct_sub_files(ParentFileID),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}
     %% 2 acl & collision
-    case meta_db:select_all_from_filemeta_byName(SrcUnderDst)
-    
-    
-    
+    case meta_db:select_all_from_filemeta_byName(SrcUnderDst) of
+        []->
+            DirID = lib_uuid:gen(),
+            ParentID = meta_db:get_id(DesDir),
+            meta_db:add_new_dir(DirID,SrcUnderDst,ParentID),            
+            copy_file_crowd(ResList,SrcUnderDst),
+            error_logger:info_msg("copy dir :~p finished~n",[Fullsrc]),
+            ok;
+        _Any->
+            {error,"Destination Dir exist."}
+    end.
 
-      
+copy_file_crowd([],DesDir)->
+    error_logger:info_msg("end of the list. Dst: ~p~n",DesDir),    
+    welcome;
+copy_file_crowd(ResList,DesDir)->
+    error_logger:info_msg("copying a list,."),    
+    [HeadFile|T] = ResList,
+    {Tag,_FileID,FileName} = HeadFile,
+    case Tag of 
+        file ->
+            SrcUnderDst = filename:join(DesDir,filename:basename(FileName)),            
+            copy_a_file(FileName,SrcUnderDst,DesDir);
+        dir ->
+            SrcUnderDst = filename:join(DesDir,filename:basename(FileName)),
+            copy_a_dir(FileName,SrcUnderDst,DesDir);
+        Any ->
+            error_logger:info_msg("error,wtf....~p,~n",[Any])
+    end,
+    copy_file_crowd(T,DesDir).      
 
 
 do_copy(FullSrc, FullDst, _UserName)->
-    CheckResult = check_op_type(FullSrc, FullDst),    
+    error_logger:info_msg("In Do_Copy, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
+    CheckResult = check_op_type(FullSrc, FullDst),
+    error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
     case CheckResult of
         {ok, caseFileToDir, SrcUnderDst} ->
-            copy_a_file(FullSrc,SrcUnderDst,FullDst);
-        {ok, caseDirToDir, RealDst} ->
-            copy_a_dir()
+            copy_a_file(FullSrc,SrcUnderDst,FullDst),
+            {ok,single_file_copy};        
+        {ok, caseDirToDir, SrcUnderDst} ->
+            copy_a_dir(FullSrc,SrcUnderDst,FullDst),
+            {ok,dir_copy};        
+        {error,Msg}->
+            error_logger:info_msg("copy fail: ~n"),
+            error_logger:info_msg(Msg++"~n"),
+            {error,Msg}
     end.
-  
-
-
+%% do_copy + do_delete.
+%% TODO: file modifytime?
 do_move(FullSrc, FullDst, _UserName)->
+    error_logger:info_msg("In Do_Move, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
+    error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
+    %% acl as copy.   if can write , just gen new file first, then think about delete
     case CheckResult of
-        {ok, _,_,_} ->
-            %% 冗余，待整理
-            {ok,Case,RealDst} = CheckResult,
-            %%gen_server:call(?ACL_SERVER, {copyfoder, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
-            CopyDirAcl = get_acl(),
-            %%gen_server:call(?ACL_SERVER, {copyfile, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
-            CopyFileAcl = get_acl(),
-            case Case of
-                caseDirToUnDir when CopyDirAcl->
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    {CT,MT} = meta_db:get_time(SrcFileID),
-                    meta_db:add_one_row(SrcFileID,RealDst,CT,MT,dir,meta_db:get_id(filename:dirname(RealDst))),
-                    [SrcFileIDList, SrcDirIDList] = meta_db:get_all_sub_files(SrcFileID),
-                    meta_db:add_moved_files(SrcDirIDList,FullSrc,RealDst),
-                    meta_db:add_moved_files(SrcFileIDList,FullSrc,RealDst),
-                    %                    gen_server:call(?ACL_SERVER, {delete_aclrecord, FullSrc});
-                    get_acl();
-                caseDirToDir when CopyDirAcl->
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    {CT,MT} = meta_db:get_time(SrcFileID),
-                    meta_db:add_one_row(SrcFileID,RealDst,CT,MT,dir,meta_db:get_id(filename:dirname(RealDst))),
-                    [SrcFileIDList, SrcDirIDList] = meta_db:get_all_sub_files(SrcFileID),
-                    meta_db:add_moved_files(SrcDirIDList,FullSrc,RealDst),
-                    meta_db:add_moved_files(SrcFileIDList,FullSrc,RealDst),
-                    %                    gen_server:call(?ACL_SERVER, {delete_aclrecord, FullSrc});
-                    get_acl();
-                caseFileToUnFile when CopyFileAcl->
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    {CT,MT} = meta_db:get_time(SrcFileID),
-                    meta_db:add_one_row(SrcFileID,FullDst,CT,MT,file,meta_db:get_id(filename:dirname(FullDst))),
-                    %                    gen_server:call(?ACL_SERVER, {delete_aclrecord, FullSrc});
-                    get_acl();
-                caseFileToDir when CopyFileAcl->
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    meta_db:add_moved_files([SrcFileID],filename:dirname(FullSrc),RealDst),
-                    %                    gen_server:call(?ACL_SERVER, {delete_aclrecord, FullSrc});
-                    get_acl();
-                _Any ->
-                    {error, "sorry, you are not authorized to do this operation "}
-            end;
-        {error, _} ->
-            {error, "wrong input"}
+        {ok, caseFileToDir, SrcUnderDst} ->
+            copy_a_file(FullSrc,SrcUnderDst,FullDst),
+            do_delete(FullSrc, _UserName), %% with acl check in function.
+            {ok,single_file_move};        
+        {ok, caseDirToDir, SrcUnderDst} ->
+            copy_a_dir(FullSrc,SrcUnderDst,FullDst),
+            do_delete(FullSrc,_UserName),
+            {ok,dir_move};        
+        {error,Msg}->
+            error_logger:info_msg("move fail, copy fail.: ~n"),
+            error_logger:info_msg(Msg++"~n"),
+            {error_movefilefail,Msg}        
     end
 .
 
@@ -219,7 +263,6 @@ do_mkdir(PathName, _UserName)->
     end
 .
 
-
 do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
     case meta_db:get_tag(FileName) of
         null ->
@@ -229,7 +272,6 @@ do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
             get_acl()
     end
 .
-
 
 %% 
 %% uuid_gen_N(0) ->
@@ -253,10 +295,13 @@ check_op_type(SrcFullPath, DstFullPath) ->
     SrcTag = meta_db:get_tag(SrcFullPath),
     DstTag = meta_db:get_tag(DstFullPath),
     SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
+    
+    error_logger:info_msg("SrcUnderDst:~p,SrcTag:~p,DstTag:~p,SrcUnderDstTag:~p~n",[SrcUnderDst,SrcTag,DstTag,SrcUnderDstTag]),
+    
 
     CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null),
     CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null),
-    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(SrcFullPath,DstFullPath)=:=0),
+    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
     CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null), 
     if       
         CaseFileToUnFile ->
@@ -272,7 +317,6 @@ check_op_type(SrcFullPath, DstFullPath) ->
     end
 .
  
-
 %%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
 %% check_op_type_hiatusV(SrcFullPath, DstFullPath) ->
 %%     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),
@@ -303,41 +347,6 @@ check_op_type(SrcFullPath, DstFullPath) ->
 
 %%%%%%%%%%%%%%%%
 
-call_meta_delete(list,FileIDList) ->
-    case call_meta_check(list,FileIDList) of
-        {ok,_} ->
-            call_meta_do_delete(list,FileIDList);
-        {error,FileID} ->
-            {error,FileID}
-    end.
-
-
-call_meta_do_delete(list,[]) ->    
-    {ok,"success"};
-call_meta_do_delete(list,FileIDList)->   %% return ok || ThatFileID    
-    [FileID|T] = FileIDList,
-    case call_meta_do_delete(FileID) of
-        {ok,_}->
-            call_meta_do_delete(list,T);
-        {error,_}->
-            {error,FileID}
-    end.
-
-call_meta_do_delete(FileID)->
-    meta_db:do_delete_filemeta(FileID).
-
-
-call_meta_check(list,[]) ->    
-    {ok,"no file conflict"};
-call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
-    io:format("aaa,~p~n",[FileIDList]),
-    [FileID|T] = FileIDList,
-    case call_meta_check(FileID) of
-        {ok,_}->
-            call_meta_check(list,T);
-        {error,_}->
-            {error,FileID}
-    end.
 
 %% @spec check_process_byName(ID) -> {ok,FileName} | {error,"output"} 
 check_process_byID(FileID)->
