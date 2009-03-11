@@ -577,20 +577,6 @@ get_time(ID) ->
             {CT,MT}
     end
 .
-delete_rows([]) ->
-    ok;
-delete_rows(IDList) ->
-    [Head|Left] = IDList,
-    delete_one_row(Head),
-    delete_rows(Left)
-.
-delete_one_row(ID) ->
-    Row = {filemeta, ID},
-    F = fun() ->
-                mnesia:delete(Row)
-        end,
-    mnesia:transaction(F)
-.
 
 
 %% checked it's a dir before function called. 
@@ -606,7 +592,7 @@ get_all_dir_sub_files(FileName)->
     
 
 %% easier one , useing powerful qlc.
-get_all_sub_files(FileID) ->
+get_all_sub_files_byID(FileID) ->
     case get_tag_by_id(FileID) of
         file ->
             [{file,FileID,get_name(FileID)}];		%% [{tag,id,name}]
@@ -617,6 +603,23 @@ get_all_sub_files(FileID) ->
                                {X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
                       		||X<-mnesia:table(filemeta), 
                               string:equal(string:left(X#filemeta.filename,L),FileName),
+                              X#filemeta.filename =/= FileName
+                      ])),
+            Result;				%%[{}{}{}{}{}{}{}{}{}{}]
+        null->
+            [{wtf,wtf,wtf}]
+    end.
+
+get_all_sub_files_byName(FileName) ->
+    case get_tag(FileName) of
+        file ->
+            [{file,get_id(FileName),FileName}];		%% [{tag,id,name}]
+        dir ->            
+            L = length(FileName),
+            Result = do(qlc:q([
+                               {X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+                      		||X<-mnesia:table(filemeta), 
+                              string:equal(string:left(X#filemeta.filename,L+1),FileName++"/"),
                               X#filemeta.filename =/= FileName
                       ])),
             Result;				%%[{}{}{}{}{}{}{}{}{}{}]
