@@ -86,7 +86,7 @@ do(Q) ->
 example_tables() ->
     [
      %%{hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}},
-     {filemeta,lib_uuid:gen(),"/",0,[],erlang:localtime(),erlang:localtime(),dir,[]}
+     {filemeta,lib_uuid:gen(),"/",-1,[],erlang:localtime(),erlang:localtime(),dir,[]}
     ].
 
 clear_tables()->
