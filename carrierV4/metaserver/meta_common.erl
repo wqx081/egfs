@@ -76,52 +76,69 @@ do_delete(FilePathName, _UserName)->
     end
 .
 
+%% -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}). 
+
+%%	copy a file : just add a new file record into table filemeta 
+%%  @spec copy_a_file(Fullsrc,SrcUnderDst,DesDir)-> "Msg"
+%%  Fullsrc : a file name, checked before this function being called
+%%	SrcUnderDst: file name of that Creating
+%%	DesDir : a dir name , checked , 
+copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
+    [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
+    {filemeta,_ID,_N,FileSize,Chunklist,_CreateT,_ModifyT,_Tag,_Parent} = SrcFile#filemeta{},
+    NewFileID = lib_uuid:gen(),
+    ParentID = meta_db:get_id(DesDir),
+    NewFileMeta = #filemeta{fileid=NewFileID,
+                         filename = SrcUnderDst,
+                         filesize = FileSize,
+                         chunklist = Chunklist,
+                         createT = calendar:local_time(),
+                         modifyT = calendar:local_time(),
+                         tag = file,
+                         parent = ParentID
+                         },
+%%	check before write.     
+    case check_process_byname(NewfileMeta) of
+        {ok,_}->
+            meta_db:write_to_db(NewFileMeta),            
+            {ok,"copy finished"};
+        {error,Msg} ->
+            io:format("Can't copy to new location:~p , ~p.~n",[NewFileMeta,Msg]),
+            {error,NewFileMeta}         
+    end.
+
+
+%%	copy a dir: copy sub dirs/files to Dstdir 
+%%  @spec copy_a_dir(Fullsrc,SrcUnderDst,DesDir)-> "Msg"
+%%  Fullsrc : a dir name, checked before this function being called
+%%	SrcUnderDst: file name of that Creating dir.
+%%	DesDir : a dir name , checked , 
+%%	should be recursive , call itself to resolve copy sub dirs
+%%  1 get file/dir list
+%%	2 file: copy_a_file
+%% 	3 dir: copy_a_dir
+%%	4 TODO: mass acl and collision problems. 
+copy_a_dir(Fullsrc,SrcUnderDst,DesDir) ->
+    %% 1 
+    ResList = get_all_sub_files(Fullsrc),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}
+    %% 2 acl & collision
+    case meta_db:select_all_from_filemeta_byName(SrcUnderDst)
+    
+    
+    
+
+      
+
 
 do_copy(FullSrc, FullDst, _UserName)->
     CheckResult = check_op_type(FullSrc, FullDst),    
     case CheckResult of
-        {ok,Case,_DirToAcl,RealDst} ->
-            %% 冗余，待整理                       
-            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,_UserName})
-            CopyDir = ((Case=:=caseDirToDir) or (Case=:=caseDirToUnDir))
-            and get_acl(),
-            %%gen_server:call(?ACL_SERVER, {copyfolder, FullSrc, DirToAcl,_UserName})
-            CopyFile = ((Case=:=caseFileToDir) or (Case=:=caseFileToUnFile))
-            and get_acl(),
-            if
-                CopyDir ->
-                    meta_db:add_new_dir(lib_uuid:gen(),RealDst,meta_db:get_id(filename:dirname(RealDst))),
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    [SrcFileIDList, SrcDirIDList] = meta_db:get_all_sub_files(SrcFileID),
-                    DstFileIDList = uuid_gen_N(length(SrcFileIDList)),
-                    case call_meta_copy(list, SrcFileIDList, DstFileIDList) of
-                        true ->
-                            DstDirIDList = uuid_gen_N(length(SrcDirIDList)),
-                            meta_db:add_copyed_files(SrcDirIDList,DstDirIDList,FullSrc,RealDst),
-                            meta_db:add_copyed_files(SrcFileIDList,DstFileIDList,FullSrc,RealDst);
-                        false ->
-                            {error, "error when copying"}
-                    end;
-                CopyFile ->
-                    DstFileID = lib_uuid:gen(),
-                    SrcFileID = meta_db:get_id(FullSrc),
-                    case call_meta_copy(list, [SrcFileID], [DstFileID]) of
-                        true when (Case=:=caseFileToUnFile) ->
-                            {CT,MT} = meta_db:get_time(SrcFileID),
-                            meta_db:add_one_row(DstFileID,FullDst,CT,MT,file,meta_db:get_id(filename:dirname(FullDst)));
-                        true when (Case=:=caseFileToDir) ->
-                            meta_db:add_copyed_files([SrcFileID],[DstFileID],filename:dirname(FullSrc),RealDst);
-                        false ->
-                            {error, "error when copying"}
-                    end;
-                true ->
-                    {error, "sorry, you are not authorized to do this operation "}
-            end;
-        {error, _} ->
-            {error, "wrong input"}
-    end
-.
-
+        {ok, caseFileToDir, SrcUnderDst} ->
+            copy_a_file(FullSrc,SrcUnderDst,FullDst);
+        {ok, caseDirToDir, RealDst} ->
+            copy_a_dir()
+    end.
+  
 
 
 do_move(FullSrc, FullDst, _UserName)->
@@ -129,7 +146,7 @@ do_move(FullSrc, FullDst, _UserName)->
     case CheckResult of
         {ok, _,_,_} ->
             %% 冗余，待整理
-            {ok,Case,_DirToAcl,RealDst} = CheckResult,
+            {ok,Case,RealDst} = CheckResult,
             %%gen_server:call(?ACL_SERVER, {copyfoder, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
             CopyDirAcl = get_acl(),
             %%gen_server:call(?ACL_SERVER, {copyfile, FullSrc, DirToAcl, _UserName}) and gen_server:call(?ACL_SERVER, {delete, FullSrc, _UserName})
@@ -179,7 +196,8 @@ do_list(FilePathName,_UserName)->
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
             %%TODO:
-            meta_db:get_direct_sub_files(ParentDirID);
+%%             meta_db:get_direct_sub_files(ParentDirID);
+			meta_db:get_order_direct_sub_files(ParentDirID);
         false ->
             {error, "not a dir or you are not authorized to do this operation "}
     end 
@@ -202,7 +220,6 @@ do_mkdir(PathName, _UserName)->
 .
 
 
-
 do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
     case meta_db:get_tag(FileName) of
         null ->
@@ -214,45 +231,75 @@ do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
 .
 
 
+%% 
+%% uuid_gen_N(0) ->
+%%     [];
+%% uuid_gen_N(N) ->
+%%     lists:append([lib_uuid:gen()],uuid_gen_N(N-1))
+%% .
 
-uuid_gen_N(0) ->
-    [];
-uuid_gen_N(N) ->
-    lists:append([lib_uuid:gen()],uuid_gen_N(N-1))
-.
 get_acl() ->
     true
 .
 
+%% filename:dirname("/a") -> "/" ,  ("/a/")->"/a"  ,"//" ->"/" , ""->"."
+%%		-> conclude: .  | File | Dir        
+%% filename:basename("/") ->[] , ("/a/")->"a" ("/a")->a
+%%		-> conclude: [] | File | Dir
 
 %%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
 check_op_type(SrcFullPath, DstFullPath) ->
-    SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),
-    DstParent = filename:dirname(DstFullPath),
-
+    SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),    
     SrcTag = meta_db:get_tag(SrcFullPath),
     DstTag = meta_db:get_tag(DstFullPath),
     SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
-    DstParentTag = meta_db:get_tag(DstParent),
 
-    CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null) and (DstParentTag=:=dir),
-    CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
-    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
-    CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null) and (DstParentTag=:=dir),
-    if
+    CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null),
+    CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null),
+    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(SrcFullPath,DstFullPath)=:=0),
+    CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null), 
+    if       
         CaseFileToUnFile ->
-            {ok, caseFileToUnFile, DstParent, DstParent};
+            {error," rename not supported"};
         CaseFileToDir ->
-            {ok, caseFileToDir, DstFullPath, DstFullPath};
+            {ok, caseFileToDir, SrcUnderDst};
         CaseDirToDir ->
-            {ok, caseDirToDir, DstFullPath, SrcUnderDst};
+            {ok, caseDirToDir, SrcUnderDst};
         CaseDirToUnDir ->
-            {ok, caseDirToUnDir, DstParent, DstFullPath};
+            {error, "destination error"};
         true ->
             {error, "wrong input"}
     end
 .
+ 
 
+%%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
+%% check_op_type_hiatusV(SrcFullPath, DstFullPath) ->
+%%     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),
+%%     DstParent = filename:dirname(DstFullPath),
+%%     
+%%     SrcTag = meta_db:get_tag(SrcFullPath),
+%%     DstTag = meta_db:get_tag(DstFullPath),
+%%     SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
+%%     DstParentTag = meta_db:get_tag(DstParent),
+%% 
+%%     CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null) and (DstParentTag=:=dir),
+%%     CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
+%%     CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
+%%     CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null) and (DstParentTag=:=dir),
+%%     if
+%%         CaseFileToUnFile ->
+%%             {ok, caseFileToUnFile, DstParent, DstParent};
+%%         CaseFileToDir ->
+%%             {ok, caseFileToDir, DstFullPath, DstFullPath};
+%%         CaseDirToDir ->
+%%             {ok, caseDirToDir, DstFullPath, SrcUnderDst};
+%%         CaseDirToUnDir ->
+%%             {ok, caseDirToUnDir, DstParent, DstFullPath};
+%%         true ->
+%%             {error, "wrong input"}
+%%     end
+%% .
 
 %%%%%%%%%%%%%%%%
 
@@ -280,20 +327,6 @@ call_meta_do_delete(FileID)->
     meta_db:do_delete_filemeta(FileID).
 
 
-
-
-
-call_meta_copy(list,_S,_D)->
-    %%TODO.
-    todo.
-
-call_meta_copy(_FileID) ->
- %%TODO.
-%%     gen_server:call(?CHUNK_SERVER,{chunkCopy,[From],[To1,To2]}),
-    
-    {ok, <<1:64>>}
-.
-
 call_meta_check(list,[]) ->    
     {ok,"no file conflict"};
 call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
@@ -306,22 +339,31 @@ call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
             {error,FileID}
     end.
 
-call_meta_check(FileID)->
+%% @spec check_process_byName(ID) -> {ok,FileName} | {error,"output"} 
+check_process_byID(FileID)->
     FileName = meta_db:get_name(FileID),
+    check_process_byName(FileName).
+
+
+%% @spec check_process_byName(Name) -> {ok,FileName} | {error,"output"}  
+check_process_byName(FileName) ->
     WA = lib_common:generate_processname(FileName,write),
-    RA = lib_common:generate_processname(FileName,read),
-    
+    RA = lib_common:generate_processname(FileName,read),    
     case whereis(WA) of
         undefined->
             case whereis(RA) of
                 undefined->
-                    {ok,FileID};
+                    {ok,FileName};
                 _->
                     {error,"someone reading this file."}
             end;
         _->
             {error,"someone writing this file."}
-    end.
+    end.    
+	
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%meta_server
@@ -430,29 +472,6 @@ do_collect_orphanchunk(HostProcName)->
     meta_db:do_delete_orphanchunk_byhost(HostProcName),
     OrphanChunkList.
 
-%% do_register_heartbeat(HostName,State)->
-%%     meta_db:add_heartbeat_info(HostName,State).
-
-%%     
-%%     Res = select_from_hostinfo(HostInfoRec#hostinfo.hostname),
-%%     Host = HostInfoRec#hostinfo.host,
-%%     case Res of
-%%         [{hostinfo,_Proc,Host,_TotalSpace,_FreeSpace,_Health}]->
-%%             {_,TimeTick,_} = now(),
-%%             NewInfo = HostInfoRec#hostinfo{health = {TimeTick,10}}, %%   ?INIT_NODE_HEALTH = 10 , TODO, 
-%%             write_to_db(NewInfo),
-%%             {ok,"heartbeat ok"};                
-%%         _-> {error,"chunk does not exist"}
-%%     end.
-
-rpc(Pid, Request) ->
-    Pid ! {self(), Request},
-    receive
-	Response ->
-	    Response
-    end.
-
-
 %% 
 %% debug 
 %% 
@@ -484,5 +503,20 @@ do_showWorker(FileName,EasyMod)->
         Pid->			% pid exist, set this pid process as the meta worker
         	{state,gen_server:call(Pid, {debug})}
    end.
+
+
+
+seperate_file_dir([]) ->
+    [[],[],[],[]];
+seperate_file_dir(FileList) ->
+    [{Tag, ID,Name}|Left] = FileList,
+    [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
+    case Tag of
+        file ->
+            [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
+        dir ->
+            [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
+    end
+.
 
     

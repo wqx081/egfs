@@ -101,7 +101,6 @@ reset_example_tables()->
     mnesia:create_table(hostinfo, [{attributes, record_info(fields,hostinfo)},
                                       {disc_copies,[node()]}
                                      ]),
-    
     F = fun() ->
 		foreach(fun mnesia:write/1, example_tables())
 		end,
@@ -206,6 +205,9 @@ select_all_from_Table(T)->
     do(qlc:q([
               X||X<-mnesia:table(T)
               ])).  %result [L]
+%%[ {},{},{},{}  ]
+
+
 
 select_all_from_filemeta_byID(FileID) ->    %result [L]
     do(qlc:q([
@@ -515,19 +517,29 @@ select_random_one_from_hostinfo()->
 
 
 %%%%%%%%%%%%%from hiatus
+get_tag(FileName) ->
+    io:format("aaa??,~p~n",[FileName]),
+    L = length(FileName),    
+%%     io:format("~p~n",[L]),
+    case (string:equal(string:right(FileName,1),"/"))andalso L>1 of
+       true->           
+           io:format("true,~p~n",[FileName]),
+           get_tag(string:substr(FileName,1,L-1));
+       false->
+           io:format(",~p~n",[FileName]),
+           Result = do(qlc:q([X#filemeta.tag||X<-mnesia:table(filemeta), X#filemeta.filename=:=FileName])),
+           case Result of
+               [] ->
+                   null;
+               [Tag] ->
+                   Tag
+           end;
+        Any->
+            io:format("wtf!,~p~n",[Any])
+            
+    end.
 
 
-
-
-get_tag(Dir) ->
-    Result = do(qlc:q([X#filemeta.tag||X<-mnesia:table(filemeta), X#filemeta.filename=:=Dir])),
-    case Result of
-        [] ->
-            null;
-        [Tag] ->
-            Tag
-    end
-.
 get_tag_by_id(ID) ->
     Result = do(qlc:q([X#filemeta.tag||X<-mnesia:table(filemeta), X#filemeta.fileid=:=ID])),
     case Result of
@@ -547,11 +559,8 @@ get_name(ID) ->
     end
 .
 
-get_id_from_dirmeta(FileName)->
-    do(qlc:q([X#filemeta.fileid||X<-mnesia:table(filemeta), X#filemeta.filename=:=FileName])).
-
-get_id(Dir) ->
-    Result = do(qlc:q([X#filemeta.fileid||X<-mnesia:table(filemeta), X#filemeta.filename=:=Dir])),
+get_id(FileName) ->
+    Result = do(qlc:q([X#filemeta.fileid||X<-mnesia:table(filemeta), X#filemeta.filename=:=FileName])),
     case Result of
         [] ->
             null;
@@ -583,86 +592,93 @@ delete_one_row(ID) ->
     mnesia:transaction(F)
 .
 
-%%%%TODO.
-add_one_row(ID,FileName,CreateTime,ModifyTime,Tag,ParentID) ->
-    Row = #filemeta{fileid=ID,filename=FileName,tag=Tag,createT=CreateTime,modifyT=ModifyTime,parent=ParentID,filesize = todo,chunklist = todo},
-    F = fun() ->
-                mnesia:write(Row)
-        end,
-    mnesia:transaction(F)
-.
 
+%% checked it's a dir before function called. 
+get_all_dir_sub_files(FileName)->
+    L = length(FileName),
+    Result = do(qlc:q([
+                               {X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+                      		||X<-mnesia:table(filemeta), 
+                              string:equal(string:left(X#filemeta.filename,L),FileName),
+                              X#filemeta.filename =/= FileName
+                      ])),
+    Result.				%%[{}{}{}{}{}{}{}{}{}{}]
+    
+
+%% easier one , useing powerful qlc.
 get_all_sub_files(FileID) ->
-    case meta_db:get_tag_by_id(FileID) of
+    case get_tag_by_id(FileID) of
         file ->
-            [[FileID],[]];
+            [{file,FileID,get_name(FileID)}];		%% [{tag,id,name}]
         dir ->
-            [DirectSubFile,DirectSubDir] = get_direct_sub_files(FileID),
-            [DirectSubDir_File, DirectSubDir_Dir] = get_all_sub_files(list, DirectSubDir),
-            [lists:append(DirectSubFile, DirectSubDir_File),lists:append(DirectSubDir, DirectSubDir_Dir)]
-    end
-.
-get_all_sub_files(list, []) ->
-    [[],[]];
-get_all_sub_files(list, FileIDList) ->
-    [Head|Left] = FileIDList,
-    [HeadSubFile,HeadSubDir] = get_all_sub_files(Head),
-    [LeftSubFile,LeftSubDir] = get_all_sub_files(list, Left),
-    [lists:append(HeadSubFile, LeftSubFile),lists:append(HeadSubDir, LeftSubDir)]
-.
+            FileName = get_name(FileID),
+            L = length(FileName),
+            Result = do(qlc:q([
+                               {X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+                      		||X<-mnesia:table(filemeta), 
+                              string:equal(string:left(X#filemeta.filename,L),FileName),
+                              X#filemeta.filename =/= FileName
+                      ])),
+            Result;				%%[{}{}{}{}{}{}{}{}{}{}]
+        null->
+            [{wtf,wtf,wtf}]
+    end.
 
+%% hiatus version. 
+%% get_all_sub_files(FileID) ->
+%%     case meta_db:get_tag_by_id(FileID) of
+%%         file ->
+%%             [[FileID],[]];
+%%         dir ->
+%%             [DirectSubFile,DirectSubDir] = get_direct_sub_files(FileID),
+%%             [DirectSubDir_File, DirectSubDir_Dir] = get_all_sub_files(list, DirectSubDir),
+%%             [lists:append(DirectSubFile, DirectSubDir_File),lists:append(DirectSubDir, DirectSubDir_Dir)]
+%%     end
+%% .
+%% 
+%% get_all_sub_files(list, []) ->
+%%     [[],[]];
+%% get_all_sub_files(list, FileIDList) ->
+%%     [Head|Left] = FileIDList,
+%%     [HeadSubFile,HeadSubDir] = get_all_sub_files(Head),
+%%     [LeftSubFile,LeftSubDir] = get_all_sub_files(list, Left),
+%%     [lists:append(HeadSubFile, LeftSubFile),lists:append(HeadSubDir, LeftSubDir)]
+%% .
+%% seperate_file_dir([]) ->
+%%     [[],[],[],[]];
+%% seperate_file_dir(FileList) ->
+%%     [{Tag, ID,Name}|Left] = FileList,
+%%     [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
+%%     case Tag of
+%%         file ->
+%%             [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
+%%         dir ->
+%%             [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
+%%     end
+%% .
+%% 
+
+
+get_order_direct_sub_files(FileID) ->
+    Q1 = qlc:q([
+                {X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+                      		||X<-mnesia:table(filemeta), X#filemeta.parent=:=FileID
+                      ]),
+    Q2 = qlc:keysort(1,Q1,{order,descending}), %% 1: filemeta.tag  descending:f>d, file(f) first,then dirs(d)    
+
+    do(Q2).
 
 get_direct_sub_files(FileID) ->
-    Result = do(qlc:q([{X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
+    Result = do(
+               qlc:q([{X#filemeta.tag,X#filemeta.fileid,X#filemeta.filename}
                       		||X<-mnesia:table(filemeta), X#filemeta.parent=:=FileID
-                      ])),
-    seperate_file_dir(Result)
-.
+                      ])
+               ),
+	Result.
 
-seperate_file_dir([]) ->
-    [[],[],[],[]];
-seperate_file_dir(FileList) ->
-    [{Tag, ID,Name}|Left] = FileList,
-    [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
-    case Tag of
-        file ->
-            [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
-        dir ->
-            [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
-    end
-.
 
-get_modifyed_path(ID, SrcHead, DstHead) ->
-    SrcPath = get_name(ID),
-    Path = string:substr(SrcPath,string:len(SrcHead)+1,string:len(SrcPath)),
-    string:concat(DstHead,Path)
-.
-add_moved_files([],_FullSrc,_RealDst) ->
-    ok;
-add_moved_files(SrcFileIDList,FullSrc,RealDst) ->
-    [Head|Left] = SrcFileIDList,
-    NewPath = get_modifyed_path(Head,FullSrc,RealDst),
-    {CT,MT} = meta_db:get_time(Head),
-    meta_db:add_one_row(Head,NewPath,CT,MT,file,meta_db:get_id(filename:dirname(NewPath))),
-    add_moved_files(Left,FullSrc,RealDst)
-.
-add_copyed_files([],[],_FullSrc,_RealDst) ->
-    [];
-add_copyed_files(SrcFileIDList,DstFileIDList,Src,AimDst) ->
-    [SrcHead|SrcLeft] = SrcFileIDList,
-    [DstHead|DstLeft] = DstFileIDList,
-    NewPath = get_modifyed_path(SrcHead,Src,AimDst),
-    [{NewCT,NewMT,NewTag}|_T] = do(qlc:q([{X#filemeta.createT,X#filemeta.modifyT,X#filemeta.tag}
-        ||X<-mnesia:table(filemeta),X#filemeta.fileid=:=SrcHead])),
-    NewParent = get_id(filename:dirname(NewPath)),
-    Row = #filemeta{fileid=DstHead,filename=NewPath,createT=NewCT,modifyT=NewMT,tag=NewTag,parent=NewParent},
-    F = fun() ->
-                mnesia:write(Row)
-        end,
-    mnesia:transaction(F),
-    [NewPath|add_copyed_files(SrcLeft,DstLeft,Src,AimDst)]
-.
 
+%% there's no "/" after DirName, 
 add_new_dir(ID,DirName,ParentID) ->
     Row = #filemeta{fileid=ID,filename=DirName,filesize = -1 ,createT = calendar:local_time(),modifyT = calendar:local_time(),tag=dir,parent=ParentID,chunklist=[]},
     F = fun() ->
@@ -686,16 +702,25 @@ update_heartbeat(HostName,State) ->
     end.
 
 
-dofix()->
-    X = select_all_from_Table(filemeta),%%[{},{},{}]
-    dofix(X).
-dofix(X) when X =:= [] ->
-    ture;
-dofix(X) ->
-    [H|T] = X,
-    New = H#filemeta{parent = get_id(filename:dirname(H#filemeta.filename))},
-    write_to_db(New),
-    dofix(T).
+
+
+
+%% 
+%% do_fix()->    
+%%     [R] = select_all_from_filemeta_byName("/"),    
+%%     New = R#filemeta{parent = []},
+%%     write_to_db(New).
+
+%% old_dofix()->
+%%     X = select_all_from_Table(filemeta),%%[{},{},{}]
+%%     dofix(X).
+%% dofix(X) when X =:= [] ->
+%%     ture;
+%% dofix(X) ->
+%%     [H|T] = X,
+%%     New = H#filemeta{parent = get_id(filename:dirname(H#filemeta.filename))},
+%%     write_to_db(New),
+%%     dofix(T).
      
     
     
