@@ -77,14 +77,16 @@ handle_call({debug},{_From, _},State)->
 %%     {reply, Reply, State}.
 
 
-handle_cast({stop,_Reason,From}, State) ->
+handle_cast({stop,Reason,From}, State) ->
+    error_logger:info_msg("Reason: ~p~n",[Reason]),
+    error_logger:info_msg("State: ~p~n",[State]),
     %%TODO.
     do_close(From,State),
 	{noreply, State};	
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'EXIT', _Pid, Why}, State) ->
+handle_info({'EXIT', _Pid, _Why}, State) ->
     io:format("EXiT.~n"),
 	{stop, normal, State};	
 handle_info(_Info, State) ->
@@ -124,10 +126,11 @@ do_get_chunk(FileID, ChunkIdx)->
 
 do_close(From,State) ->
     error_logger:info_msg("-- meta_worker  do_close"),
-    error_logger:info_msg(" metaworkerstate: 
+    error_logger:info_msg(" metaworkerstate: ~p~n",[State#metaWorkerState.clients]),
+    error_logger:info_msg("From: ~p~n",[From]),
+
     case State#metaWorkerState.mod of
         read->            
-            error_logger:info_msg("mod = r , Clients = ",[Clients]),
             Clients = State#metaWorkerState.clients--[From],
             error_logger:info_msg("mod = r , Clients = ",[Clients]),
             case Clients of
