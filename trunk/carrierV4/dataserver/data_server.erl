@@ -69,7 +69,7 @@ handle_call(_Request, _From, State) ->
 handle_cast({replica, DestHost, ChunkID}, State) ->
 	case data_db:select_md5_from_chunkmeta_id(ChunkID) of
 		[MD5] ->
-			{ok, DataWorkPid} = lib_chan:connect(DestHost, 8888, dataworker,?PASSWORD, {replica, ChunkID,MD5}),
+			{ok, DataWorkPid} = lib_chan:connect(DestHost, ?DATA_PORT, dataworker,?PASSWORD, {replica, ChunkID,MD5}),
 			{ok, ChunkHdl}=	lib_common:get_file_handle({read, ChunkID}),
 			loop_replica(DataWorkPid,ChunkHdl),
 			{noreply, State};
