@@ -15,7 +15,7 @@ public class PutHugeCase extends TestCaseAdapter{
 	
 	@Override
 	public String getDesc() {
-		return "Put "+size+"GB File into "+dst+" at Hadoop";
+		return "Put "+size+"GB File From Local "+src+" To Hadoop "+dst;
 	}
 
 	@Override

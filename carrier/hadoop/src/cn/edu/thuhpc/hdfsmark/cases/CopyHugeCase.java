@@ -16,7 +16,7 @@ public class CopyHugeCase extends TestCaseAdapter {
 	
 	@Override
 	public String getDesc() {
-		return "Copy "+size+"GB File from "+src+" to "+dst+" at Hadoop";
+		return "Copy "+size+"GB File From "+src+" To "+dst+" At Hadoop";
 	}
 
 	@Override

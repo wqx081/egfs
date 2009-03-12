@@ -14,7 +14,7 @@ public class PutKernelCase  extends TestCaseAdapter {
 
 	@Override
 	public String getDesc() {
-		return "Copy Kernel From Local To Hadoop " + dst;
+		return "Put Kernel From Local "+src+" To Hadoop "+dst;
 	}
 
 	@Override

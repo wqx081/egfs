@@ -15,7 +15,7 @@ public class CopyKernelCase extends TestCaseAdapter {
 	
 	@Override
 	public String getDesc() {
-		return "Copy Kernel at Hadoop from " + src + " to " + dst;
+		return "Copy Kernel From "+src+" To "+dst+"  At Hadoop";
 	}
 
 	@Override
