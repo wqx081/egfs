@@ -93,10 +93,4 @@ public class ListDirWithEmptyDirs extends TestCaseAdapter {
 		}
 	}
 
-	@Override
-	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
-	}
-
 }

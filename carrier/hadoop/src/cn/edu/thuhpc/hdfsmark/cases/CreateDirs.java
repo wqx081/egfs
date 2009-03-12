@@ -37,11 +37,4 @@ public class CreateDirs extends TestCaseAdapter {
 			e.printStackTrace();
 		}		
 	}
-
-	@Override
-	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// I will do clean.
-		
-	}
-
 }

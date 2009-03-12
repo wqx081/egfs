@@ -39,13 +39,6 @@ public class CreateFiles extends TestCaseAdapter {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
-	}
-
-	@Override
-	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
-	}
+	}	
 
 }
