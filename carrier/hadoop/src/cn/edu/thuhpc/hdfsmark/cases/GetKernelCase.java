@@ -2,12 +2,12 @@ package cn.edu.thuhpc.hdfsmark.cases;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
 
-public class GetKernelCase extends Configured implements TestCase {
+public class GetKernelCase extends TestCaseAdapter {
 
 	String src = null;
 	String dst = null;
@@ -24,16 +24,21 @@ public class GetKernelCase extends Configured implements TestCase {
 	}
 
 	@Override
-	public void run() {
+	public void run(FileSystem hdfs, Configuration conf) {
 		Path srcp = new Path(src);
 	    Path dstp = new Path(dst);
 	    
 	    try {
-			FileSystem dstFS = dstp.getFileSystem(getConf());
-		    dstFS.copyToLocalFile(false, srcp, dstp);
+		    hdfs.copyToLocalFile(false, srcp, dstp);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
+	}
+
+	@Override
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		// TODO Auto-generated method stub
+		
 	}
 }
