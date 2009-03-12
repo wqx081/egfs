@@ -1,0 +1,33 @@
+Client Server -> Client Worker: {open, FileName}
+activate Client Server
+activate Client Worker
+Client Worker->Meta Server: open (FileName, Mode)
+activate Meta Server
+Meta Server->Meta Worker: [FileRecord,Mod] ％create a meta worker 
+Meta Worker->Meta Server: ok
+Meta Server->Client Worker: {ok, FileID, FileSize, ChunkList, MetaWorkerPid} 
+Client Worker->Client Server: {ok, ClientWorkerPid} 
+deactivate Meta Server
+deactivate Client Worker
+deactivate Client Server
+
+loop read_chunks
+activate Client Worker
+Client Worker -> Meta Worker: {seekchunk, ChunkID}
+activate Meta Worker
+Meta Worker -> Client Worker: [Hosts]
+deactivate Meta Worker
+Client Worker -> Data Server: {read, ChunkID}
+activate Data Server
+Data Server -> Client Worker: {ok, DataWorkerPid}
+deactivate Data Server
+loop read_data
+Client Worker -> Data Worker: {read, ChunkID, Start, Length}
+activate Data Worker
+Data Worker -> Client Worker: {ok, Data}
+end
+deactivate Data Worker
+end
+deactivate Client Worker
+
+
