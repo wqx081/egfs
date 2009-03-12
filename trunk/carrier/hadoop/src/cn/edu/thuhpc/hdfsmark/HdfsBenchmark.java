@@ -4,6 +4,8 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.ini4j.Ini;
 import org.ini4j.InvalidIniFormatException;
 
@@ -13,13 +15,25 @@ public class HdfsBenchmark implements Runnable {
 
 	private static HdfsBenchmark benchmark = null;
 	private static Ini ini = null;
+	private Configuration conf = null;
+	private FileSystem    hdfs = null;
 
-	public static HdfsBenchmark getInstance() {
+	public static HdfsBenchmark getInstance() throws IOException {
 		if (benchmark == null) {
 			benchmark = new HdfsBenchmark();
 		}
 		return benchmark;
 	}
+	
+	
+
+	public HdfsBenchmark() throws IOException {
+		super();
+		conf = new Configuration();
+		hdfs = FileSystem.get(conf);
+	}
+
+
 
 	/**
 	 * @param args
@@ -49,12 +63,15 @@ public class HdfsBenchmark implements Runnable {
 				try {
 					tc.setup(section);
 					long begin = System.currentTimeMillis();
-					tc.run();
+					tc.run(hdfs, conf);
 					long end = System.currentTimeMillis();
 					System.out.print("["+begin+"]");
 					System.out.print("["+end+"]");
 					System.out.print("["+(end-begin)+"]");
 					System.out.println(": "+tc.getDesc());
+					if(tc.isCleanup()) {
+						tc.cleanup(hdfs, conf);
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

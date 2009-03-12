@@ -1,8 +1,10 @@
 package cn.edu.thuhpc.hdfsmark.cases;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.ini4j.Ini.Section;
 
-public class CreateCase implements TestCase {
+public class CreateCase extends TestCaseAdapter {
 	
 	int count = 10000;
 
@@ -17,9 +19,15 @@ public class CreateCase implements TestCase {
 	}
 
 	@Override
-	public void run() {
+	public void run(FileSystem hdfs, Configuration conf) {
 		
 		System.out.println("doing create... done!");
+	}
+
+	@Override
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

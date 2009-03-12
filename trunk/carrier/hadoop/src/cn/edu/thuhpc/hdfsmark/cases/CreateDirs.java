@@ -1,21 +1,11 @@
 package cn.edu.thuhpc.hdfsmark.cases;
 
-import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.text.SimpleDateFormat;
-import java.util.Locale;
-import java.util.TimeZone;
-
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.ini4j.InvalidIniFormatException;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
-import org.apache.hadoop.fs.*;
 
-import cn.edu.thuhpc.hdfsmark.cases.TestCase;
-
-public class CreateDirs implements TestCase {
+public class CreateDirs extends TestCaseAdapter {
 
 	int count = 10000;
 
@@ -31,12 +21,10 @@ public class CreateDirs implements TestCase {
 
 
 	@Override
-	public void run() {
+	public void run(FileSystem hdfs, Configuration conf) {
 		int i = 0; 
 		
-		Configuration config = new Configuration();
 		try {
-			FileSystem hdfs = FileSystem.get(config);			
 			Path pFolder = new Path("TestHadoopMkdirDir");
 			hdfs.mkdirs(pFolder);
 			
@@ -45,10 +33,15 @@ public class CreateDirs implements TestCase {
 				hdfs.mkdirs(path);				
 			}
 			
-			hdfs.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}		
+	}
+
+	@Override
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		// I will do clean.
+		
 	}
 
 }

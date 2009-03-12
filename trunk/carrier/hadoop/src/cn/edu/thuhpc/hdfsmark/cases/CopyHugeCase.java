@@ -2,13 +2,13 @@ package cn.edu.thuhpc.hdfsmark.cases;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
 
-public class CopyHugeCase extends Configured implements TestCase{
+public class CopyHugeCase extends TestCaseAdapter {
 
 	float size = 1;
 	String src = null;
@@ -27,16 +27,20 @@ public class CopyHugeCase extends Configured implements TestCase{
 	}
 	
 	@Override
-	public void run() {
+	public void run(FileSystem hdfs, Configuration conf) {
 		Path srcp = new Path(src);
 		Path dstp = new Path(dst);
 		try {
-			FileSystem srcFS = srcp.getFileSystem(getConf());
-			FileSystem dstFS = dstp.getFileSystem(getConf());			
-			FileUtil.copy(srcFS, srcp, dstFS, dstp, false, getConf());
+			FileUtil.copy(hdfs, srcp, hdfs, dstp, false, conf);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}		
+	}
+
+	@Override
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

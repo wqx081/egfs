@@ -2,12 +2,12 @@ package cn.edu.thuhpc.hdfsmark.cases;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
 
-public class RemoveKernelCase extends Configured implements TestCase{
+public class RemoveKernelCase extends TestCaseAdapter{
 
 	String dirpath = null;
 	
@@ -23,15 +23,20 @@ public class RemoveKernelCase extends Configured implements TestCase{
 	}
 
 	@Override
-	public void run() {
+	public void run(FileSystem hdfs, Configuration conf) {
 		
 	    Path dirp = new Path(dirpath);
 	    try {
-		    FileSystem dirFS = dirp.getFileSystem(getConf());
-			dirFS.delete(dirp,true);
+	    	hdfs.delete(dirp,true);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+	}
+
+	@Override
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		// TODO Auto-generated method stub
 		
 	}
 

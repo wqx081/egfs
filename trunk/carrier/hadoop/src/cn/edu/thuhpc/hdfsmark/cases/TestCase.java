@@ -1,10 +1,18 @@
 package cn.edu.thuhpc.hdfsmark.cases;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.ini4j.Ini.Section;
 
-public interface TestCase extends Runnable {
+public interface TestCase {
 	
-	public abstract void setup(Section sec);
+	void setup(Section sec);
 
-	public abstract String getDesc();
+	String getDesc();
+
+	void run(FileSystem hdfs, Configuration conf);
+	
+	void cleanup(FileSystem hdfs, Configuration conf);
+
+	boolean isCleanup();
 }
