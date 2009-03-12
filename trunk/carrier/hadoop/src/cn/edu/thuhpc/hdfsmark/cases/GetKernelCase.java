@@ -1,5 +1,6 @@
 package cn.edu.thuhpc.hdfsmark.cases;
 
+import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +39,7 @@ public class GetKernelCase extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
+	    File dstf = new File(dst);
+	    dstf.delete();
 	}
 }

@@ -38,7 +38,11 @@ public class PutKernelCase  extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
+	    Path dirp = new Path(dst);
+	    try {
+	    	hdfs.delete(dirp,true);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}		
 	}
 }
