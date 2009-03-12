@@ -9,28 +9,37 @@ public class CopyFromHdfsToLocal extends TestCaseAdapter {
 
 	int count = 10000;
 
-	@Override
+	
 	public void setup(Section sec) {
 		super.setup(sec);
 		count = Integer.parseInt(sec.fetch("number"));
 	}
 
-	@Override
-	public String getDesc() {
-		return "copy one file with size " + count + " bytes into form HDFS to Local";
-	}
 
+	public String getDesc() {
+		return "copy one file with size " + count
+				+ " bytes into form HDFS to Local";
+	}
 
 	@Override
 	public void run(FileSystem hdfs, Configuration conf) {
-		
+
 		try {
-			Path pSrc = new Path("linux");
-			Path pDst = new Path("/home/pp/linux");
-			hdfs.copyToLocalFile(pSrc, pDst);					
+			Path pHdfsSrc = new Path("linux");
+			Path pLocalDst = new Path("/home/pp/");
+			hdfs.copyToLocalFile(pHdfsSrc, pLocalDst);
 		} catch (Exception e) {
 			e.printStackTrace();
-		}		
+		}
+	}
+
+	public void cleanup(FileSystem hdfs, Configuration conf) {
+		try {
+			Path pFolder = new Path("linux");
+			hdfs.delete(pFolder, true);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 }

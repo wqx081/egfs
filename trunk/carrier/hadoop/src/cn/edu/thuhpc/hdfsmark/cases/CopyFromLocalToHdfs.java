@@ -24,18 +24,12 @@ public class CopyFromLocalToHdfs extends TestCaseAdapter {
 	public void run(FileSystem hdfs, Configuration conf) {
 		
 		try {
-			Path pSrc = new Path("/home/pp/test");
-			Path pDst = new Path("linux");
-			hdfs.copyFromLocalFile(pSrc, pDst);							
+			Path pLocalSrc = new Path("/home/pp/test");
+			Path pHdfsDst = new Path("linux");
+			hdfs.copyFromLocalFile(pLocalSrc, pHdfsDst);							
 		} catch (Exception e) {
 			e.printStackTrace();
 		}		
 	}
-
-	@Override
-	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
-	}
-
+	
 }

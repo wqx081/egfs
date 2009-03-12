@@ -23,11 +23,5 @@ public class CreateCase extends TestCaseAdapter {
 		
 		System.out.println("doing create... done!");
 	}
-
-	@Override
-	public void cleanup(FileSystem hdfs, Configuration conf) {
-		// TODO Auto-generated method stub
-		
-	}
-
+	
 }
