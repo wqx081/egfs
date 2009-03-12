@@ -24,7 +24,7 @@ public class CopyFromLocalToHdfs extends TestCaseAdapter {
 	public void run(FileSystem hdfs, Configuration conf) {
 		
 		try {
-			Path pLocalSrc = new Path("/home/pp/test");
+			Path pLocalSrc = new Path("/home/lkliu/test");
 			Path pHdfsDst = new Path("linux");
 			hdfs.copyFromLocalFile(pLocalSrc, pHdfsDst);							
 		} catch (Exception e) {
