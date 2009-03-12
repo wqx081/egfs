@@ -357,7 +357,9 @@ check_process_byID(FileID)->
 %% @spec check_process_byName(Name) -> {ok,FileName} | {error,"output"}  
 check_process_byName(FileName) ->
     WA = lib_common:generate_processname(FileName,write),
-    RA = lib_common:generate_processname(FileName,read),    
+    RA = lib_common:generate_processname(FileName,read),
+    error_logger:info_msg("Write processname: ~p~n",[WA]),
+    error_logger:info_msg("Read processname: ~p~n",[RA]),
     case whereis(WA) of
         undefined->
             case whereis(RA) of
@@ -392,7 +394,7 @@ do_file_open(FileName,Mod)->
     end.
 
 do_write_open(FileName)->    
-    ProcessName = lib_common:generate_processname(FileName,w),
+    ProcessName = lib_common:generate_processname(FileName,write),
     io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
         undefined -> % no meta worker , create one worker to server this writing request.
@@ -422,7 +424,7 @@ do_write_open(FileName)->
     end.
 
 do_read_open(FileName)->
-    ProcessName = lib_common:generate_processname(FileName,r),
+    ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
             case meta_db:select_all_from_filemeta_byName(FileName) of			
@@ -503,8 +505,8 @@ do_debug(Arg) ->
             io:format("ohter~n")
     end.
 
-do_showWorker(FileName,EasyMod)->
-    ProcessName = lib_common:generate_processname(FileName,EasyMod),
+do_showWorker(FileName,Mod)->
+    ProcessName = lib_common:generate_processname(FileName,Mod),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
             io:format(" no this file worker exist."),
