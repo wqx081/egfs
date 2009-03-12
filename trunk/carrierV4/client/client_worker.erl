@@ -16,13 +16,9 @@
 %% gen_server callbacks
 %%====================================================================
 % do open operation
-init([]) ->
+init([FileName, Mode, UserName]) ->
 	process_flag(trap_exit,true),
 	error_logger:info_msg("[~p, ~p]: client worker ~p starting~n", [?MODULE, ?LINE, self()]),	
-	{ok, #filecontext{}}.
-	
-handle_call({open, FileName, Mode, UserName}, _From, FileContext) ->
-	error_logger:info_msg("[~p, ~p]: open file ~p mode ~p~n", [?MODULE, ?LINE, FileName, Mode]),	
 	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
 			% set the correct position of FileContext 	
@@ -41,10 +37,10 @@ handle_call({open, FileName, Mode, UserName}, _From, FileContext) ->
 											mode = Mode,
 											metaworkerpid = MetaWorkerPid},
 			link(MetaWorkerPid),
-			{reply, {ok, self()}, NewFileContext};
+			{ok, NewFileContext};
 		{error, Why} ->
-			{reply, {error, Why}, FileContext}
-	end;
+			{stop, Why}
+	end.	
 
 handle_call({write, Bytes}, _From, FileContext) ->
 %	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
@@ -55,7 +51,7 @@ handle_call({write, Bytes}, _From, FileContext) ->
 		_Any ->
 			{reply, {error, "write open mode error"}, FileContext}
 	end;
-	
+
 handle_call({read, Number}, _From, FileContext) ->
 %	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	case FileContext#filecontext.mode of
@@ -70,6 +66,41 @@ handle_call({read, Number}, _From, FileContext) ->
 		_Any ->
 			{reply, {error, "read open mode error"}, FileContext}
 	end;
+	
+handle_call({position, Location}, _From, FileContext) ->
+	error_logger:info_msg("[~p, ~p]: set position ~p  ~n", [?MODULE, ?LINE, Location]),	
+	#filecontext{	offset   = Offset,
+					filesize = FileSize,
+				 	dataworkerpid = DataWorkerPid} = FileContext,
+	case Location =<  FileSize of
+	    true ->
+			TargetChunkIndex= Location div ?CHUNKSIZE,
+			CurrentChunkIndex= Offset div ?CHUNKSIZE,
+			case TargetChunkIndex =:= CurrentChunkIndex of
+				true ->
+					NewFC= FileContext#filecontext{	offset = Location},
+			    	{reply, ok, NewFC};
+				false ->
+					lib_chan:disconnect(DataWorkerPid),
+					NewFC= FileContext#filecontext{	offset = Location, 													
+													chunkid=[],
+													host=[],
+													dataworkerpid=undefined},
+			    	{reply, ok, NewFC}
+			end;
+    	false ->
+			Reason= "set wrong location",
+			{reply, {error, Reason}, FileContext}
+	end;
+
+handle_call({pread, Location, Number}, _From, FileContext) ->
+	error_logger:info_msg("[~p, ~p]: pread ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
+	case gen_server:call(?MODULE, {position, Location}) of
+		ok ->
+			gen_server:call(?MODULE, {read, Number});	
+		{error, Reason} ->
+			{error, Reason}
+	end;	
 		
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=write ->
 	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	

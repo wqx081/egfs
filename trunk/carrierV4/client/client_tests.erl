@@ -67,7 +67,7 @@ testw({FileName,_FileSize, _MD5}) ->
 		{ok, ClientWorkerPid}  ->
 			{ok,Hdl}=file:open(?INPUTDIR++FileName,[binary,raw,read,read_ahead]),
 			write_loop(ClientWorkerPid, Hdl),
-			gen_server:call(client_server,{close,ClientWorkerPid});
+			gen_server:call(ClientWorkerPid,{close,ClientWorkerPid});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)
@@ -76,7 +76,7 @@ testw({FileName,_FileSize, _MD5}) ->
 write_loop(ClientWorkerPid, Hdl)->
 	case file:read(Hdl,?STRIP_SIZE) of % read 128K every time 
 		{ok, Data} ->
-			gen_server:call(client_server,{write,ClientWorkerPid,Data}),
+			gen_server:call(ClientWorkerPid,{write,Data},120000),
 			write_loop(ClientWorkerPid, Hdl);
 		eof ->
 			file:close(Hdl);	
@@ -90,7 +90,7 @@ testr({FileName,_FileSize, MD5}) ->
 		{ok, ClientWorkerPid}   ->
 			{ok,Hdl}=file:open(TargetFile, [binary,raw,write]),
 			read_loop(ClientWorkerPid,Hdl),
-			gen_server:call(client_server,{close,ClientWorkerPid});
+			gen_server:call(ClientWorkerPid,{close,ClientWorkerPid});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)
@@ -105,7 +105,7 @@ testr({FileName,_FileSize, MD5}) ->
 	end.
 	
 read_loop(ClientWorkerPid, Hdl) ->
-	case  gen_server:call(client_server,{read,ClientWorkerPid,?STRIP_SIZE}) of % read 128K every time 
+	case  gen_server:call(ClientWorkerPid,{read,?STRIP_SIZE},120000) of % read 128K every time 
 		{ok, Data} ->
 			file:write(Hdl,Data),
 			read_loop(ClientWorkerPid, Hdl);
@@ -114,5 +114,4 @@ read_loop(ClientWorkerPid, Hdl) ->
 		{error,Reason} ->
 			Reason
 	end.
-		
 
