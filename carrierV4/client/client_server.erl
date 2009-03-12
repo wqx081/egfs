@@ -12,8 +12,6 @@
 -export([	start_link/0, 
 			list_dir/1,
 			open/3, 
-			write/2, 
-			read/2, 
 			close/1, 
 			delete/2,
 			copy/3,
@@ -48,20 +46,6 @@ list_dir(FileName) ->
 open(FileName, Mode, UserName) ->
 	gen_server:call(?MODULE, {open, FileName, Mode, UserName}).
 
-%% --------------------------------------------------------------------
-%% Function: write(binary()) ->  {ok, FileContext} | {error, Reason} 
-%% Description: write Bytes to dataserver
-%% --------------------------------------------------------------------
-write(ClientWorkerPid, Bytes) ->
-	gen_server:call(?MODULE, {write, ClientWorkerPid, Bytes},120000).
-
-%% --------------------------------------------------------------------
-%% Function: read(int()) ->  {ok, FileContext, Data} | {eof, FileContext} | {error, Reason} 
-%% Description: read Number Bytes from Location offset
-%% --------------------------------------------------------------------
-read(ClientWorkerPid, Number) ->
-	gen_server:call(?MODULE, {read, ClientWorkerPid, Number}, 120000).
-	
 %% --------------------------------------------------------------------
 %% Function: close/1 ->  ok | {error, Reason} 
 %% Description: close file
@@ -128,22 +112,8 @@ init([]) ->
     {ok, []}.
 
 handle_call({open, FileName, Mode, UserName}, _From, State) ->
-	{ok, ClientWorkerPid}=gen_server:start(client_worker, [], []),
-	Reply = gen_server:call(ClientWorkerPid,{open, FileName, Mode, UserName}),
-	{reply, Reply, State};	
-
-
-handle_call({write, ClientWorkerPid, Bytes}, _From, State) ->
-	Reply = gen_server:call(ClientWorkerPid,{write, Bytes},120000),
-	{reply, Reply, State};	
-	
-handle_call({read, ClientWorkerPid, Number}, _From, State) ->
-	Reply = gen_server:call(ClientWorkerPid,{read, Number},120000),
-	{reply, Reply, State};	
-
-handle_call({close, ClientWorkerPid}, _From, State) ->
-	Reply = gen_server:call(ClientWorkerPid,{close}),
-	{reply, Reply, State};	
+	{ok, ClientWorkerPid}=gen_server:start(client_worker, [FileName, Mode, UserName], []),
+	{reply, {ok, ClientWorkerPid}, State};	
 
 handle_call({delete, FileName, UserName}, _From, State)  ->
 	error_logger:info_msg("[~p, ~p]: delete ~p ~n", [?MODULE, ?LINE, FileName]),	
