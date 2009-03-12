@@ -16,7 +16,7 @@ public class GetHugeCase extends TestCaseAdapter{
 	
 	@Override
 	public String getDesc() {
-		return "Get "+size+"GB File to Local "+dst+" from Hadoop";
+		return "Get "+size+"GB File From Hadoop "+src+" To Local "+dst;
 	}
 
 	@Override
