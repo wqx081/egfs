@@ -20,6 +20,7 @@ public class GetKernelCase extends TestCaseAdapter {
 
 	@Override
 	public void setup(Section sec) {
+		super.setup(sec);
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");
 	}

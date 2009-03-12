@@ -21,6 +21,7 @@ public class GetHugeCase extends TestCaseAdapter{
 
 	@Override
 	public void setup(Section sec) {
+		super.setup(sec);
 		size = Float.valueOf(sec.fetch("size"));
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");

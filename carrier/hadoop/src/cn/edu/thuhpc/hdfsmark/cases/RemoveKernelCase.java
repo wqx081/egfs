@@ -18,6 +18,7 @@ public class RemoveKernelCase extends TestCaseAdapter{
 
 	@Override
 	public void setup(Section sec) {
+		super.setup(sec);
 		dirpath = sec.fetch("dirpath");
 		
 	}
