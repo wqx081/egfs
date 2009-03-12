@@ -8,7 +8,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.ini4j.Ini.Section;
 
-public class CopyKernel extends TestCaseAdapter {
+public class CopyKernelCase extends TestCaseAdapter {
 
 	String src = null;
 	String dst = null;
