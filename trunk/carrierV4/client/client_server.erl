@@ -10,7 +10,6 @@
 -include("../include/header.hrl").
 -include_lib("kernel/include/file.hrl").
 -export([	start_link/0, 
-			list_dir/1,
 			open/3, 
 			close/1, 
 			delete/2,
@@ -30,13 +29,6 @@
 start_link() ->
     error_logger:info_msg("[~p, ~p]: client server ~p starting ~n", [?MODULE, ?LINE, node()]),
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-%%--------------------------------------------------------------------------------
-%% Function: list(string(),Mode) -> {ok, FileNames} | {error, Reason} 
-%% Description: list sub files and directories
-%%--------------------------------------------------------------------------------
-list_dir(FileName) ->
-	gen_server:call(?MODULE, {listdir, FileName}).
 
 %%--------------------------------------------------------------------------------
 %% Function: open(string(),Mode) -> {ok, ClientWorkerPid} | {error, Reason} 
@@ -112,8 +104,8 @@ init([]) ->
     {ok, []}.
 
 handle_call({open, FileName, Mode, UserName}, _From, State) ->
-	{ok, ClientWorkerPid}=gen_server:start(client_worker, [FileName, Mode, UserName], []),
-	{reply, {ok, ClientWorkerPid}, State};	
+	Reply=gen_server:start(client_worker, [FileName, Mode, UserName], []),
+	{reply, Reply, State};	
 
 handle_call({delete, FileName, UserName}, _From, State)  ->
 	error_logger:info_msg("[~p, ~p]: delete ~p ~n", [?MODULE, ?LINE, FileName]),	
