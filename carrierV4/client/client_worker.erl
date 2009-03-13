@@ -54,50 +54,31 @@ handle_call({write, Bytes}, _From, FileContext) ->
 
 handle_call({read, Number}, _From, FileContext) ->
 %	error_logger:info_msg("[~p, ~p]: read ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
-	case FileContext#filecontext.mode of
-		read ->
-			case FileContext#filecontext.offset =:= FileContext#filecontext.filesize of
-			    true ->
-			    	{reply, eof , FileContext};
-		    	false ->
-		    		{ok, NewFileContext, Data} = read_data(FileContext, Number),	
-					{reply, {ok, Data}, NewFileContext}
-			end;			
-		_Any ->
-			{reply, {error, "read open mode error"}, FileContext}
+	case do_read(FileContext, Number) of
+		{ok, NewFC, Data} ->
+			{reply, {ok, Data}, NewFC};	
+		eof ->
+			{reply, eof,FileContext};
+		{error, Reason} ->
+			{reply, {error,Reason}, FileContext}
+		
 	end;
 	
 handle_call({position, Location}, _From, FileContext) ->
 	error_logger:info_msg("[~p, ~p]: set position ~p  ~n", [?MODULE, ?LINE, Location]),	
-	#filecontext{	offset   = Offset,
-					filesize = FileSize,
-				 	dataworkerpid = DataWorkerPid} = FileContext,
-	case Location =<  FileSize of
-	    true ->
-			TargetChunkIndex= Location div ?CHUNKSIZE,
-			CurrentChunkIndex= Offset div ?CHUNKSIZE,
-			case TargetChunkIndex =:= CurrentChunkIndex of
-				true ->
-					NewFC= FileContext#filecontext{	offset = Location},
-			    	{reply, ok, NewFC};
-				false ->
-					lib_chan:disconnect(DataWorkerPid),
-					NewFC= FileContext#filecontext{	offset = Location, 													
-													chunkid=[],
-													host=[],
-													dataworkerpid=undefined},
-			    	{reply, ok, NewFC}
-			end;
-    	false ->
-			Reason= "set wrong location",
-			{reply, {error, Reason}, FileContext}
+	case do_position(FileContext, Location) of
+		{ok, NewFC} ->
+			{reply, ok, NewFC};
+		{error, Reason} ->
+			{reply, {error,Reason},FileContext}
 	end;
 
 handle_call({pread, Location, Number}, _From, FileContext) ->
 	error_logger:info_msg("[~p, ~p]: pread ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
-	case gen_server:call(?MODULE, {position, Location}) of
-		ok ->
-			gen_server:call(?MODULE, {read, Number});	
+	case do_position(FileContext, Location) of
+		{ok, NewFC} ->
+			{ok, NewFC1, Data} = do_read(NewFC, Number),
+			{reply, {ok,Data}, NewFC1};
 		{error, Reason} ->
 			{error, Reason}
 	end;	
@@ -223,7 +204,48 @@ write_data(FileContext, Bytes) ->
 			{ok, NewFC}			
 	end.
 
+generate_chunkmapping_record([],[]) ->
+	[];
+generate_chunkmapping_record([CH|CT],[NH|NT]) ->
+	[#chunkmapping{chunkid=CH, chunklocations=[NH]}] ++ generate_chunkmapping_record(CT,NT).
 
+do_position(FileContext, Location) ->
+	#filecontext{	offset   = Offset,
+					filesize = FileSize,
+				 	dataworkerpid = DataWorkerPid} = FileContext,
+	case Location =<  FileSize of
+	    true ->
+			TargetChunkIndex= Location div ?CHUNKSIZE,
+			CurrentChunkIndex= Offset div ?CHUNKSIZE,
+			case TargetChunkIndex =:= CurrentChunkIndex of
+				true ->
+					NewFC= FileContext#filecontext{	offset = Location},
+			    	{ok, NewFC};
+				false ->
+					lib_chan:disconnect(DataWorkerPid),
+					NewFC= FileContext#filecontext{	offset = Location, 													
+													chunkid=[],
+													host=[],
+													dataworkerpid=undefined},
+					{ok, NewFC}
+			end;
+    	false ->
+			{error, "set wrong location"}
+	end.
+
+do_read(FileContext, Number) ->
+	case FileContext#filecontext.mode of
+		read ->
+			case FileContext#filecontext.offset =:= FileContext#filecontext.filesize of
+			    true ->
+			    	eof;
+		    	false ->
+		    		read_data(FileContext, Number)
+			end;			
+		_Any ->
+			{error, "read open mode error"}
+	end.
+	
 read_data(FileContext, Number) ->
 	read_data(FileContext, Number, []).
 read_data(FileContext, 0, L) ->
@@ -267,10 +289,4 @@ read_data(FileContext, Number, L) ->
 			%error_logger:info_msg("[~p, ~p]:E read ~p~n", [?MODULE, ?LINE, Data]),
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength},			
 			read_data(NewFC, Number-ReadLength, L1)
-	end.
-			
-generate_chunkmapping_record([],[]) ->
-	[];
-generate_chunkmapping_record([CH|CT],[NH|NT]) ->
-	[#chunkmapping{chunkid=CH, chunklocations=[NH]}] ++ generate_chunkmapping_record(CT,NT).
-
+	end.	
