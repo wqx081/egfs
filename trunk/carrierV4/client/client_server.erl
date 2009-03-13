@@ -17,6 +17,7 @@
 			move/3,
 			listdir/2,
 			mkdir/2,
+			getfileinfo/2,
 			chmod/4]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
@@ -94,6 +95,13 @@ mkdir(Dir, UserName) ->
 chmod(FileName, UserName, UserType, CtrlACL) ->
 	gen_server:call(?MODULE, {chmod, FileName, UserName, UserType, CtrlACL}).		
 	
+%% --------------------------------------------------------------------
+%% Function: fileinfo/4 ->  ok | {error, Reason} 
+%% Description: list dir
+%% Returns: ok | {error, Reason}
+%% --------------------------------------------------------------------	
+getfileinfo(FileName, UserName) ->
+	gen_server:call(?MODULE, {getfileinfo, FileName, UserName}).	
 	
 
 %%====================================================================
@@ -131,6 +139,11 @@ handle_call({mkdir, Dir, UserName}, {_From, _}, State) ->
 	error_logger:info_msg("[~p, ~p]: make dir=~p~n", [?MODULE, ?LINE, Dir]),
     Reply = gen_server:call(?META_SERVER, {mkdir, Dir, UserName}),	
     {reply, Reply, State};    
+
+handle_call({getfileinfo, FileName, UserName}, _From, State)  ->
+	error_logger:info_msg("[~p, ~p]: fileinfo ~p ~n", [?MODULE, ?LINE, FileName]),	
+	Reply = gen_server:call(?META_SERVER, {getfileinfo, FileName, UserName}),					
+	{reply, Reply, State};
 
 handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) ->
 	error_logger:info_msg("[~p, ~p]: chmod FileName:~p~n UserName:~p~n UserType:~p~n CtrlACL:~p~n", [?MODULE, ?LINE, [FileName, UserName, UserType, CtrlACL]]),
