@@ -10,17 +10,19 @@ import org.ini4j.Ini.Section;
 
 public class GetKernelCase extends TestCaseAdapter {
 
+	Integer size = 0;
 	String src = null;
 	String dst = null;
 
 	@Override
 	public String getDesc() {
-		return "Get Kernel From Hadoop "+src+" To Local "+dst;
+		return "Get "+size+" Bytes Kernel From Hadoop "+src+" To Local "+dst;
 	}
 
 	@Override
 	public void setup(Section sec) {
 		super.setup(sec);
+		size = Integer.parseInt(sec.fetch("size"));
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");
 	}
@@ -40,7 +42,9 @@ public class GetKernelCase extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-	    File dstf = new File(dst);
+		Path srcp = new Path(src);
+		String name = srcp.getName();
+		File dstf = new File((dst+"/"+name));
 	    dstf.delete();
 	}
 }

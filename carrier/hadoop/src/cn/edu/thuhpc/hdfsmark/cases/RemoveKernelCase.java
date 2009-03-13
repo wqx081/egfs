@@ -31,8 +31,7 @@ public class RemoveKernelCase extends TestCaseAdapter{
 	    	hdfs.delete(dirp,true);
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
-		
+		}		
 	}
 
 }

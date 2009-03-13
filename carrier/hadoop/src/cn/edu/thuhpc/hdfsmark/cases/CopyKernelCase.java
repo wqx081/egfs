@@ -10,17 +10,20 @@ import org.ini4j.Ini.Section;
 
 public class CopyKernelCase extends TestCaseAdapter {
 
+	Integer size = 0;
 	String src = null;
 	String dst = null;
 	
+	
 	@Override
 	public String getDesc() {
-		return "Copy Kernel From "+src+" To "+dst+"  At Hadoop";
+		return "Copy "+size+" Bytes Kernel From "+src+" To "+dst+"  At Hadoop";
 	}
 
 	@Override
 	public void setup(Section sec) {
 		super.setup(sec);
+		size = Integer.parseInt(sec.fetch("size"));
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");
 	}
@@ -39,7 +42,9 @@ public class CopyKernelCase extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-	    Path dirp = new Path(dst);
+		Path srcp = new Path(src);
+		String name = srcp.getName();
+		Path dirp = new Path((dst+"/"+name));
 	    try {
 	    	hdfs.delete(dirp,true);
 		} catch (IOException e) {

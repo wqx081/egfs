@@ -10,19 +10,19 @@ import org.ini4j.Ini.Section;
 
 public class CopyHugeCase extends TestCaseAdapter {
 
-	float size = 1;
+	Integer size = 0;
 	String src = null;
 	String dst = null;
 	
 	@Override
 	public String getDesc() {
-		return "Copy "+size+"GB File From "+src+" To "+dst+" At Hadoop";
+		return "Copy "+size+" Bytes File From "+src+" To "+dst+" At Hadoop";
 	}
 
 	@Override
 	public void setup(Section sec) {
 		super.setup(sec);
-		size = Float.valueOf(sec.fetch("size"));
+		size = Integer.parseInt(sec.fetch("size"));
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");
 	}
@@ -40,7 +40,9 @@ public class CopyHugeCase extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-	    Path dirp = new Path(dst);
+		Path srcp = new Path(src);
+		String name = srcp.getName();
+		Path dirp = new Path((dst+"/"+name));
 	    try {
 	    	hdfs.delete(dirp,true);
 		} catch (IOException e) {
