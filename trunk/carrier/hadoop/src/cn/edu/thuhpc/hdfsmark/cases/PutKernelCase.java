@@ -9,17 +9,19 @@ import org.ini4j.Ini.Section;
 
 public class PutKernelCase  extends TestCaseAdapter {
 
+	Integer size = 0;
 	String src = null;
 	String dst = null;
 
 	@Override
 	public String getDesc() {
-		return "Put Kernel From Local "+src+" To Hadoop "+dst;
+		return "Put "+size+" Bytes Kernel From Local "+src+" To Hadoop "+dst;
 	}
 
 	@Override
 	public void setup(Section sec) {
 		super.setup(sec);
+		size = Integer.parseInt(sec.fetch("size"));
 		src = sec.fetch("src");
 		dst = sec.fetch("dst");
 	}
@@ -39,7 +41,9 @@ public class PutKernelCase  extends TestCaseAdapter {
 
 	@Override
 	public void cleanup(FileSystem hdfs, Configuration conf) {
-	    Path dirp = new Path(dst);
+		Path srcp = new Path(src);
+		String name = srcp.getName();
+		Path dirp = new Path((dst+"/"+name));
 	    try {
 	    	hdfs.delete(dirp,true);
 		} catch (IOException e) {
