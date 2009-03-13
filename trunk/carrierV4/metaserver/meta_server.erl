@@ -132,6 +132,10 @@ handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
 	Reply = meta_common:do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
+handle_call({getfileinfo,FileName,_UserName}, {_From, _}, State) -> 
+    error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),
+    Reply  = meta_db:select_all_from_filemeta_byName(FileName),
+	{reply, Reply, State};
 
 handle_call({debug,Arg},{_From,_},State) ->
     Reply = meta_common:do_debug(Arg),
