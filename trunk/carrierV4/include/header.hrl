@@ -70,4 +70,6 @@
 -define(NODE_CHECK_INTERVAL,10000). %% 10second. chech monitor_node result.
 -define(CHUNKMAPPING_BROADCAST_INTERVAL,86400000).  %%1day = 24h = 24*3600s = 1000*24*3600 = 86,400,000
 -define(HOSTLIFE_AUTO_DECREASE_INTERVAL,5000).
--define(HOST_INIT_LIFE,10).
+-define(HOST_INIT_LIFE,2).
+
+%%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).

@@ -33,7 +33,9 @@ do_open(FilePathName, Mode, _UserName) ->
                 
                 dir ->
                     {error, "you are opening a dir"};
-                _Any ->                    
+                Any -> 
+                    error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
+                    
                     ParentDir = filename:dirname(FilePathName),
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
@@ -134,7 +136,7 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
                          parent = ParentID
                          },
 %%	check before write.     
-    case check_process_byName(NewFileMeta) of
+    case check_process_byName(SrcUnderDst) of
         {ok,_}->
             meta_db:write_to_db(NewFileMeta),            
             {ok,"copy finished"};
@@ -284,6 +286,9 @@ get_acl() ->
     true
 .
 
+
+
+
 %% filename:dirname("/a") -> "/" ,  ("/a/")->"/a"  ,"//" ->"/" , ""->"."
 %%		-> conclude: .  | File | Dir        
 %% filename:basename("/") ->[] , ("/a/")->"a" ("/a")->a
@@ -291,6 +296,9 @@ get_acl() ->
 
 %%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
 check_op_type(SrcFullPath, DstFullPath) ->
+    
+    
+    
     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),    
     SrcTag = meta_db:get_tag(SrcFullPath),
     DstTag = meta_db:get_tag(DstFullPath),
@@ -298,12 +306,18 @@ check_op_type(SrcFullPath, DstFullPath) ->
     
     error_logger:info_msg("SrcUnderDst:~p,SrcTag:~p,DstTag:~p,SrcUnderDstTag:~p~n",[SrcUnderDst,SrcTag,DstTag,SrcUnderDstTag]),
     
+    CaseSrcequalDes = string:equal(SrcFullPath,DstFullPath),
 
     CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null),
     CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null),
-    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
+    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) 
+									and (string:rstr(DstFullPath,SrcFullPath++"/")=:=0), 
+    %% TODO: copy dir /hxm to dir /hxm/copy is not allowed , but /hxm -> /hxmOtherdir is allowed, 
+    																			
     CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null), 
     if       
+        CaseSrcequalDes ->
+            {error," Src = Des."};
         CaseFileToUnFile ->
             {error," rename not supported"};
         CaseFileToDir ->
@@ -399,8 +413,8 @@ do_write_open(FileName)->
     case whereis(ProcessName) of
         undefined -> % no meta worker , create one worker to server this writing request.
             io:format("C...~n"),
-			case meta_db:get_id_from_dirmeta(FileName) of                
-				[] ->
+			case meta_db:get_id(FileName) of                
+				null ->
                     io:format("A...~n"),
 					% if the target file is not exist, then generate a new fileid. 
                     FileID = lib_uuid:gen(),
@@ -415,7 +429,7 @@ do_write_open(FileName)->
                     io:format("A2...~n"),
 					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileRecord, write], []),
 					{ok, FileID, 0, [], MetaWorkerPid};	  
-				[_FileMeta] ->
+				Any ->
                     io:format("B...~n"),
 					{error, "Cant Write! The same file name has existed in database."}
 			end;
