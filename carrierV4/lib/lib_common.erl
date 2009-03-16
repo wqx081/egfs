@@ -13,7 +13,8 @@
 		 get_file_name/1,
 		 generate_dirs/2,
          for/3,
-         idToAtom/2
+         idToAtom/2,
+         get_rid_of_last_slash/1
         ]).
 
 
@@ -44,6 +45,22 @@ generate_processname(Filename,Mode)->
 				end,    
     ModeList = lists:append(atom_to_list(ModePreFix),Filename),
     list_to_atom(ModeList).
+
+get_rid_of_last_slash(FileName)->
+    case string:len(FileName) of
+        1->
+            FileName;
+        Any->
+            case string:right(FileName,1) =:="/" of
+                true->
+                    get_rid_of_last_slash(string:left(FileName,Any-1));
+                _False->
+                    FileName
+            end
+    end.
+                    
+
+
 
 get_local_ip() ->
     {ok, Host} = inet:gethostname(),
