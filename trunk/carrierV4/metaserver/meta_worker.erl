@@ -29,45 +29,47 @@
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
-init([FileRecord,Mod]) ->
+init([FileRecord,Mod,_UserName]) ->
 	process_flag(trap_exit,true),
 	error_logger:info_msg("[~p, ~p]: start metaworker ~p~n", [?MODULE, ?LINE, self()]),
     
-    {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.fileid]), % check host health every 5 second
+    {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
     
 	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=[]},
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
     error_logger:info_msg("~~~~ in registerchunk~~~~n"),
-    io:format("checking...~n"),
-    io:format("worker state:~n"),
-    io:format("mod:    ~p~n",[State#metaWorkerState.mod]),
-    io:format("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.fileid]),
-    io:format("submit: ~p~n",[FileRecord#filemeta.fileid]),
+    error_logger:info_msg("checking...~n"),
+    error_logger:info_msg("worker state:~n"),
+    error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
+    error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
+    error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
 	Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords),
     
 %%    Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
 	{reply, Reply, State};
 
 handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
+    error_logger:info_msg("~~~~ in seekchunk~~~~n"),
 	Reply = meta_db:select_hosts_from_chunkmapping_id(ChunkID),
 	{reply, Reply, State};
 	
 handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
-	
+	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),
     Reply  = meta_db:select_all_from_filemeta_byName(FileName),
 	{reply, Reply, State};
 
 
 handle_call({locatechunk,FileID, ChunkIndex}, {_From, _}, State) ->
+    error_logger:info_msg("~~~~ in locatechunk~~~~n"),
     Reply = do_get_chunk(FileID, ChunkIndex),
     
 	{reply, Reply, State};
 
 
 handle_call({debug},{_From, _},State)->    
-    io:format(" someone is checking my state.~n"),
+    error_logger:info_msg(" someone is checking my state.~n"),
     {reply,{self(),State},State}.
 
 
@@ -87,10 +89,10 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'EXIT', _Pid, _Why}, State) ->
-    io:format("EXiT.~n"),
+    error_logger:info_msg("EXiT.~n"),
 	{stop, normal, State};	
 handle_info(_Info, State) ->
-    io:format("handle_info.~n"),
+    error_logger:info_msg("handle_info.~n"),
     {noreply, State}.
 
 terminate(Reason, _State) ->
@@ -126,13 +128,15 @@ do_get_chunk(FileID, ChunkIdx)->
 
 do_close(From,State) ->
     error_logger:info_msg("-- meta_worker  do_close"),
-    error_logger:info_msg(" metaworkerstate: ~p~n",[State#metaWorkerState.clients]),
+    error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
     error_logger:info_msg("From: ~p~n",[From]),
 
     case State#metaWorkerState.mod of
-        read->            
+        read->
+                      
+            
             Clients = State#metaWorkerState.clients--[From],
-            error_logger:info_msg("mod = r , Clients = ",[Clients]),
+            error_logger:info_msg("mod = read , Clients = ",[Clients]),
             case Clients of
                 []->
                     exit(normal);    %%use handle_info instead of handle_cast, avoid crash
@@ -140,11 +144,11 @@ do_close(From,State) ->
                     nil
             end;
         write->
-            error_logger:info_msg("mod = w"),
+            error_logger:info_msg("mod = write"),
             exit(normal)
     end.
 
 try_close(ID) ->
-    io:format("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
+    error_logger:info_msg("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
     
 
