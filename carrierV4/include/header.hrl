@@ -76,8 +76,16 @@
 %% file metadata 
 %%-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
 
--record(file_meta,
+%%
+
+-record(filemeta,
 	{
+     %% old one
+     id = 0,
+     name = 0,
+     chunklist =[],
+     parent = 0,
+    
      %% from file.hrl
      size = 0,			% Size of file in bytes.
 	 type = regular,		% Atom: device, directory, regular,
@@ -98,10 +106,6 @@
 					% filesystem doesn't support links).
 	 inode = 0,			% Inode number for file.
 	 uid = 0,			% User id for owner (integer).
-	 gid = 0,		% Group id for owner (integer).
-     %% old one
-     id = 0,
-     name = 0,
-     chunklist =[],
-     parent = 0
+	 gid = 0		% Group id for owner (integer).
+    
     }).			
