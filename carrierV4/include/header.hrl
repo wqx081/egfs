@@ -73,10 +73,10 @@
 
 %%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).
 
-%% file metadata 
+%% old file metadata 
 %%-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
 
-%%
+%%-record(filemeta,{id,name,chunklist,parent,size,type,access,atime,mtime,ctime,mode,links,inode,uid,gid})
 
 -record(filemeta,
 	{
