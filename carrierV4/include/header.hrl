@@ -47,8 +47,7 @@
 %%naming server.
 %%-record(dirmeta,{id, filename, createT, modifyT,tag,parent}).
 
-%% file metadata 
--record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
+
 %% dataserver process info
 -record(hostinfo,{hostname, freespace, totalspace, status,life}).
 %% chunk mapping relationship
@@ -74,8 +73,13 @@
 
 %%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).
 
+%% file metadata 
+%%-record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}).
+
 -record(file_meta,
-	{size = 0,			% Size of file in bytes.
+	{
+     %% from file.hrl
+     size = 0,			% Size of file in bytes.
 	 type = regular,		% Atom: device, directory, regular,
 					% or other.
 	 access = read,			% Atom: read, write, read_write, or none.
@@ -94,4 +98,10 @@
 					% filesystem doesn't support links).
 	 inode = 0,			% Inode number for file.
 	 uid = 0,			% User id for owner (integer).
-	 gid = 0}).			% Group id for owner (integer).
+	 gid = 0,		% Group id for owner (integer).
+     %% old one
+     id = 0,
+     name = 0,
+     chunklist =[],
+     parent = 0
+    }).			
