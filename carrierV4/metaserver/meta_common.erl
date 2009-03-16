@@ -20,31 +20,32 @@
 
 %%%%%  Part1 Naming Server
 
-do_open(FilePathName, Mode, _UserName) ->
+do_open(FilePathName, Mode, UserName) ->
     %% gen_server:call(?ACL_SERVER, {Mode, FilePathName, _UserName})
     case get_acl() of
         true ->
-            case meta_db:get_tag(FilePathName) of
-                file ->
-                    FileID = meta_db:get_id(FilePathName),
+            ReadPath = lib_common:get_rid_of_last_slash(FilePathName),
+            case meta_db:get_tag(ReadPath) of
+                regular ->
+                    FileID = meta_db:get_id(ReadPath),
                     io:format("show FileID ~p~n",[FileID]),
                     io:format("call_meta_open:"),
-                    do_file_open(FilePathName,Mode);
+                    do_file_open(ReadPath,Mode,UserName);
                 
-                dir ->
+                directory ->
                     {error, "you are opening a dir"};
-                Any -> 
+                Any -> %% create a file.
                     error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
                     
-                    ParentDir = filename:dirname(FilePathName),
+                    ParentDir = filename:dirname(ReadPath),
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
                     
                     io:format("parentdir: ~p~n",[ParentDir]),
                     %%%%%%%%%%%%TODO:
-                    case true  of 
+                    case (meta_db:get_tag(ParentDir)=:=directory) and (Mode=:=write) of 
                         true ->
-                            do_file_open(FilePathName, Mode);
+                            do_file_open(ReadPath, Mode,UserName);
                         false ->
                             {error, "parent dir does not exist"}
                     end
@@ -56,9 +57,9 @@ do_open(FilePathName, Mode, _UserName) ->
 
 do_delete(FilePathName, _UserName)->
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
-    DeleteDir = ((meta_db:get_tag(FilePathName)=:=dir) and get_acl()),
+    DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
-    DeleteFile = ((meta_db:get_tag(FilePathName)=:=file) and get_acl()),
+    DeleteFile = ((meta_db:get_tag(FilePathName)=:=regular) and get_acl()),
     if
         DeleteDir or DeleteFile->            
             ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
@@ -113,6 +114,7 @@ call_meta_check(list,File)->   %% return ok || ThatFileID
 
 
 %% -record(filemeta, {fileid, filename, filesize, chunklist, createT, modifyT,tag,parent}). 
+%%-record(filemeta,{id,name,chunklist,parent,size,type,access,atime,mtime,ctime,mode,links,inode,uid,gid})
 
 %%	copy a file : just add a new file record into table filemeta 
 %%  @spec copy_a_file(Fullsrc,SrcUnderDst,DesDir)-> "Msg"
@@ -123,17 +125,25 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
     error_logger:info_msg("copying a file.~n"),
     error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
-    {filemeta,_ID,_N,FileSize,Chunklist,_CreateT,_ModifyT,_Tag,_Parent} = SrcFile#filemeta{},
+    {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,_MreateT,_CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
     NewFileID = lib_uuid:gen(),
     ParentID = meta_db:get_id(DesDir),
-    NewFileMeta = #filemeta{fileid=NewFileID,
-                         filename = SrcUnderDst,
-                         filesize = FileSize,
-                         chunklist = Chunklist,
-                         createT = calendar:local_time(),
-                         modifyT = calendar:local_time(),
-                         tag = file,
-                         parent = ParentID
+    NewFileMeta = #filemeta{
+                            id=NewFileID,
+                            name = SrcUnderDst,
+                            chunklist = Chunklist,
+                            parent = ParentID,                            
+                            size = FileSize,
+                            type = regular,
+                            access = 0,
+                            atime = 0,
+                            mtime = calendar:local_time(),
+                            ctime = calendar:local_time(),
+                            mode = 0,
+                            links = 1,
+                            inode = 0,
+                            uid = 0,
+                            gid = 0                         
                          },
 %%	check before write.     
     case check_process_byName(SrcUnderDst) of
@@ -184,10 +194,10 @@ copy_file_crowd(ResList,DesDir)->
     [HeadFile|T] = ResList,
     {Tag,_FileID,FileName} = HeadFile,
     case Tag of 
-        file ->
+        regular ->
             SrcUnderDst = filename:join(DesDir,filename:basename(FileName)),            
             copy_a_file(FileName,SrcUnderDst,DesDir);
-        dir ->
+        directory ->
             SrcUnderDst = filename:join(DesDir,filename:basename(FileName)),
             copy_a_dir(FileName,SrcUnderDst,DesDir);
         Any ->
@@ -238,7 +248,7 @@ do_move(FullSrc, FullDst, _UserName)->
 
 do_list(FilePathName,_UserName)->
     %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
-    case get_acl() and (meta_db:get_tag(FilePathName)=:=dir) of
+    case get_acl() and (meta_db:get_tag(FilePathName)=:=directory) of
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
             %%TODO:
@@ -254,7 +264,7 @@ do_mkdir(PathName, _UserName)->
         null ->
             ParentDirName = filename:dirname(PathName),
             %%gen_server:call(?ACL_SERVER, {write, ParentDirName, _UserName})
-            case get_acl()  and (meta_db:get_tag(ParentDirName)=:=dir) of
+            case get_acl()  and (meta_db:get_tag(ParentDirName)=:=directory) of
                 true ->
                     meta_db:add_new_dir(lib_uuid:gen(),PathName,meta_db:get_id(ParentDirName));
                 false ->
@@ -308,13 +318,13 @@ check_op_type(SrcFullPath, DstFullPath) ->
     
     CaseSrcequalDes = string:equal(SrcFullPath,DstFullPath),
 
-    CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null),
-    CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null),
-    CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) 
+    CaseFileToUnFile = (SrcTag=:=regular) and (DstTag=:=null),
+    CaseFileToDir = (SrcTag=:=regular) and (DstTag=:=directory) and (SrcUnderDstTag=:=null),
+    CaseDirToDir = (SrcTag=:=directory) and (DstTag=:=directory) and (SrcUnderDstTag=:=null) 
 									and (string:rstr(DstFullPath,SrcFullPath++"/")=:=0), 
     %% TODO: copy dir /hxm to dir /hxm/copy is not allowed , but /hxm -> /hxmOtherdir is allowed, 
     																			
-    CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null), 
+    CaseDirToUnDir = (SrcTag=:=directory) and (DstTag=:=null), 
     if       
         CaseSrcequalDes ->
             {error," Src = Des."};
@@ -385,11 +395,6 @@ check_process_byName(FileName) ->
         _->
             {error,"someone writing this file."}
     end.    
-	
-
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%meta_server
 
@@ -397,17 +402,17 @@ check_process_byName(FileName) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 %%from old meta_server ;   handle these function.
 
-do_file_open(FileName,Mod)-> 
+do_file_open(FileName,Mod,UserName)-> 
     case Mod of
         read ->            
-            do_read_open(FileName);
+            do_read_open(FileName,UserName);
         write ->
-            do_write_open(FileName);
+            do_write_open(FileName,UserName);
         _->
             {error,"unkown open mode"}
     end.
 
-do_write_open(FileName)->    
+do_write_open(FileName,UserName)->    
     ProcessName = lib_common:generate_processname(FileName,write),
     io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
@@ -419,25 +424,25 @@ do_write_open(FileName)->
 					% if the target file is not exist, then generate a new fileid. 
                     FileID = lib_uuid:gen(),
                     io:format("A1...~n"),
-				    FileRecord = #filemeta{	fileid=FileID, 
-											filename=FileName, 
-											filesize=0, 
+				    FileRecord = #filemeta{	id=FileID, 
+											name=FileName, 
+											size=0, 
 											chunklist=[], 
-				                 			createT=calendar:local_time(), 
-											modifyT=calendar:local_time()
+				                 			ctime=calendar:local_time(), 
+											mtime=calendar:local_time()
                                             },
                     io:format("A2...~n"),
-					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileRecord, write], []),
+					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileRecord, write,UserName], []),
 					{ok, FileID, 0, [], MetaWorkerPid};	  
 				Any ->
                     io:format("B...~n"),
-					{error, "Cant Write! The same file name has existed in database."}
+					{error, "Cant Write! The same file name has existed in database.~p",[Any]}
 			end;
         _Pid->			% pid exist, write error
             {error, "other client is writing the same file."}  
     end.
 
-do_read_open(FileName)->
+do_read_open(FileName,UserName)->
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
@@ -446,12 +451,12 @@ do_read_open(FileName)->
 					% if the target file is not exist, then report error .		
 					{error, "the target file is not exist."};  
 				[FileMeta] ->	 %%%%%%%%%%%%%%%%%%%%% wait for modifying 
-					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileMeta,read], []),
-					{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, MetaWorkerPid}
+					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileMeta,read,UserName], []),
+					{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, MetaWorkerPid}
 			end;
         Pid->			% pid exist, set this pid process as the meta worker
         	FileMeta = gen_server:call(Pid, {getfileinfo,FileName}),
-       		{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, Pid}
+       		{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, Pid}
    end.
 
 %%
@@ -537,9 +542,9 @@ seperate_file_dir(FileList) ->
     [{Tag, ID,Name}|Left] = FileList,
     [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
     case Tag of
-        file ->
+        regular ->
             [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
-        dir ->
+        directory ->
             [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
     end
 .
