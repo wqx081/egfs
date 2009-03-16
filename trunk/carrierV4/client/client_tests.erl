@@ -67,7 +67,7 @@ testw({FileName,_FileSize, _MD5}) ->
 		{ok, ClientWorkerPid}  ->
 			{ok,Hdl}=file:open(?INPUTDIR++FileName,[binary,raw,read,read_ahead]),
 			write_loop(ClientWorkerPid, Hdl),
-			gen_server:call(ClientWorkerPid,{close,ClientWorkerPid});
+			gen_server:call(ClientWorkerPid,{close});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)
@@ -90,7 +90,7 @@ testr({FileName,_FileSize, MD5}) ->
 		{ok, ClientWorkerPid}   ->
 			{ok,Hdl}=file:open(TargetFile, [binary,raw,write]),
 			read_loop(ClientWorkerPid,Hdl),
-			gen_server:call(ClientWorkerPid,{close,ClientWorkerPid});
+			gen_server:call(ClientWorkerPid,{close});
 		{error, Why} ->
 			io:format("Error:~p~n",[Why]),
 			exit(normal)

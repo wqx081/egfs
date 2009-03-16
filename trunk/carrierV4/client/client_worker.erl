@@ -106,9 +106,9 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=wri
 					false ->
 					 	PreNodeList++[Host]
 				end, 				
- 	FileRecord = #filemeta{	fileid = FileID,
-							filename = FileName,
-							filesize = FileSize,
+ 	FileRecord = #filemeta{	id = FileID,
+							name = FileName,
+							size = FileSize,
 							chunklist = ChunkList},	
 	ChunkMappingRecords = generate_chunkmapping_record(ChunkList, NodeList),
 	Reply = gen_server:call(MetaWorkerPid, {registerchunk, FileRecord, ChunkMappingRecords}),
