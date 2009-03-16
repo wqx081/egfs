@@ -91,9 +91,9 @@
 	 type = regular,		% Atom: device, directory, regular,
 					% or other.
 	 access = read,			% Atom: read, write, read_write, or none.
-	 atime = 0,			% The local time the file was last read:
+	 atime = {{1970,1,1},{8,0,0}},			% The local time the file was last read:
 					% {{Year, Mon, Day}, {Hour, Min, Sec}}.
-	 mtime =0,			% The local time the file was last written.
+	 mtime = 0,			% The local time the file was last written.
 	 ctime = 0,			% The interpreation of this time field
 					% is dependent on operating system.
 					% On Unix it is the last time the file or
