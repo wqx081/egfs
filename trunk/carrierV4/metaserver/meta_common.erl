@@ -454,7 +454,7 @@ do_read_open(FileName)->
        		{ok, FileMeta#filemeta.fileid, FileMeta#filemeta.filesize, FileMeta#filemeta.chunklist, Pid}
    end.
 
-
+%%
 %%
 %% 
 %% host drop.
