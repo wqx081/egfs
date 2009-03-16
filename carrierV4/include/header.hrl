@@ -73,3 +73,25 @@
 -define(HOST_INIT_LIFE,2).
 
 %%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).
+
+-record(file_meta,
+	{size = 0,			% Size of file in bytes.
+	 type = regular,		% Atom: device, directory, regular,
+					% or other.
+	 access = read,			% Atom: read, write, read_write, or none.
+	 atime = 0,			% The local time the file was last read:
+					% {{Year, Mon, Day}, {Hour, Min, Sec}}.
+	 mtime =0,			% The local time the file was last written.
+	 ctime = 0,			% The interpreation of this time field
+					% is dependent on operating system.
+					% On Unix it is the last time the file or
+					% or the inode was changed.  On Windows,
+					% it is the creation time.
+	 mode = 0,			% Integer: File permissions.  On Windows,
+		    			% the owner permissions will be duplicated
+					% for group and user.
+	 links = 1,			% Number of links to the file (1 if the
+					% filesystem doesn't support links).
+	 inode = 0,			% Inode number for file.
+	 uid = 0,			% User id for owner (integer).
+	 gid = 0}).			% Group id for owner (integer).
