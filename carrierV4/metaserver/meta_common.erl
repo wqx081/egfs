@@ -460,7 +460,6 @@ do_read_open(FileName,UserName)->
    end.
 
 %%
-%%
 %% 
 %% host drop.
 %% update chunkmapping and delete chunks

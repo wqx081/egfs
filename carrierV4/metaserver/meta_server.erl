@@ -29,9 +29,6 @@ stop() ->
 terminate(_Reason, _State) ->
     io:format("meta server terminating.abc.~n").
 
-
-
-
 %%% from name server.
 
 %%"name server" methods
@@ -44,7 +41,6 @@ handle_call({open, FilePathName, Mode, _UserName}, {_From, _}, State) ->
 %%     io:format("inside handle_call_open, FileName:~p,Mode:~p,Token:~p~n",[FilePathName,Mode,_UserName]),
     Reply = meta_common:do_open(FilePathName, Mode, _UserName),
     {reply, Reply, State};
-
 
 
 %%"name server" methods
