@@ -38,14 +38,15 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
 	process_flag(trap_exit,true),
-	{ok, HostName}= inet:gethostname(),
-	case gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), undefined, undefined, uplink}) of
-		ok 	 ->
-		    error_logger:info_msg("[~p, ~p]: dataserver ~p starting~n", [?MODULE, ?LINE, list_to_atom(HostName)]),
-		   	lib_chan:start_server("./data_config");		    
-		_Any ->
-			error_logger:info_msg("[~p, ~p]: dataserver ~p init failed~n", [?MODULE, ?LINE, list_to_atom(HostName)])
-	end,
+%	{ok, HostName}= inet:gethostname(),
+%	case gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), undefined, undefined, uplink}) of
+%		ok 	 ->
+%		    error_logger:info_msg("[~p, ~p]: dataserver ~p starting~n", [?MODULE, ?LINE, list_to_atom(HostName)]),
+%		   	lib_chan:start_server("./data_config");		    
+%		_Any ->
+%			error_logger:info_msg("[~p, ~p]: dataserver ~p init failed~n", [?MODULE, ?LINE, list_to_atom(HostName)])
+%	end,
+	lib_chan:start_server("./data_config"),
     {ok, #state{}}.
 
 %%--------------------------------------------------------------------

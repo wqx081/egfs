@@ -10,7 +10,7 @@ heartbeat() ->
     {ok, HostName}= inet:gethostname(),
 	case gen_server:call(?HOST_SERVER, {heartbeat, list_to_atom(HostName), uplink}) of
 		needreport ->
-			gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), undefined, undefined, uplink}),
+			gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), node(), undefined, undefined, uplink}),
 			bootreport();
 		_Any ->
 			void
