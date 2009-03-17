@@ -297,6 +297,7 @@ select_item_from_chunkmapping_id(ChunkID) ->
 
 % detach_from_chunk_mapping
 % arg, Host name
+%%TODO, test if mnesia:write can be done in last transaction.
 detach_from_chunk_mapping(Host) ->
     DelHost =
         fun(ChunkMapping, Acc) ->
@@ -470,9 +471,9 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
 
 
 
-add_hostinfo_item(HostName, FreeSpace, TotalSpace, Status,From) ->
+add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
     io:format("in side add_hostiofo_item.~n"),
-	Row = #hostinfo{hostname=HostName, freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
+	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
 	io:format("From : ~p~n",[From]),
     
 	case select_from_hostinfo(HostName) of
@@ -503,8 +504,7 @@ select_random_one_from_hostinfo()->
 
 
 %%%%%%%%%%%%%from hiatus
-get_tag(FileName) ->
-    io:format("aaa??,~p~n",[FileName]),
+get_tag(FileName) ->    
     L = length(FileName),    
 %%     io:format("~p~n",[L]),
     case (string:equal(string:right(FileName,1),"/"))andalso L>1 of
@@ -519,11 +519,11 @@ get_tag(FileName) ->
                    null;
                [Tag] ->
                    Tag
-           end;
-        Any->
-            io:format("wtf!,~p~n",[Any])
-            
+           end
     end.
+
+
+%%get_tag
 
 
 get_tag_by_id(ID) ->
@@ -682,7 +682,11 @@ update_heartbeat(HostName,State) ->
     case select_from_hostinfo(HostName) of
         [Host]-> %%update            
             Row = Host#hostinfo{status = State,life = ?HOST_INIT_LIFE},
-            write_to_db(Row),
+    		F = fun() ->
+				mnesia:write(Row)
+			end,
+    		{atomic,Val}=mnesia:transaction(F),           
+%%          write_to_db(Row), too many log ...
             ok;
         []->
             error_logger:error_msg("no info of this host, neeeedreport,"),

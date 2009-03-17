@@ -73,8 +73,69 @@ decrease() ->
 %%    			end
 %% 	end.
 
-                                                        
 
+%% check replica and notify dataserver to make replica,if need 
+%% @spec check_replica(N)-> {ok,"MSG"} || {error,"MSG"}
+%% N-> number of replica needed ,(include himself)
+
+%% 1 check chunkmapping table , find  
+check_replica(N)->
+    error_logger:info_msg("in func check_replica,_replica num:~p~n",[N]),
+    case meta_db:select_all_from_Table(hostinfo) of
+        []->
+            {error,"NO Dataserver connected to metaserver"};
+        Hosts-> %%[{},{}]
+            if length(Hosts)<N ->
+                   {error,"not enough dataserver to make these replications possible"};
+               true->
+                   HostnameList = get_hostname_list(Hosts),                   
+                   
+                   FunCheckEveryChunkID = 
+                       fun(ChunkMappingItem,Acc) ->                               
+                               %%TODO: HOsts too many,                               
+                               select_host(ChunkMappingItem,HostnameList,N),%% select_host, and call dataserver to do replica
+                               Acc %%return value of Acc,                                                              
+                       end,
+                   
+                   Fun = fun()->
+                                 mnesia:foldl(FunCheckEveryChunkID,[],chunkmapping,write)
+                         end,
+                   mnesia:transaction(Fun)
+            end
+    end.
+
+get_hostname_list([])->
+    [];
+get_hostname_list(Hosts)->
+    [H|T] = Hosts,
+    [H#hostinfo.hostname]++get_hostname_list(T).
+
+
+%% -record(hostinfo,{hostname, freespace, totalspace, status,life}).
+%% -record(chunkmapping, {chunkid, chunklocations}).
+select_host(ChunkMappingItem,HostnameList,N) ->
+    Chunklocations = ChunkMappingItem#chunkmapping.chunklocations, %%[H1,H2]    
+    DieHosts = Chunklocations--HostnameList,    
+    
+    OptionHosts =HostnameList--Chunklocations,
+    %%TODO: selection needed, discussible.
+    Need = N-length(Chunklocations)+length(DieHosts),
+    
+    %%TODO, select policy, random;first N; location
+    notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid).
+
+notify_dataserver(OptionHosts,Need,ID)->
+    case Need of
+        0 ->
+            ok;
+        Rest->
+            [H|T] = OptionHosts,
+            gen_server:cast({data_server,H#hostinfo.nodename},{replica,H#hostinfo.hostname,ID}),
+            notify_dataserver(T,Need-1,ID)
+    end.
+
+                                                        
+%% broad cast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
 broadcast() ->
     Mappings = select_all_from_Table(chunkmapping),
     MappingsNum = length(Mappings),

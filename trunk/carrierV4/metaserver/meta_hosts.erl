@@ -28,9 +28,9 @@ init([]) ->
     {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,decrease,[]), % check host health every 5 second
     {ok, []}.
 
-handle_call({register_dataserver, HostName, FreeSpace, TotalSpace, Status}, {From, _}, State) ->
+handle_call({register_dataserver, HostName,Nodename, FreeSpace, TotalSpace, Status}, {From, _}, State) ->
     error_logger:info_msg("[~p, ~p]: register dataserver ~p request~n", [?MODULE, ?LINE, HostName]),
- 	Reply = meta_db:add_hostinfo_item(HostName, FreeSpace, TotalSpace, Status,From),
+ 	Reply = meta_db:add_hostinfo_item(HostName,Nodename, FreeSpace, TotalSpace, Status,From),
 	{reply, Reply, State};
 
 handle_call({allocate_dataserver}, {_From, _}, State) ->
