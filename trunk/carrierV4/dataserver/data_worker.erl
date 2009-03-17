@@ -60,19 +60,17 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 	    MM ! {send, R}, 
 	    loop_replica(MM, ChunkID, MD5, ChunkHdl);
 	{chan_closed, MM} ->
+		file:close(ChunkHdl),
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, LocalMD5}	= lib_md5:file(FileName),
 		case LocalMD5 =:= MD5 of
 			true ->
 				data_db:add_chunkmeta_item(ChunkID, MD5),
-				{ok, _HostName}= inet:gethostname();
-				%%================= not implemented
-				%gen_server:call(?META_SERVER, {registerchunk, ChunkID, list_to_atom(HostName)});
-				%%==================
+				{ok, HostName}= inet:gethostname(),
+				gen_server:call(?META_SERVER, {registerchunk, ChunkID, list_to_atom(HostName)});
 			false ->
 				file:delete(FileName)
 		end,	
-		file:close(ChunkHdl),
 		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.

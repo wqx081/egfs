@@ -38,14 +38,7 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
 	process_flag(trap_exit,true),
-%	{ok, HostName}= inet:gethostname(),
-%	case gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), undefined, undefined, uplink}) of
-%		ok 	 ->
-%		    error_logger:info_msg("[~p, ~p]: dataserver ~p starting~n", [?MODULE, ?LINE, list_to_atom(HostName)]),
-%		   	lib_chan:start_server("./data_config");		    
-%		_Any ->
-%			error_logger:info_msg("[~p, ~p]: dataserver ~p init failed~n", [?MODULE, ?LINE, list_to_atom(HostName)])
-%	end,
+	error_logger:info_msg("[~p, ~p]: dataserver ~p starting~n", [?MODULE, ?LINE, node()]),
 	lib_chan:start_server("./data_config"),
     {ok, #state{}}.
 
@@ -68,6 +61,7 @@ handle_call(_Request, _From, State) ->
 %%				Ask the local data server writes a new replica to DestHost.
 %%--------------------------------------------------------------------
 handle_cast({replica, DestHost, ChunkID}, State) ->
+	error_logger:info_msg("[~p, ~p]: receive replica DestHost:~p ChunkID~p~n", [?MODULE, ?LINE, DestHost, ChunkID]),	
 	case data_db:select_md5_from_chunkmeta_id(ChunkID) of
 		[MD5] ->
 			{ok, DataWorkPid} = lib_chan:connect(DestHost, ?DATA_PORT, dataworker,?PASSWORD, {replica, ChunkID,MD5}),
