@@ -22,6 +22,7 @@
 
 -include_lib("kernel/include/file.hrl").
 -include_lib("fuserl.hrl").
+-include("../include/header.hrl").
 
 -record(egfsrv, {inodes, names}).
 
@@ -74,14 +75,14 @@ my_get_attr({Parent, Name}, State) ->
     {Ino, NewState} = make_inode({Parent, Name}, State),
     {ok, FileInfo} = clientlib:read_file_info(LocalName),
     Attr = #stat{ st_ino = Ino, 
-		  st_size = FileInfo#file_info.size, 
-                  st_mode = FileInfo#file_info.mode,
-	          st_atime = datetime_to_seconds(FileInfo#file_info.atime),
-	          st_mtime = datetime_to_seconds(FileInfo#file_info.mtime),
-	          st_ctime = datetime_to_seconds(FileInfo#file_info.ctime),
-		  st_uid = FileInfo#file_info.uid,
-		  st_gid = FileInfo#file_info.gid,
-	          st_nlink = FileInfo#file_info.links},
+		  st_size = FileInfo#filemeta.size, 
+                  st_mode = FileInfo#filemeta.mode,
+	          st_atime = datetime_to_seconds(FileInfo#filemeta.atime),
+	          st_mtime = datetime_to_seconds(FileInfo#filemeta.mtime),
+	          st_ctime = datetime_to_seconds(FileInfo#filemeta.ctime),
+		  st_uid = FileInfo#filemeta.uid,
+		  st_gid = FileInfo#filemeta.gid,
+	          st_nlink = FileInfo#filemeta.links},
     {Attr, NewState}.
 
 make_inode(GFName, State) ->

@@ -31,7 +31,13 @@ min(A, B) ->
 %%--------------------------------------------------------------------------------
 open(FileName, Mode) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {open, FileName, Mode, UserName}).
+    case gen_server:call(?CLIENT_SERVER, {open, FileName, Mode, UserName}) of
+	{error, _Reason} ->
+	    {error, _Reason};
+	{ok, WorkerPid} ->
+	    {ok, WorkerPid}
+    end.
+
 
 %% --------------------------------------------------------------------
 %% Function: close/1 ->  ok | {error, Reason} 
@@ -39,7 +45,7 @@ open(FileName, Mode) ->
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------
 close(WorkerPid) ->
-    gen_server:call(?CLIENT_SERVER, {close, WorkerPid}).
+    gen_server:call(WorkerPid, {close}).
 	
 %% --------------------------------------------------------------------
 %% Function: delete/1 ->  ok | {error, Reason} 
@@ -51,23 +57,47 @@ delete(FileName)->
     gen_server:call(?CLIENT_SERVER, {delete, FileName,UserName}).	
 
 %% --------------------------------------------------------------------
-%% Function: read_file_info/1 ->  ok | {error, Reason} 
+%% Function: read_file_info/1 ->  {ok, #file_info{}} | {error, Reason} 
 %% Description: read file meta info 
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------	
 read_file_info(FileName) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {getfileinfo, FileName, UserName}).	
+    case gen_server:call(?CLIENT_SERVER, {getfileinfo, FileName, UserName}) of
+	[] ->
+	    {error, enoent};
+	[error, _] ->
+	    {error, enoent};
+	[H|_] ->
+	    {ok, H}
+    end.
+	    
 	
 %% --------------------------------------------------------------------
-%% Function: listdir/1 ->  list() | {error, Reason} 
+%% Function: listdir/1 ->  {ok, filename_list} | {error, Reason} 
 %% Description: list dir
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------	
 listdir(Dir) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {list, Dir, UserName}).	
+    case gen_server:call(?CLIENT_SERVER, {list, Dir, UserName}) of
+	{error, _R} ->
+	    {error, enoent};
+	[] ->
+	    {ok, []};
+	[H|T] ->
+	    Namelist = parse_names([H|T], []),
+	    {ok, Namelist} 
+    end.
 	
+parse_names([], Names) ->
+    lists:reverse(Names);
+parse_names([H|T], Names) ->
+    {_, _, FullPath} = H,
+    Name = filename:basename(FullPath),
+    NewNames = [Name | Names],
+    parse_names(T, NewNames).
+
 %% --------------------------------------------------------------------
 %% Function: mkdir/1 ->  ok | {error, Reason} 
 %% Description: list dir
@@ -75,7 +105,12 @@ listdir(Dir) ->
 %% --------------------------------------------------------------------	
 mkdir(Dir) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {mkdir, Dir, UserName}).	
+    case gen_server:call(?CLIENT_SERVER, {mkdir, Dir, UserName}) of
+	{atomic, ok} ->
+	    ok;
+	{error, _} ->
+	    {error, enoent}
+    end.
 
 
 %% --------------------------------------------------------------------
