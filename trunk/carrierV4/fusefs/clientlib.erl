@@ -14,7 +14,7 @@
 	  move/2,
 	  chmod/4]).
 
--define(CLIENT_SERVER, client_server).
+-define(CLIENT_SERVER, {client_server, ltclient1@lt}).
 
 min(A, B) ->
     if 
@@ -23,6 +23,9 @@ min(A, B) ->
 	true  ->
 	    A
     end.
+
+rm_slash(Path) ->
+    filename:absname(Path).
 
 %%--------------------------------------------------------------------------------
 %% Function: open(string(),Mode) -> {ok, ClientWorkerPid} | {error, Reason} 
@@ -54,7 +57,13 @@ close(WorkerPid) ->
 %% --------------------------------------------------------------------
 delete(FileName)->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {delete, FileName,UserName}).	
+    CFName = rm_slash(FileName),
+    case gen_server:call(?CLIENT_SERVER, {delete, CFName, UserName}) of
+	{ok, _} ->
+	    ok;
+	{error, Reason} ->
+	    {error, Reason}
+    end.
 
 %% --------------------------------------------------------------------
 %% Function: read_file_info/1 ->  {ok, #file_info{}} | {error, Reason} 
@@ -63,7 +72,8 @@ delete(FileName)->
 %% --------------------------------------------------------------------	
 read_file_info(FileName) ->
     UserName = any,
-    case gen_server:call(?CLIENT_SERVER, {getfileinfo, FileName, UserName}) of
+    CFName = rm_slash(FileName),
+    case gen_server:call(?CLIENT_SERVER, {getfileinfo, CFName, UserName}) of
 	[] ->
 	    {error, enoent};
 	[error, _] ->
@@ -80,7 +90,8 @@ read_file_info(FileName) ->
 %% --------------------------------------------------------------------	
 listdir(Dir) ->
     UserName = any,
-    case gen_server:call(?CLIENT_SERVER, {list, Dir, UserName}) of
+    CDir = rm_slash(Dir),
+    case gen_server:call(?CLIENT_SERVER, {list, CDir, UserName}) of
 	{error, _R} ->
 	    {error, enoent};
 	[] ->
@@ -105,7 +116,8 @@ parse_names([H|T], Names) ->
 %% --------------------------------------------------------------------	
 mkdir(Dir) ->
     UserName = any,
-    case gen_server:call(?CLIENT_SERVER, {mkdir, Dir, UserName}) of
+    CDir = rm_slash(Dir),
+    case gen_server:call(?CLIENT_SERVER, {mkdir, CDir, UserName}) of
 	{atomic, ok} ->
 	    ok;
 	{error, _} ->
@@ -120,7 +132,14 @@ mkdir(Dir) ->
 %% --------------------------------------------------------------------	
 deldir(Dir) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {delete, Dir, UserName}).	
+    CDir = rm_slash(Dir),
+    case gen_server:call(?CLIENT_SERVER, {delete, CDir, UserName}) of
+	{ok, _} ->
+	    ok;
+	{error, Reason} ->
+	    {error, Reason}
+    end.
+
 
 %% --------------------------------------------------------------------
 %% Function: chmod/4 ->  ok | {error, Reason} 
@@ -128,7 +147,8 @@ deldir(Dir) ->
 %% Returns: ok | {error, Reason}
 %% --------------------------------------------------------------------	
 chmod(FileName, UserName, UserType, CtrlACL) ->
-    gen_server:call(?CLIENT_SERVER, {chmod, FileName, UserName, UserType, CtrlACL}).		
+    CFName = rm_slash(FileName),
+    gen_server:call(?CLIENT_SERVER, {chmod, CFName, UserName, UserType, CtrlACL}).		
 	
 %% --------------------------------------------------------------------
 %% Function: pread/3 ->  {ok, Data} | eof | {error, Reason} 
@@ -177,4 +197,6 @@ pwrite(WorkerPid, _Offset, Data) ->
 %% --------------------------------------------------------------------	
 move(Src, Dst) ->
     UserName = any,
-    gen_server:call(?CLIENT_SERVER, {move, Src, Dst, UserName}).
+    CSrc = rm_slash(Src),
+    CDst = rm_slash(Dst),
+    gen_server:call(?CLIENT_SERVER, {move, CSrc, CDst, UserName}).
