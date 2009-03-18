@@ -3,7 +3,7 @@
 -export([run/3]).
 
 run(MM, ArgC, _ArgS) ->
- 	error_logger:info_msg("[~p, ~p]: dataworker ~p running ArgC =~p ~n", [?MODULE, ?LINE, self(),ArgC]),
+ 	%error_logger:info_msg("[~p, ~p]: dataworker ~p running ArgC =~p ~n", [?MODULE, ?LINE, self(),ArgC]),
 	case ArgC of
 		{write, ChunkID} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
@@ -35,7 +35,7 @@ loop_write(MM, ChunkID, ChunkHdl) ->
 		{ok, MD5}		= lib_md5:file(FileName),
 		data_db:add_chunkmeta_item(ChunkID, MD5),		
 		file:close(ChunkHdl),
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -48,7 +48,7 @@ loop_read(MM, ChunkHdl) ->
 	    loop_read(MM, ChunkHdl);
 	{chan_closed, MM} ->
 		file:close(ChunkHdl),
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -71,7 +71,7 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 			false ->
 				file:delete(FileName)
 		end,	
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -100,7 +100,7 @@ loop_garbagecheck(MM, NextDataworkPid, Bin) ->
 		BloomFilter = binary_to_term(Bin),
 		ChunkList = data_db:select_chunklist_from_chunkmeta(),
 		lists:foreach(fun(X) -> check_element(X, BloomFilter) end, ChunkList),		
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.    
 
