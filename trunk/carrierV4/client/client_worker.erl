@@ -18,7 +18,7 @@
 % do open operation
 init([FileName, Mode, UserName]) ->
 	process_flag(trap_exit,true),
-	error_logger:info_msg("[~p, ~p]: client worker ~p starting~n", [?MODULE, ?LINE, self()]),	
+	%error_logger:info_msg("[~p, ~p]: client worker ~p starting~n", [?MODULE, ?LINE, self()]),	
 	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
 			% set the correct position of FileContext 	
@@ -74,7 +74,7 @@ handle_call({position, Location}, _From, FileContext) ->
 	end;
 
 handle_call({pread, Location, Number}, _From, FileContext) ->
-	error_logger:info_msg("[~p, ~p]: pread ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
+	%error_logger:info_msg("[~p, ~p]: pread ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	case do_position(FileContext, Location) of
 		{ok, NewFC} ->
 			{ok, NewFC1, Data} = do_read(NewFC, Number),
@@ -84,7 +84,7 @@ handle_call({pread, Location, Number}, _From, FileContext) ->
 	end;	
 		
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=write ->
-	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
+	%error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	fileid	 = FileID, 
 				 	filename = FileName, 
 					filesize = FileSize, 
@@ -121,7 +121,7 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=wri
 	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
 	{stop, normal, Reply, #filecontext{}};
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=read ->
-	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
+	%error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	metaworkerpid= MetaWorkerPid,
 					dataworkerpid= DataWorkerPid} = FileContext,
 	case DataWorkerPid =:= undefined of
@@ -137,13 +137,13 @@ handle_cast(_Msg, FileContext) ->
     {noreply, FileContext}.
 
 handle_info({'EXIT', Pid, Why}, FileContext) ->
-	error_logger:info_msg("[~p, ~p]: receive EXIT message from ~p since ~p~n", [?MODULE, ?LINE, Pid,Why]),	
+	%error_logger:info_msg("[~p, ~p]: receive EXIT message from ~p since ~p~n", [?MODULE, ?LINE, Pid,Why]),	
 	{stop, Why, FileContext};	    
 handle_info(_Info, FileContext) ->
     {noreply, FileContext}.
 
 terminate(Reason, _FileContext) ->
-	error_logger:info_msg("[~p, ~p]: close client worker ~p  since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
+	%error_logger:info_msg("[~p, ~p]: close client worker ~p  since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
     ok.
 
 code_change(_OldVsn, FileContext, _Extra) ->
