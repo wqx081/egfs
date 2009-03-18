@@ -596,9 +596,9 @@ get_all_sub_files_byID(FileID) ->
 
 get_all_sub_files_byName(FileName) ->
     case get_tag(FileName) of
-        file ->
+        regular ->
             [{regular,get_id(FileName),FileName}];		%% [{tag,id,name}]
-        dir ->            
+        directory ->            
             L = length(FileName),
             Result = do(qlc:q([
                                {X#filemeta.type,X#filemeta.id,X#filemeta.name}
