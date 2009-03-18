@@ -31,7 +31,7 @@
 %%====================================================================
 init([FileRecord,Mod,_UserName]) ->
 	process_flag(trap_exit,true),
-	error_logger:info_msg("[~p, ~p]: start metaworker ~p~n", [?MODULE, ?LINE, self()]),
+%% 	error_logger:info_msg("[~p, ~p]: start metaworker ~p~n", [?MODULE, ?LINE, self()]),
     
 %%     {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
     
@@ -92,7 +92,7 @@ handle_info({'EXIT', _Pid, _Why}, State) ->
 %%     error_logger:info_msg("EXiT.~n"),
 	{stop, normal, State};	
 handle_info(_Info, State) ->
-    error_logger:info_msg("handle_info.~n"),
+%%     error_logger:info_msg("handle_info.~n"),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -132,11 +132,9 @@ do_close(From,State) ->
 %%     error_logger:info_msg("From: ~p~n",[From]),
 
     case State#metaWorkerState.mod of
-        read->
-                      
-            
+        read->                      
             Clients = State#metaWorkerState.clients--[From],
-            error_logger:info_msg("mod = read , Clients = ",[Clients]),
+%%             error_logger:info_msg("mod = read , Clients = ",[Clients]),
             case Clients of
                 []->
                     exit(normal);    %%use handle_info instead of handle_cast, avoid crash
@@ -144,7 +142,7 @@ do_close(From,State) ->
                     nil
             end;
         write->
-            error_logger:info_msg("mod = write"),
+%%             error_logger:info_msg("mod = write"),
             exit(normal)
     end.
 
