@@ -27,7 +27,7 @@ do_open(FilePathName, Mode, UserName) ->
             ReadPath = lib_common:get_rid_of_last_slash(FilePathName),
             case meta_db:get_tag(ReadPath) of
                 regular ->
-                    FileID = meta_db:get_id(ReadPath),
+%%                     FileID = meta_db:get_id(ReadPath),
 %%                     io:format("show FileID ~p~n",[FileID]),
 %%                     io:format("call_meta_open:"),
                     do_file_open(ReadPath,Mode,UserName);
@@ -60,13 +60,22 @@ do_delete(FilePathName, _UserName)->
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteFile = ((meta_db:get_tag(FilePathName)=:=regular) and get_acl()),
+    error_logger:info_msg("DeleteDir and DeleteFile_~p,~p,~n",[DeleteDir,DeleteFile]),
     if
-        DeleteDir or DeleteFile->            
+        DeleteDir->            
             ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
             %% acl.
             call_meta_delete(list,ResList),
             FileID = meta_db:get_id(FilePathName),
-            meta_db:do_delete_filemeta_byID(FileID);            
+            meta_db:do_delete_filemeta_byID(FileID);
+        DeleteFile->
+            FileID = meta_db:get_id(FilePathName),
+            case check_process_byID(FileID) of
+                {ok,_}->
+                    call_meta_do_delete(FileID);
+                {error,_}->
+                    {error,FilePathName}
+            end;
         true ->
             {error, "file does not exist or you are not authorized to do this operation"}
     end
