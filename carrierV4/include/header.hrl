@@ -49,7 +49,7 @@
 
 
 %% dataserver process info
--record(hostinfo,{hostname, freespace, totalspace, status,life}).
+-record(hostinfo,{hostname,nodename,freespace, totalspace, status,life}).
 %% chunk mapping relationship
 -record(chunkmapping, {chunkid, chunklocations}).
 -record(clientinfo, {clientid, modes}).   % maybe fileid?
