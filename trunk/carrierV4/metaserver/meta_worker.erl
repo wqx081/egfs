@@ -18,9 +18,9 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--export([
-         try_close/1
-         ]).
+%% -export([
+%%          try_close/1
+%%          ]).
 
 
 -record(metaWorkerState,{filemeta=#filemeta{},mod,clients=[]}).
@@ -79,7 +79,7 @@ handle_call({debug},{_From, _},State)->
 %%     {reply, Reply, State}.
 
 
-handle_cast({stop,Reason,From}, State) ->
+handle_cast({stop,_Reason,From}, State) ->
 %%     error_logger:info_msg("Reason: ~p~n",[Reason]),
 %%     error_logger:info_msg("State: ~p~n",[State]),
     %%TODO.
@@ -95,7 +95,7 @@ handle_info(_Info, State) ->
     error_logger:info_msg("handle_info.~n"),
     {noreply, State}.
 
-terminate(Reason, _State) ->
+terminate(_Reason, _State) ->
 %% 	error_logger:info_msg("[~p, ~p]: close metaworker ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	
     ok.
 
@@ -148,7 +148,7 @@ do_close(From,State) ->
             exit(normal)
     end.
 
-try_close(ID) ->
+%% try_close(ID) ->
 %%     error_logger:info_msg("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
     
 
