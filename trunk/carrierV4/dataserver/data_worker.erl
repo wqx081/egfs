@@ -3,7 +3,7 @@
 -export([run/3]).
 
 run(MM, ArgC, _ArgS) ->
- 	error_logger:info_msg("[~p, ~p]: dataworker ~p running ArgC =~p ~n", [?MODULE, ?LINE, self(),ArgC]),
+ 	%error_logger:info_msg("[~p, ~p]: dataworker ~p running ArgC =~p ~n", [?MODULE, ?LINE, self(),ArgC]),
 	case ArgC of
 		{write, ChunkID} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
@@ -26,7 +26,7 @@ run(MM, ArgC, _ArgS) ->
 loop_write(MM, ChunkID, ChunkHdl) ->
     receive
 	{chan, MM, {write, Bytes}} ->
-		error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
+		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_write(MM, ChunkID, ChunkHdl);
@@ -35,7 +35,7 @@ loop_write(MM, ChunkID, ChunkHdl) ->
 		{ok, MD5}		= lib_md5:file(FileName),
 		data_db:add_chunkmeta_item(ChunkID, MD5),		
 		file:close(ChunkHdl),
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
