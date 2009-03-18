@@ -33,36 +33,36 @@ init([FileRecord,Mod,_UserName]) ->
 	process_flag(trap_exit,true),
 	error_logger:info_msg("[~p, ~p]: start metaworker ~p~n", [?MODULE, ?LINE, self()]),
     
-    {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
+%%     {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
     
 	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=[]},
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
-    error_logger:info_msg("~~~~ in registerchunk~~~~n"),
-    error_logger:info_msg("checking...~n"),
-    error_logger:info_msg("worker state:~n"),
-    error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
-    error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
-    error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
+%%     error_logger:info_msg("~~~~ in registerchunk~~~~n"),
+%%     error_logger:info_msg("checking...~n"),
+%%     error_logger:info_msg("worker state:~n"),
+%%     error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
+%%     error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
+%%     error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
 	Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords),
     
 %%    Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
 	{reply, Reply, State};
 
 handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
-    error_logger:info_msg("~~~~ in seekchunk~~~~n"),
+%%     error_logger:info_msg("~~~~ in seekchunk~~~~n"),
 	Reply = meta_db:select_hosts_from_chunkmapping_id(ChunkID),
 	{reply, Reply, State};
 	
 handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
-	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),
+%% 	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),
     Reply  = meta_db:select_all_from_filemeta_byName(FileName),
 	{reply, Reply, State};
 
 
 handle_call({locatechunk,FileID, ChunkIndex}, {_From, _}, State) ->
-    error_logger:info_msg("~~~~ in locatechunk~~~~n"),
+%%     error_logger:info_msg("~~~~ in locatechunk~~~~n"),
     Reply = do_get_chunk(FileID, ChunkIndex),
     
 	{reply, Reply, State};
@@ -80,8 +80,8 @@ handle_call({debug},{_From, _},State)->
 
 
 handle_cast({stop,Reason,From}, State) ->
-    error_logger:info_msg("Reason: ~p~n",[Reason]),
-    error_logger:info_msg("State: ~p~n",[State]),
+%%     error_logger:info_msg("Reason: ~p~n",[Reason]),
+%%     error_logger:info_msg("State: ~p~n",[State]),
     %%TODO.
     do_close(From,State),
 	{noreply, State};	
@@ -89,14 +89,14 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'EXIT', _Pid, _Why}, State) ->
-    error_logger:info_msg("EXiT.~n"),
+%%     error_logger:info_msg("EXiT.~n"),
 	{stop, normal, State};	
 handle_info(_Info, State) ->
     error_logger:info_msg("handle_info.~n"),
     {noreply, State}.
 
 terminate(Reason, _State) ->
-	error_logger:info_msg("[~p, ~p]: close metaworker ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	
+%% 	error_logger:info_msg("[~p, ~p]: close metaworker ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -127,9 +127,9 @@ do_get_chunk(FileID, ChunkIdx)->
 
 
 do_close(From,State) ->
-    error_logger:info_msg("-- meta_worker  do_close"),
-    error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
-    error_logger:info_msg("From: ~p~n",[From]),
+%%     error_logger:info_msg("-- meta_worker  do_close"),
+%%     error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
+%%     error_logger:info_msg("From: ~p~n",[From]),
 
     case State#metaWorkerState.mod of
         read->
@@ -149,6 +149,6 @@ do_close(From,State) ->
     end.
 
 try_close(ID) ->
-    error_logger:info_msg("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
+%%     error_logger:info_msg("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
     
 
