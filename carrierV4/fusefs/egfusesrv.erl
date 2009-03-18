@@ -74,15 +74,26 @@ my_get_attr({Parent, Name}, State) ->
     LocalName = Parent ++ Name,
     {Ino, NewState} = make_inode({Parent, Name}, State),
     {ok, FileInfo} = clientlib:read_file_info(LocalName),
+    case FileInfo#filemeta.type of
+	directory ->
+	    Mode = ?S_IFDIR bor 8#0555,
+	    Size = 4096,
+	    Nlink = 2;
+	_ ->
+	    Mode = ?S_IFREG bor 8#0644,
+	    Size = FileInfo#filemeta.size,
+	    Nlink = 1
+    end,
+
     Attr = #stat{ st_ino = Ino, 
-		  st_size = FileInfo#filemeta.size, 
-                  st_mode = FileInfo#filemeta.mode,
+		  st_size = Size, 
+                  st_mode = Mode,
 	          st_atime = datetime_to_seconds(FileInfo#filemeta.atime),
 	          st_mtime = datetime_to_seconds(FileInfo#filemeta.mtime),
 	          st_ctime = datetime_to_seconds(FileInfo#filemeta.ctime),
 		  st_uid = FileInfo#filemeta.uid,
 		  st_gid = FileInfo#filemeta.gid,
-	          st_nlink = FileInfo#filemeta.links},
+	          st_nlink = Nlink},
     {Attr, NewState}.
 
 make_inode(GFName, State) ->
@@ -135,12 +146,12 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 	{value, {Parent, Name}} ->
 	    LocalName = Parent ++ Name,
 	    {ok, FileInfo} = clientlib:read_file_info(LocalName),
-	    case FileInfo#file_info.type of
+	    case FileInfo#filemeta.type of
 		regular ->
-		    Len = FileInfo#file_info.size,
+		    Len = FileInfo#filemeta.size,
 		    if 
 			Offset < Len ->
-			    {ok, IoDev} = clientlib:open(LocalName, [read, binary]),
+			    {ok, IoDev} = clientlib:open(LocalName, read),
 			    if 
 				Offset + Size > Len ->
 				    Take = Len - Offset,
@@ -163,14 +174,15 @@ read(_, X, Size, Offset, _Fi, _, State) ->
     end.
 
 write(_, Inode, Data, Offset, _Fi, _, State) ->
+    io:format("[~p, ~p] write~n", [?MODULE, ?LINE]),
     %%io:format("[~p, ~p] ~p~n", [?MODULE, ?LINE, Data]),
     case gb_trees:lookup(Inode, State#egfsrv.inodes) of
 	{value, {Parent, Name}} ->
 	    LocalName = Parent ++ Name,
 	    {ok, FileInfo} = clientlib:read_file_info(LocalName),
-	    case FileInfo#file_info.type of
+	    case FileInfo#filemeta.type of
 		regular ->
-		    {ok, IoDev} = clientlib:open(LocalName, [raw, read, write, binary]),
+		    {ok, IoDev} = clientlib:open(LocalName, write),
 		    ok = clientlib:pwrite(IoDev, Offset, Data),
 		    clientlib:close(IoDev),
 		    {#fuse_reply_write{count = erlang:size(Data)}, State};
@@ -284,11 +296,11 @@ get_parent(Ino, State) ->
     PParent ++ PName ++ "/".
 
 create(_, PIno, BName, _Mode, Fi, _, State) ->
-    %%io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, PIno, BName]),
+    io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, PIno, BName]),
     Parent = get_parent(PIno, State),
     Name = binary_to_list(BName),
     FullPath = Parent ++ Name,
-    {ok, Io} = clientlib:open(FullPath, [raw, read, write, binary]),
+    {ok, Io} = clientlib:open(FullPath, write),
     clientlib:close(Io),
     {Attr, NewState} = my_get_attr({Parent, Name}, State), 
     {#fuse_reply_create{
