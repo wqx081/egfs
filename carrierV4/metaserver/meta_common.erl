@@ -64,15 +64,13 @@ do_delete(FilePathName, _UserName)->
     if
         DeleteDir->            
             ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
-            %% acl.
-            call_meta_delete(list,ResList),
-            FileID = meta_db:get_id(FilePathName),
-            meta_db:do_delete_filemeta_byID(FileID);
+            %% acl.            
+            call_meta_delete(list,ResList);            
         DeleteFile->
             FileID = meta_db:get_id(FilePathName),
             case check_process_byID(FileID) of
                 {ok,_}->
-                    call_meta_do_delete(FileID);
+                     meta_db:do_delete_filemeta_byID(FileID);
                 {error,_}->
                     {error,FilePathName}
             end;

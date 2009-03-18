@@ -287,11 +287,12 @@ select_item_from_chunkmapping_id(ChunkID) ->
 
 % detach_from_chunk_mapping
 % arg, Host name
-%%TODO, test if mnesia:write can be done in last transaction.
+%%TODO, 
 detach_from_chunk_mapping(Host) ->
     DelHost =
         fun(ChunkMapping, Acc) ->
                 ChunkLoc = ChunkMapping#chunkmapping.chunklocations,
+                %%TODO, rewrite these,
                 Guard = lists:member(Host,ChunkLoc),
                 if Guard =:= true ->
                        ChunkLocList = ChunkLoc -- [Host],
@@ -460,7 +461,7 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
 
 
 
-
+%% add record hostinfo to table hostinfo, no chunkmapping table change .
 add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
     io:format("in side add_hostiofo_item.~n"),
 	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
