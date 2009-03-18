@@ -14,9 +14,10 @@ ping(Host) ->
 generate_files() ->
 	file:make_dir(?INPUTDIR),
 	file:make_dir(?OUTPUTDIR),	
-    generate_file(2, 1024),
-    generate_file(2, 1048576),
-    generate_file(2, 104857600).      
+%    generate_file(2, 1024),
+%    generate_file(2, 1048576),
+%    generate_file(2, 104857600). 
+	generate_file(10000, 10240).    
 
 generate_file(0, _) ->
 	ok;
@@ -54,13 +55,19 @@ gen_bin(R1, R2, R3, R4, FileSize) ->
 %% test function
 %% --------------------------------------------------------------------
 test_write_all() ->
+	statistics(wall_clock),
 	{ok, FileData}= file:consult(?FILELIST),
-	lists:foreach(fun testw/1, FileData).
+	lists:foreach(fun testw/1, FileData),
+	{_,Time}=statistics(wall_clock),
+	error_logger:info_msg("[~p, ~p]: Write Process Total Time= ~p seconds~n", [?MODULE, ?LINE, Time]).
 	
 test_read_all() ->
+	statistics(wall_clock),
 	{ok, FileData}= file:consult(?FILELIST),
-	lists:foreach(fun testr/1, FileData).
-		
+	lists:foreach(fun testr/1, FileData),
+	{_,Time}=statistics(wall_clock),
+	error_logger:info_msg("[~p, ~p]: Read Process Total Time= ~p seconds~n", [?MODULE, ?LINE, Time]).
+			
 	
 testw({FileName,_FileSize, _MD5}) ->
 	case gen_server:call(client_server, {open,FileName,write, any}) of
