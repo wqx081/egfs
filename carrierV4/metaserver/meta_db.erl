@@ -493,28 +493,35 @@ select_random_one_from_hostinfo()->
 	end.
 
 
+%% with end '/' slash version. 
+%% get_tag(FileName) ->    
+%%     L = length(FileName),    
+%% %%     io:format("~p~n",[L]),
+%%     case (string:equal(string:right(FileName,1),"/"))andalso L>1 of
+%%        true->           
+%% %%            io:format("true,~p~n",[FileName]),
+%%            get_tag(string:substr(FileName,1,L-1));
+%%        false->
+%% %%            io:format(",~p~n",[FileName]),
+%%            Result = do(qlc:q([X#filemeta.type||X<-mnesia:table(filemeta), X#filemeta.name=:=FileName])),
+%%            case Result of
+%%                [] ->
+%%                    null;
+%%                [Tag] ->
+%%                    Tag
+%%            end
+%%     end.
 
-%%%%%%%%%%%%%from hiatus
-get_tag(FileName) ->    
-    L = length(FileName),    
-%%     io:format("~p~n",[L]),
-    case (string:equal(string:right(FileName,1),"/"))andalso L>1 of
-       true->           
-%%            io:format("true,~p~n",[FileName]),
-           get_tag(string:substr(FileName,1,L-1));
-       false->
-%%            io:format(",~p~n",[FileName]),
-           Result = do(qlc:q([X#filemeta.type||X<-mnesia:table(filemeta), X#filemeta.name=:=FileName])),
-           case Result of
-               [] ->
-                   null;
-               [Tag] ->
-                   Tag
-           end
-    end.
 
-
-%%get_tag
+get_tag(FileName) ->
+    Result = do(qlc:q([X#filemeta.type||X<-mnesia:table(filemeta), X#filemeta.name=:=FileName])),
+     case Result of
+        [] ->
+            null;
+        [Tag] ->
+            Tag
+    end
+.   
 
 
 get_tag_by_id(ID) ->
@@ -590,7 +597,7 @@ get_all_sub_files_byID(FileID) ->
 get_all_sub_files_byName(FileName) ->
     case get_tag(FileName) of
         file ->
-            [{file,get_id(FileName),FileName}];		%% [{tag,id,name}]
+            [{regular,get_id(FileName),FileName}];		%% [{tag,id,name}]
         dir ->            
             L = length(FileName),
             Result = do(qlc:q([
