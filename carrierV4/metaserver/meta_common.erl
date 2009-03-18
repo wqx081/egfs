@@ -28,8 +28,8 @@ do_open(FilePathName, Mode, UserName) ->
             case meta_db:get_tag(ReadPath) of
                 regular ->
                     FileID = meta_db:get_id(ReadPath),
-                    io:format("show FileID ~p~n",[FileID]),
-                    io:format("call_meta_open:"),
+%%                     io:format("show FileID ~p~n",[FileID]),
+%%                     io:format("call_meta_open:"),
                     do_file_open(ReadPath,Mode,UserName);
                 
                 directory ->
@@ -41,7 +41,7 @@ do_open(FilePathName, Mode, UserName) ->
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
                     
-                    io:format("parentdir: ~p~n",[ParentDir]),
+%%                     io:format("parentdir: ~p~n",[ParentDir]),
                     %%%%%%%%%%%%TODO:
                     case (meta_db:get_tag(ParentDir)=:=directory) and (Mode=:=write) of 
                         true ->
@@ -414,16 +414,16 @@ do_file_open(FileName,Mod,UserName)->
 
 do_write_open(FileName,UserName)->    
     ProcessName = lib_common:generate_processname(FileName,write),
-    io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
+%%    io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
         undefined -> % no meta worker , create one worker to server this writing request.
-            io:format("C...~n"),
+%%             io:format("C...~n"),
 			case meta_db:get_id(FileName) of                
 				null ->
-                    io:format("A...~n"),
+%%                    io:format("A...~n"),
 					% if the target file is not exist, then generate a new fileid. 
                     FileID = lib_uuid:gen(),
-                    io:format("A1...~n"),
+%%                     io:format("A1...~n"),
 				    FileRecord = #filemeta{	id=FileID, 
 											name=FileName, 
 											size=0, 
@@ -431,18 +431,19 @@ do_write_open(FileName,UserName)->
 				                 			ctime=calendar:local_time(), 
 											mtime=calendar:local_time()
                                             },
-                    io:format("A2...~n"),
+%%                     io:format("A2...~n"),
 					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileRecord, write,UserName], []),
 					{ok, FileID, 0, [], MetaWorkerPid};	  
 				Any ->
-                    io:format("B...~n"),
-					{error, "Cant Write! The same file name has existed in database.~p",[Any]}
+%%                     io:format("B...~n"),
+					{error, "Cant Write! The same file name has existed in database.FileID:~p,FileName:~p~n",[Any,FileName]}
 			end;
         _Pid->			% pid exist, write error
             {error, "other client is writing the same file."}  
     end.
 
 do_read_open(FileName,UserName)->
+    error_logger:info_msg("in do_read_open~n"),
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
@@ -484,12 +485,18 @@ do_dataserver_bootreport(HostRecord, ChunkList)->
 
 %%
 do_register_replica(ChunkID,Host) ->
+    error_logger:info_msg("in do_register_replica,~p,~p~n",[ChunkID,Host]),
     case meta_db:select_item_from_chunkmapping_id(ChunkID) of
         []->            
             meta_db:write_to_db(#chunkmapping{chunkid = ChunkID,chunklocations = [Host]});
         [X]->
-            New = X#chunkmapping{chunklocations = X#chunkmapping.chunklocations++[Host]},
-            meta_db:write_to_db(New)
+            case lists:member(Host,X#chunkmapping.chunklocations) of
+                true->
+                    {ok,"bie nao"};            
+                 false->
+                   New = X#chunkmapping{chunklocations = X#chunkmapping.chunklocations++[Host]},
+                   meta_db:write_to_db(New)
+            end
     end.
 
 %% 

@@ -111,17 +111,15 @@ get_hostname_list(Hosts)->
     [H#hostinfo.hostname]++get_hostname_list(T).
 
 
-%% -record(hostinfo,{hostname, freespace, totalspace, status,life}).
-%% -record(chunkmapping, {chunkid, chunklocations}).
+%% -record(hostinfo,{hostname,nodename, freespace, totalspace, status,life}).
+%% -record(chunkmapping, {chunkid, chunklocations(hostname)}).
 select_host(ChunkMappingItem,HostnameList,N) ->
     Chunklocations = ChunkMappingItem#chunkmapping.chunklocations, %%[H1,H2]    
     DieHosts = Chunklocations--HostnameList,    
     
     OptionHosts =HostnameList--Chunklocations,
     %%TODO: selection needed, discussible.
-    Need = N-length(Chunklocations)+length(DieHosts),
-    
-    %%TODO, select policy, random;first N; location
+    Need = N-length(Chunklocations)+length(DieHosts),   
     notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid).
 
 notify_dataserver(OptionHosts,Need,ID)->
@@ -129,6 +127,7 @@ notify_dataserver(OptionHosts,Need,ID)->
         0 ->
             ok;
         Rest->
+            %%TODO, select policy, random; first N; location            
             [H|T] = OptionHosts,
             gen_server:cast({data_server,H#hostinfo.nodename},{replica,H#hostinfo.hostname,ID}),
             notify_dataserver(T,Need-1,ID)
