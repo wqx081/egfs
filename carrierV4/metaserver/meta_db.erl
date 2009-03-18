@@ -53,7 +53,7 @@ do_this_once() ->
                                      ]),
     
     
-    reset_example_tables(),
+    reset_tables(),
 
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
     mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
@@ -97,6 +97,7 @@ clear_tables()->
     mnesia:clear_table(filemeta),    
     mnesia:clear_table(hostinfo),
     mnesia:clear_table(chunkmapping).
+
 
 reset_tables() ->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="reset_tables/0",logarg=[]},
@@ -674,7 +675,7 @@ update_heartbeat(HostName,State) ->
     		F = fun() ->
 				mnesia:write(Row)
 			end,
-    		{atomic,Val}=mnesia:transaction(F),           
+    		{atomic,_Val}=mnesia:transaction(F),           
 %%          write_to_db(Row), too many log ...
             ok;
         []->
