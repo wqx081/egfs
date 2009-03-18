@@ -118,7 +118,8 @@ handle_call({chmod, FileName, _UserName, UserType, CtrlACL}, {_From, _}, State) 
 
 
 
-handle_call({register_replica,ChunkID,Host},{_From, _}, State)->    
+handle_call({registerchunk,ChunkID,Host},{_From, _}, State ) ->
+    error_logger:info_msg("registerchunk~n"),
     Reply = meta_common:do_register_replica(ChunkID,Host),
     {reply,Reply,State};
 
@@ -142,13 +143,13 @@ handle_call({showWorker,WorkerFileName,EasyMod},{_From,_},State) ->
     {reply,Reply,State};
 
 
-handle_call(_, {_From, _}, State)->
-    io:format("inside handle_call_error~n"),
+handle_call(MSG, {_From, _}, State) ->
+    error_logger:info_msg("inside handle_call_error, MSG: ~p~n",[MSG]),
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 
 handle_cast({bootreport,HostName, ChunkList},State) ->
-    io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostName]),
+%%     io:format("inside handle_call_bootreport,HostInfoRec:~p~n",[HostName]),
 %% 	meta_common:do_dataserver_bootreport(HostInfoRec, ChunkList),
     meta_db:do_register_dataserver(HostName,ChunkList),
     {noreply,State};

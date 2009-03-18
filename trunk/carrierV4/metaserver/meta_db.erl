@@ -98,23 +98,12 @@ clear_tables()->
     mnesia:clear_table(hostinfo),
     mnesia:clear_table(chunkmapping).
 
-reset_example_tables()->
-    mnesia:create_table(hostinfo, [{attributes, record_info(fields,hostinfo)},
-                                      {disc_copies,[node()]}
-                                     ]),
-    F = fun() ->
-		foreach(fun mnesia:write/1, example_tables())
-		end,
-    mnesia:transaction(F).
-
 reset_tables() ->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="reset_tables/0",logarg=[]},
-    logF(LOG),
-    mnesia:clear_table(dirmeta),
+    logF(LOG),    
     mnesia:clear_table(filemeta),
     mnesia:clear_table(chunkmapping),    
     mnesia:clear_table(hostinfo),
-
     F = fun() ->
 		foreach(fun mnesia:write/1, example_tables())
 		end,
@@ -693,8 +682,6 @@ update_heartbeat(HostName,State) ->
             needreport
     
     end.
-
-
 
 
 
