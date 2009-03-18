@@ -442,7 +442,7 @@ do_get_orphanchunk_byhost(HostProcName) ->
 %% add file info to table: filemeta & chunkmapping
 %%====================================================================
 add_a_file_record(FileRecord, ChunkMappingRecords) ->
-    error_logger:info_msg("~~~~ in add_a_file_record~~~~n"),
+%%     error_logger:info_msg("~~~~ in add_a_file_record~~~~n"),
     CurrentT = erlang:localtime(),
     %%TODO: create time & modify time . . mode append,. 
     Row = FileRecord#filemeta{	ctime=CurrentT, 
@@ -455,7 +455,7 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
 		lists:foreach(fun mnesia:write/1, ChunkMappingRecords)   
 	end,
     {atomic, Val} = mnesia:transaction(F),
-    error_logger:info_msg("write into db success"),
+%%     error_logger:info_msg("write into db success"),
 	Val.
 
 
@@ -499,10 +499,10 @@ get_tag(FileName) ->
 %%     io:format("~p~n",[L]),
     case (string:equal(string:right(FileName,1),"/"))andalso L>1 of
        true->           
-           io:format("true,~p~n",[FileName]),
+%%            io:format("true,~p~n",[FileName]),
            get_tag(string:substr(FileName,1,L-1));
        false->
-           io:format(",~p~n",[FileName]),
+%%            io:format(",~p~n",[FileName]),
            Result = do(qlc:q([X#filemeta.type||X<-mnesia:table(filemeta), X#filemeta.name=:=FileName])),
            case Result of
                [] ->

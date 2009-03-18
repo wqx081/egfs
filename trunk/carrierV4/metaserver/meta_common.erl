@@ -35,7 +35,7 @@ do_open(FilePathName, Mode, UserName) ->
                 directory ->
                     {error, "you are opening a dir"};
                 Any -> %% create a file.
-                    error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
+%%                     error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
                     
                     ParentDir = filename:dirname(ReadPath),
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
@@ -314,7 +314,7 @@ check_op_type(SrcFullPath, DstFullPath) ->
     DstTag = meta_db:get_tag(DstFullPath),
     SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
     
-    error_logger:info_msg("SrcUnderDst:~p,SrcTag:~p,DstTag:~p,SrcUnderDstTag:~p~n",[SrcUnderDst,SrcTag,DstTag,SrcUnderDstTag]),
+%%     error_logger:info_msg("SrcUnderDst:~p,SrcTag:~p,DstTag:~p,SrcUnderDstTag:~p~n",[SrcUnderDst,SrcTag,DstTag,SrcUnderDstTag]),
     
     CaseSrcequalDes = string:equal(SrcFullPath,DstFullPath),
 
@@ -382,8 +382,8 @@ check_process_byID(FileID)->
 check_process_byName(FileName) ->
     WA = lib_common:generate_processname(FileName,write),
     RA = lib_common:generate_processname(FileName,read),
-    error_logger:info_msg("Write processname: ~p~n",[WA]),
-    error_logger:info_msg("Read processname: ~p~n",[RA]),
+%%     error_logger:info_msg("Write processname: ~p~n",[WA]),
+%%     error_logger:info_msg("Read processname: ~p~n",[RA]),
     case whereis(WA) of
         undefined->
             case whereis(RA) of
@@ -443,7 +443,7 @@ do_write_open(FileName,UserName)->
     end.
 
 do_read_open(FileName,UserName)->
-    error_logger:info_msg("in do_read_open~n"),
+%%     error_logger:info_msg("in do_read_open~n"),
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.

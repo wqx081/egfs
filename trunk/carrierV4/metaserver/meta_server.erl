@@ -13,7 +13,7 @@
 
 init(_Arg) ->
     process_flag(trap_exit, true),
-    io:format("meta server starting~n"),
+%%     io:format("meta server starting~n"),
     %init_mnesia(),
     {ok, []}.
 
@@ -27,7 +27,7 @@ stop() ->
     gen_server:cast(?META_SERVER, stop).
 
 terminate(_Reason, _State) ->
-    io:format("meta server terminating.abc.~n").
+      io:format("meta server terminating.abc.~n").
 
 %%% from name server.
 
@@ -49,7 +49,7 @@ handle_call({open, FilePathName, Mode, _UserName}, {_From, _}, State) ->
 %% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 handle_call({delete, FilePathName, _UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_delete, FilePathName:~p,_UserName:~p~n",[FilePathName,_UserName]),
+%%     io:format("inside handle_call_delete, FilePathName:~p,_UserName:~p~n",[FilePathName,_UserName]),
     Reply = meta_common:do_delete(FilePathName, _UserName),
     {reply, Reply, State};
 
@@ -61,7 +61,7 @@ handle_call({delete, FilePathName, _UserName}, {_From, _}, State) ->
 %% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 handle_call({copy, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_copy, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
+%%     io:format("inside handle_call_copy, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
     Reply = meta_common:do_copy(SrcFilePathName, DstFilePathName, _UserName),
     {reply, Reply, State};
 
@@ -75,7 +75,7 @@ handle_call({copy, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, Sta
 %% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 handle_call({move, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_move, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
+%%     io:format("inside handle_call_move, SrcFilePathName:~p, DstFilePathName:~p, _UserName:~p~n",[SrcFilePathName, DstFilePathName, _UserName]),
     Reply = meta_common:do_move(SrcFilePathName, DstFilePathName, _UserName),
     {reply, Reply, State};
 
@@ -86,7 +86,7 @@ handle_call({move, SrcFilePathName, DstFilePathName, _UserName}, {_From, _}, Sta
 %% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 handle_call({list, FilePathName, _UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_list, FilePathName:~p,_UserName:~p~n",[FilePathName, _UserName]),
+%%     io:format("inside handle_call_list, FilePathName:~p,_UserName:~p~n",[FilePathName, _UserName]),
     Reply = meta_common:do_list(FilePathName, _UserName),
     {reply, Reply, State};
 %%"name server" methods
@@ -97,7 +97,7 @@ handle_call({list, FilePathName, _UserName}, {_From, _}, State) ->
 
 
 handle_call({mkdir, PathName, _UserName}, {_From, _}, State) ->
-    io:format("inside handle_call_mkdir, PathName:~p,_UserName:~p~n",[PathName, _UserName]),
+%%     io:format("inside handle_call_mkdir, PathName:~p,_UserName:~p~n",[PathName, _UserName]),
     Reply = meta_common:do_mkdir(PathName, _UserName),
     {reply, Reply, State};
 
@@ -112,25 +112,25 @@ handle_call({mkdir, PathName, _UserName}, {_From, _}, State) ->
 %% _UserName -> <<integer():64>>
 %% return -> {ok, []} | {error, []}
 handle_call({chmod, FileName, _UserName, UserType, CtrlACL}, {_From, _}, State) ->
-    io:format("inside handle_call_chmod, FileName:~p~n _UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, _UserName, UserType, CtrlACL]),
+%%     io:format("inside handle_call_chmod, FileName:~p~n _UserName:~p~n UserType:~p~n CtrlACL:~p~n",[FileName, _UserName, UserType, CtrlACL]),
     Reply = meta_common:do_chmod(FileName, _UserName, UserType, CtrlACL),
     {reply, Reply, State};
 
 
 
 handle_call({registerchunk,ChunkID,Host},{_From, _}, State ) ->
-    error_logger:info_msg("registerchunk~n"),
+%%     error_logger:info_msg("registerchunk~n"),
     Reply = meta_common:do_register_replica(ChunkID,Host),
     {reply,Reply,State};
 
 
 handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
-    io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
+%%     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
 	Reply = meta_common:do_collect_orphanchunk(HostRegName),
     {reply, Reply, State};
 
 handle_call({getfileinfo,FileName,_UserName}, {_From, _}, State) -> 
-    error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),
+%%     error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),
     Reply  = meta_db:select_all_from_filemeta_byName(FileName),
 	{reply, Reply, State};
 
@@ -144,7 +144,7 @@ handle_call({showWorker,WorkerFileName,EasyMod},{_From,_},State) ->
 
 
 handle_call(MSG, {_From, _}, State) ->
-    error_logger:info_msg("inside handle_call_error, MSG: ~p~n",[MSG]),
+     error_logger:info_msg("inside handle_call_error, MSG: ~p~n",[MSG]),
 	Reply = {error, "undefined handler"},
     {reply, Reply, State}.
 
@@ -155,7 +155,7 @@ handle_cast({bootreport,HostName, ChunkList},State) ->
     {noreply,State};
 
 handle_cast(stop, State) ->
-    io:format("meta server stopping~n"),
+%%     io:format("meta server stopping~n"),
     {stop, normal, State}.
 
 

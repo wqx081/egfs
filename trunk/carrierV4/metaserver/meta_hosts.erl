@@ -17,7 +17,7 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link() ->
-    error_logger:info_msg("[~p, ~p]: hostserver starting ~n", [?MODULE, ?LINE]),
+%%     error_logger:info_msg("[~p, ~p]: hostserver starting ~n", [?MODULE, ?LINE]),
     gen_server:start_link(?HOST_SERVER, ?MODULE, [], []).
 
 %%====================================================================
@@ -29,15 +29,15 @@ init([]) ->
     {ok, []}.
 
 handle_call({register_dataserver, HostName,Nodename, FreeSpace, TotalSpace, Status}, {From, _}, State) ->
-    error_logger:info_msg("[~p, ~p]: register dataserver ~p request~n", [?MODULE, ?LINE, HostName]),
+%%     error_logger:info_msg("[~p, ~p]: register dataserver ~p request~n", [?MODULE, ?LINE, HostName]),
  	Reply = meta_db:add_hostinfo_item(HostName,Nodename, FreeSpace, TotalSpace, Status,From),
 	{reply, Reply, State};
 
 handle_call({allocate_dataserver}, {_From, _}, State) ->
-    error_logger:info_msg("[~p, ~p]: allocate dataserver request~n", [?MODULE, ?LINE]),
+%%     error_logger:info_msg("[~p, ~p]: allocate dataserver request~n", [?MODULE, ?LINE]),
 	case meta_db:select_random_one_from_hostinfo() of
 		[] ->
-			error_logger:error_msg("[~p, ~p]: seek dataserver failed~n", [?MODULE, ?LINE]),
+%% 			error_logger:error_msg("[~p, ~p]: seek dataserver failed~n", [?MODULE, ?LINE]),
 			{reply, {error, "seek dataserver failed"}, State};
 		[SelectedHost] ->
 			{reply, {ok, SelectedHost}, State}
