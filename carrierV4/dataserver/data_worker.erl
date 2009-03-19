@@ -31,10 +31,10 @@ loop_write(MM, ChunkID, ChunkHdl) ->
 	    MM ! {send, R}, 
 	    loop_write(MM, ChunkID, ChunkHdl);
 	{chan_closed, MM} ->
+		file:close(ChunkHdl),
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
 		data_db:add_chunkmeta_item(ChunkID, MD5),		
-		file:close(ChunkHdl),
 		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
