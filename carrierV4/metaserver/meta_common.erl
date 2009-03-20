@@ -24,20 +24,28 @@ do_open(FilePathName, Mode, UserName) ->
     %% gen_server:call(?ACL_SERVER, {Mode, FilePathName, _UserName})
     case get_acl() of
         true ->
-            ReadPath = lib_common:get_rid_of_last_slash(FilePathName),
-            case meta_db:get_tag(ReadPath) of
+            RealPath = lib_common:get_rid_of_last_slash(FilePathName),
+            case meta_db:get_tag(RealPath) of
                 regular ->
 %%                     FileID = meta_db:get_id(ReadPath),
 %%                     io:format("show FileID ~p~n",[FileID]),
 %%                     io:format("call_meta_open:"),
-                    do_file_open(ReadPath,Mode,UserName);
-                
+                    case Mode of 
+                        write ->
+                            {error,"please use mode append"};
+                        read ->
+                            do_read_open(RealPath,UserName);
+                        append ->
+                            do_append_open(RealPath,UserName);
+                        Any->
+                            {error,"unknown mode: ~p~n",[Any]}
+                    end;                
                 directory ->
                     {error, "you are opening a dir"};
                 Any -> %% create a file.
 %%                     error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
                     
-                    ParentDir = filename:dirname(ReadPath),
+                    ParentDir = filename:dirname(RealPath),
                     %%gen_server:call(?ACL_SERVER, {write, ParentDir, _UserName})
 %%                     case ((Mode=:=write) and meta_db:get_tag(ParentDir)=:=dir) and get_acl() of
                     
@@ -45,9 +53,9 @@ do_open(FilePathName, Mode, UserName) ->
                     %%%%%%%%%%%%TODO:
                     case (meta_db:get_tag(ParentDir)=:=directory) and (Mode=:=write) of 
                         true ->
-                            do_file_open(ReadPath, Mode,UserName);
+                            do_write_open(RealPath,UserName);
                         false ->
-                            {error, "parent dir does not exist"}
+                            {error, "parent dir does not exist or file not exist"}
                     end
             end;
         false ->
@@ -409,16 +417,20 @@ check_process_byName(FileName) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 %%from old meta_server ;   handle these function.
 
-do_file_open(FileName,Mod,UserName)-> 
-    case Mod of
-        read ->            
-            do_read_open(FileName,UserName);
-        write ->
-            do_write_open(FileName,UserName);
-        _->
-            {error,"unkown open mode"}
-    end.
+%% do_file_open(FileName,Mod,UserName)-> 
+%%     case Mod of
+%%         read ->            
+%%             do_read_open(FileName,UserName);
+%%         write ->
+%%             do_write_open(FileName,UserName);
+%%         append->
+%%             do_append_open(FileName,UserName);
+%%         _->
+%%             {error,"unkown open mode"}
+%%     end.
 
+
+%% checked, no file exist , go ahead and write, no one reading or appending
 do_write_open(FileName,UserName)->    
     ProcessName = lib_common:generate_processname(FileName,write),
 %%    io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
@@ -449,7 +461,26 @@ do_write_open(FileName,UserName)->
             {error, "other client is writing the same file."}  
     end.
 
-do_read_open(FileName,UserName)->
+%%can't be mode write
+%% don't care someone reading,
+%% also go ahead and do append,
+do_append_open(FileName,UserName) ->
+    ProcessName = lib_common:generate_processname(FileName,append),
+    case whereis(ProcessName) of
+        undefined->
+            case meta_db:select_all_from_filemeta_byName(FileName) of
+                [] ->
+                    {error,"NO TARGET FILE EXSIT.~p~n",[FileName]};
+                [Meta]->
+                    {ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [Meta, append,UserName], []),
+                    {ok,Meta#filemeta.id,Meta#filemeta.size,lists:last(Meta#filemeta.chunklist),MetaWorkerPid}                    
+            end;
+        _AnyPid->
+            {error, "other client is appending the same file."}
+    end.
+
+%%go ahead and read, if file exist(means no one writing, maybe someone appending)  
+do_read_open(FileName,UserName)->		
 %%     error_logger:info_msg("in do_read_open~n"),
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
