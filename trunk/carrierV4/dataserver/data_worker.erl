@@ -15,7 +15,7 @@ run(MM, ArgC, _ArgS) ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 		    loop_write(MM, ChunkID, ChunkHdl);
 		{append, ChunkID, HostList}	->
-			[[NextHost]|THosts]=HostList,
+			[NextHost|THosts]=HostList,
 			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, THosts}),
 		    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);		    
@@ -25,7 +25,7 @@ run(MM, ArgC, _ArgS) ->
 	    {garbagecheck, []} ->
 			loop_garbagecheck(MM, <<>> );			
 	    {garbagecheck, HostList} ->
-	    	[[NextHost]|THosts]=HostList,
+	    	[NextHost|THosts]=HostList,
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, THosts}),
 			loop_garbagecheck(MM, NextDataworkPid, <<>> )			
 	end.
@@ -80,7 +80,7 @@ loop_read(MM, ChunkHdl) ->
 loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
     receive
 	{chan, MM, {replica, Bytes}} ->
-		%error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_replica(MM, ChunkID, MD5, ChunkHdl);
