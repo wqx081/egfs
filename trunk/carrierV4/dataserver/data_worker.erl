@@ -16,7 +16,7 @@ run(MM, ArgC, _ArgS) ->
 		    loop_write(MM, ChunkID, ChunkHdl);
 		{append, ChunkID, HostList}	->
 			[NextHost|THosts]=HostList,
-			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
+			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, THosts}),
 		    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);		    
 	    {replica, ChunkID, MD5} ->
@@ -33,7 +33,7 @@ run(MM, ArgC, _ArgS) ->
 loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl) ->
     receive
 	{chan, MM, {write, Bytes}} ->
-		%error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 		lib_chan:rpc(NextDataworkPid,{write, Bytes}),
 	    MM ! {send, R}, 
@@ -80,7 +80,7 @@ loop_read(MM, ChunkHdl) ->
 loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
     receive
 	{chan, MM, {replica, Bytes}} ->
-		error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		%error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_replica(MM, ChunkID, MD5, ChunkHdl);
