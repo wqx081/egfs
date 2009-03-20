@@ -473,7 +473,8 @@ do_append_open(FileName,UserName) ->
                     {error,"NO TARGET FILE EXSIT.~p~n",[FileName]};
                 [Meta]->
                     {ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [Meta, append,UserName], []),
-                    {ok,Meta#filemeta.id,Meta#filemeta.size,lists:last(Meta#filemeta.chunklist),MetaWorkerPid}                    
+                    {ok,Meta#filemeta.id,Meta#filemeta.size,lists:last(Meta#filemeta.chunklist),MetaWorkerPid}
+            		%%{ ok,id,size,lastchunkid,MetaWorkerPid}
             end;
         _AnyPid->
             {error, "other client is appending the same file."}

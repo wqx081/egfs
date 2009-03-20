@@ -39,17 +39,18 @@ init([FileRecord,Mod,_UserName]) ->
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
-%%     error_logger:info_msg("~~~~ in registerchunk~~~~n"),
-%%     error_logger:info_msg("checking...~n"),
-%%     error_logger:info_msg("worker state:~n"),
-%%     error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
-%%     error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
-%%     error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
+    error_logger:info_msg("~~~~ in registerchunk~~~~n"),
+    error_logger:info_msg("checking...~n"),
+    error_logger:info_msg("FileRecord:~p~n",[FileRecord]),
+    error_logger:info_msg("ChunkMappingRecords:~p~n",[ChunkMappingRecords]),
+    error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
+    error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
+    error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
     case State#metaWorkerState.mod of
         write ->
             Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords);
         append ->
-            Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords);
+            Reply = meta_db:append_a_file_record(FileRecord, ChunkMappingRecords);
         Any->
             Reply = {error,"mode error while registerchunk,~p~n",[Any]}
     end,
@@ -149,6 +150,8 @@ do_close(From,State) ->
             end;
         write->
 %%             error_logger:info_msg("mod = write"),
+            exit(normal);
+        append->
             exit(normal)
     end.
 
