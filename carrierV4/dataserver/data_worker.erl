@@ -11,22 +11,47 @@ run(MM, ArgC, _ArgS) ->
 		{read, ChunkID}	->
 			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
 		    loop_read(MM, ChunkHdl);
+		{append, ChunkID, []}	->
+			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
+		    loop_write(MM, ChunkID, ChunkHdl);
+		{append, ChunkID, HostList}	->
+			[[NextHost]|THosts]=HostList,
+			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
+			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, THosts}),
+		    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);		    
 	    {replica, ChunkID, MD5} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
 			loop_replica(MM, ChunkID, MD5, ChunkHdl);
 	    {garbagecheck, []} ->
 			loop_garbagecheck(MM, <<>> );			
 	    {garbagecheck, HostList} ->
-	    	[NextHost|THosts]=HostList,
+	    	[[NextHost]|THosts]=HostList,
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, THosts}),
 			loop_garbagecheck(MM, NextDataworkPid, <<>> )			
 	end.
 
+loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl) ->
+    receive
+	{chan, MM, {write, Bytes}} ->
+		%error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		R = file:write(ChunkHdl, Bytes),
+		lib_chan:rpc(NextDataworkPid,{write, Bytes}),
+	    MM ! {send, R}, 
+	    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);
+	{chan_closed, MM} ->
+		file:close(ChunkHdl),
+		lib_chan:disconnect(NextDataworkPid),
+		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
+		{ok, MD5}		= lib_md5:file(FileName),
+		data_db:add_chunkmeta_item(ChunkID, MD5),		
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+	    exit(normal)
+    end.
 
 loop_write(MM, ChunkID, ChunkHdl) ->
     receive
 	{chan, MM, {write, Bytes}} ->
-		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
+		%error_logger:info_msg("[~p, ~p]: write size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_write(MM, ChunkID, ChunkHdl);
@@ -43,7 +68,7 @@ loop_read(MM, ChunkHdl) ->
     receive
 	{chan, MM, {read, Start, Length}} ->
 		R = file:pread(ChunkHdl, Start, Length),
-		%error_logger:info_msg("[~p, ~p]: send ~p ~n", [?MODULE, ?LINE, R]),		
+		%error_logger:info_msg("[~p, ~p]: send size ~p ~n", [?MODULE, ?LINE, R]),		
 	    MM ! {send, R},
 	    loop_read(MM, ChunkHdl);
 	{chan_closed, MM} ->
@@ -55,7 +80,7 @@ loop_read(MM, ChunkHdl) ->
 loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
     receive
 	{chan, MM, {replica, Bytes}} ->
-		%error_logger:info_msg("[~p, ~p]: replica ~p ~n", [?MODULE, ?LINE, Bytes]),
+		%error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_replica(MM, ChunkID, MD5, ChunkHdl);
@@ -78,21 +103,21 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 loop_garbagecheck(MM, Bin) ->
     receive
 	{chan, MM, {garbagecheck, BFBytes}} ->
-		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
+		%error_logger:info_msg("[~p, ~p]: garbagecheck size ~p ~n", [?MODULE, ?LINE, size(BFBytes)]),
 		Bin1 = list_to_binary(binary_to_list(Bin) ++ binary_to_list(BFBytes)),
 	    loop_garbagecheck(MM, Bin1);
 	{chan_closed, MM} ->
 		BloomFilter = binary_to_term(Bin),
 		ChunkList = data_db:select_chunklist_from_chunkmeta(),
 		lists:foreach(fun(X) -> check_element(X, BloomFilter) end, ChunkList),		
-		error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		%error_logger:info_msg("[~p, ~p]: dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 loop_garbagecheck(MM, NextDataworkPid, Bin) ->
     receive
 	{chan, MM, {garbagecheck, BFBytes}} ->
-		%error_logger:info_msg("[~p, ~p]: write ~p ~n", [?MODULE, ?LINE, Bytes]),
-		lib:rpc(NextDataworkPid,{garbagecheck, BFBytes}),
+		%error_logger:info_msg("[~p, ~p]: garbagecheck loop size ~p ~n", [?MODULE, ?LINE, size(BFBytes)]),
+		lib_chan:rpc(NextDataworkPid,{garbagecheck, BFBytes}),
 		Bin1 = list_to_binary(binary_to_list(Bin) ++ binary_to_list(BFBytes)),
 	    loop_garbagecheck(MM, NextDataworkPid, Bin1);
 	{chan_closed, MM} ->

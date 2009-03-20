@@ -77,5 +77,5 @@ delete_chunkmeta_item(ChunkID) ->
 	end,
 	{atomic, Val} = mnesia:transaction(F),
 	Val.
-	
+
 
