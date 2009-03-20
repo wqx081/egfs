@@ -22,34 +22,57 @@ init([FileName, Mode, UserName]) ->
 	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
 			% set the correct position of FileContext 	
-			Offset = case Mode of 
+			NewFC = case Mode of
 					  	read ->
-							0;
-						write ->
-							FileSize								
-					  end,		
-			% construct the FileContext based on the FileRecord and MetaWorkerPid
-			NewFileContext = #filecontext{	fileid = FileID, 
+							#filecontext{	fileid = FileID, 
 											filename = FileName, 
 				                 			filesize = FileSize,
-											offset = Offset,
+											offset = 0,
 											chunklist= ChunkList,
 											mode = Mode,
-											metaworkerpid = MetaWorkerPid},
+											metaworkerpid = MetaWorkerPid};
+						write ->
+							#filecontext{	fileid = FileID, 
+											filename = FileName, 
+				                 			filesize = FileSize,
+											offset = FileSize,
+											chunklist= ChunkList,
+											mode = Mode,
+											metaworkerpid = MetaWorkerPid};
+						append ->
+							#filecontext{	fileid = FileID, 
+											filename = FileName, 
+				                 			filesize = FileSize,
+											offset = FileSize,
+											chunkid= ChunkList,
+											mode = Mode,
+											metaworkerpid = MetaWorkerPid}							
+					  end,		
+			% construct the FileContext based on the FileRecord and MetaWorkerPid
 			link(MetaWorkerPid),
-			{ok, NewFileContext};
+			{ok, NewFC};
 		{error, Why} ->
 			{stop, Why}
 	end.	
 
 handle_call({write, Bytes}, _From, FileContext) ->
-%	error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
+	%error_logger:info_msg("[~p, ~p]: write ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
 	case FileContext#filecontext.mode of
 		write ->
 			{ok, NewFileContext} = write_data(FileContext, Bytes),	
 			{reply, ok, NewFileContext};
 		_Any ->
 			{reply, {error, "write open mode error"}, FileContext}
+	end;
+
+handle_call({append, Bytes}, _From, FileContext) ->
+	error_logger:info_msg("[~p, ~p]: append ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),
+	case FileContext#filecontext.mode of
+		append ->
+			{ok, NewFileContext} = append_data(FileContext, Bytes),	
+			{reply, ok, NewFileContext};
+		_Any ->
+			{reply, {error, "append open mode error"}, FileContext}
 	end;
 
 handle_call({read, Number}, _From, FileContext) ->
@@ -65,7 +88,7 @@ handle_call({read, Number}, _From, FileContext) ->
 	end;
 	
 handle_call({position, Location}, _From, FileContext) ->
-	error_logger:info_msg("[~p, ~p]: set position ~p  ~n", [?MODULE, ?LINE, Location]),	
+	%error_logger:info_msg("[~p, ~p]: set position ~p  ~n", [?MODULE, ?LINE, Location]),	
 	case do_position(FileContext, Location) of
 		{ok, NewFC} ->
 			{reply, ok, NewFC};
@@ -77,10 +100,16 @@ handle_call({pread, Location, Number}, _From, FileContext) ->
 	%error_logger:info_msg("[~p, ~p]: pread ~p  ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	case do_position(FileContext, Location) of
 		{ok, NewFC} ->
-			{ok, NewFC1, Data} = do_read(NewFC, Number),
-			{reply, {ok,Data}, NewFC1};
+			case do_read(NewFC, Number) of
+				{ok, NewFC1, Data} ->
+					{reply, {ok,Data}, NewFC1};
+				eof ->
+					{reply, eof, FileContext};
+				{error, Reason} ->
+					{reply, {error, Reason}	, FileContext}
+			end;
 		{error, Reason} ->
-			{error, Reason}
+			{reply, {error, Reason}	, FileContext}
 	end;	
 		
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=write ->
@@ -120,6 +149,41 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=wri
 	end,
 	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
 	{stop, normal, Reply, #filecontext{}};
+	
+handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=append ->
+	error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
+	#filecontext{	fileid	 = FileID, 
+				 	filename = FileName, 
+					filesize = FileSize, 
+					chunkid	 = ChunkID,
+					chunklist= PreChunkList,
+					host	 = Host, 
+					nodelist = PreNodeList,
+					metaworkerpid= MetaWorkerPid,
+					dataworkerpid= DataWorkerPid} = FileContext,
+	[ChunkList, NodeList] = case ChunkID of
+								[] ->
+									[PreChunkList, PreNodeList];
+								_Any ->
+									[PreChunkList ++ [ChunkID], PreNodeList ++ [Host]]
+							end,	
+	
+ 	FileRecord = #filemeta{	id = FileID,
+							name = FileName,
+							size = FileSize,
+							chunklist = ChunkList},
+	error_logger:info_msg("[~p, ~p]: FileRecord ChunkList ~p ~n", [?MODULE, ?LINE, FileRecord#filemeta.chunklist]),	
+	case DataWorkerPid =:= undefined of
+		true ->
+			void;
+		false ->
+			lib_chan:disconnect(DataWorkerPid)
+	end,
+	ChunkMappingRecords = generate_chunkmapping_record(ChunkList, NodeList),
+	Reply = gen_server:call(MetaWorkerPid, {registerchunk, FileRecord, ChunkMappingRecords}),
+	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
+	{stop, normal, Reply, #filecontext{}};
+	
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=read ->
 	%error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
 	#filecontext{	metaworkerpid= MetaWorkerPid,
@@ -136,13 +200,13 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=rea
 handle_cast(_Msg, FileContext) ->
     {noreply, FileContext}.
 
-handle_info({'EXIT', Pid, Why}, FileContext) ->
+handle_info({'EXIT', _Pid, Why}, FileContext) ->
 	%error_logger:info_msg("[~p, ~p]: receive EXIT message from ~p since ~p~n", [?MODULE, ?LINE, Pid,Why]),	
 	{stop, Why, FileContext};	    
 handle_info(_Info, FileContext) ->
     {noreply, FileContext}.
 
-terminate(Reason, _FileContext) ->
+terminate(_Reason, _FileContext) ->
 	%error_logger:info_msg("[~p, ~p]: close client worker ~p  since ~p~n", [?MODULE, ?LINE, self(),Reason]),	 
     ok.
 
@@ -167,7 +231,7 @@ write_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= un
 									host    = SelectedHost},
 	write_data(NewFC, Bytes);
 % if the data is wrote into a existed chunk
-write_data(FileContext, Bytes) ->	
+write_data(FileContext, Bytes) ->
 	#filecontext{	offset = Offset,
 					chunklist=ChunkList,
 					nodelist= NodeList,
@@ -222,7 +286,12 @@ do_position(FileContext, Location) ->
 					NewFC= FileContext#filecontext{	offset = Location},
 			    	{ok, NewFC};
 				false ->
-					lib_chan:disconnect(DataWorkerPid),
+					case DataWorkerPid=:=undefined of 
+						true ->
+							void;
+						false ->
+							lib_chan:disconnect(DataWorkerPid)
+					end,
 					NewFC= FileContext#filecontext{	offset = Location, 													
 													chunkid=[],
 													host=[],
@@ -262,7 +331,7 @@ read_data(FileContext, Number, L) when FileContext#filecontext.dataworkerpid =:=
 	Index 	= Offset div ?CHUNKSIZE,
 	ChunkID = lists:nth(Index+1, ChunkList),
 	[Hosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),
-	[Host|_T] = Hosts,	
+	[Host|_T] = Hosts,
 	{ok, DataWorkPid} = lib_chan:connect(Host, ?DATA_PORT, dataworker,?PASSWORD, {read, ChunkID}),
 	NewFC= FileContext#filecontext{	dataworkerpid  = DataWorkPid, 
 									chunkid = ChunkID,
@@ -289,4 +358,76 @@ read_data(FileContext, Number, L) ->
 			%error_logger:info_msg("[~p, ~p]:E read ~p~n", [?MODULE, ?LINE, Data]),
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength},			
 			read_data(NewFC, Number-ReadLength, L1)
+	end.	
+	
+% if the data is null, append finish.
+append_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
+	error_logger:info_msg("[~p, ~p]:A append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+	{ok, FileContext};
+% if the data is appended into a new chunkFileContext#filecontext
+append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined ->
+	#filecontext{	offset = Offset,
+					chunkid=ChunkID,
+					metaworkerpid = MetaWorkerPid} = FileContext,	
+	NewFC= 	case (Offset rem ?CHUNKSIZE=:=0) of
+				true ->
+					error_logger:info_msg("[~p, ~p]:B append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+					NewChunkID=lib_uuid:gen(),
+					{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
+					{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, NewChunkID, []}),
+					FileContext#filecontext{dataworkerpid  = DataWorkPid, 
+											chunkid	= NewChunkID,
+											host    = SelectedHost};
+				false ->
+					error_logger:info_msg("[~p, ~p]:C append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+					[[SelectedHost]|LeftHosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),	
+					{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
+					FileContext#filecontext{dataworkerpid  = DataWorkPid,
+											chunkid=[],
+											host = []}
+			end,
+	append_data(NewFC, Bytes);	
+% if the data is appended into a existed chunk
+append_data(FileContext, Bytes) ->
+	#filecontext{	offset = Offset,
+					chunklist=ChunkList,
+					nodelist= NodeList,
+					chunkid=ChunkID,
+					host=Host,
+				 	dataworkerpid = DataWorkerPid} = FileContext,
+	Start		= Offset rem ?CHUNKSIZE,
+	WantLength	= ?CHUNKSIZE-Start,
+	Number		= size(Bytes),
+	ReadLength	= lists:min([Number, WantLength]),
+	case Start+ReadLength =:= ?CHUNKSIZE of
+		true ->		 
+			error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+			{Right, Left} = split_binary(Bytes, ReadLength),
+			lib_chan:rpc(DataWorkerPid,{write,Right}),
+			% close the data worker and reset the FileContext
+			lib_chan:disconnect(DataWorkerPid),	
+			error_logger:info_msg("[~p, ~p]:D0 ChunkID ~p~n", [?MODULE, ?LINE, ChunkID]),			
+			[NewChunkList, NewNodeList] = 	case ChunkID of
+												[] ->
+													error_logger:info_msg("[~p, ~p]:D1 append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+													[ChunkList, NodeList];
+												_Any ->
+													error_logger:info_msg("[~p, ~p]:D2 append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+													[ChunkList ++ [ChunkID], NodeList ++ [Host]]
+											end,	
+			NewFC= FileContext#filecontext{	offset = Offset+ReadLength, 
+											filesize= Offset+ReadLength,
+											dataworkerpid=undefined,
+											chunkid=[],
+											host=[],
+											chunklist=NewChunkList,
+											nodelist=NewNodeList},
+			% write the left data
+			append_data(NewFC, Left);
+		false ->
+			error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
+			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
+			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
+											filesize=Offset + ReadLength},
+			{ok, NewFC}			
 	end.	
