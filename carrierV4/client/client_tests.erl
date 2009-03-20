@@ -17,7 +17,10 @@ generate_files() ->
 %    generate_file(2, 1024),
 %    generate_file(2, 1048576),
 %    generate_file(2, 104857600). 
-	generate_file(10000, 10240).    
+%	generate_file(1, 2097152),    
+%	generate_file(1, 20971520), 	
+%	generate_file(1, 209715200).
+	generate_file(100, 10240). 
 
 generate_file(0, _) ->
 	ok;
@@ -59,14 +62,14 @@ test_write_all() ->
 	{ok, FileData}= file:consult(?FILELIST),
 	lists:foreach(fun testw/1, FileData),
 	{_,Time}=statistics(wall_clock),
-	error_logger:info_msg("[~p, ~p]: Write Process Total Time= ~p seconds~n", [?MODULE, ?LINE, Time]).
+	error_logger:info_msg("[~p, ~p]: Write Process Total Time= ~p microseconds~n", [?MODULE, ?LINE, Time]).
 	
 test_read_all() ->
 	statistics(wall_clock),
 	{ok, FileData}= file:consult(?FILELIST),
 	lists:foreach(fun testr/1, FileData),
 	{_,Time}=statistics(wall_clock),
-	error_logger:info_msg("[~p, ~p]: Read Process Total Time= ~p seconds~n", [?MODULE, ?LINE, Time]).
+	error_logger:info_msg("[~p, ~p]: Read Process Total Time= ~p microseconds~n", [?MODULE, ?LINE, Time]).
 			
 	
 testw({FileName,_FileSize, _MD5}) ->
