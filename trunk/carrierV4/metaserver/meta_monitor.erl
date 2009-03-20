@@ -40,6 +40,9 @@ hello() ->
 %%     timeCheck(4),
 	io:format("hello,,~p~n",[now()]).
 
+%%%%%%%%%%%%%==================================================================================================
+%% heartbeat
+
 decrease() ->
 %%     io:format("in decrease function .~n"),
     Life_minus =
@@ -72,6 +75,11 @@ decrease() ->
 %%                     {error, "Mnesia Transaction Abort!"}
 %%    			end
 %% 	end.
+
+
+
+%%%%%%%%%%%%%==================================================================================================
+%%  replica.
 
 
 %% check replica and notify dataserver to make replica,if need 
@@ -115,25 +123,43 @@ get_hostname_list(Hosts)->
 %% -record(chunkmapping, {chunkid, chunklocations(hostname)}).
 select_host(ChunkMappingItem,HostnameList,N) ->
     Chunklocations = ChunkMappingItem#chunkmapping.chunklocations, %%[H1,H2]    
-    DieHosts = Chunklocations--HostnameList,    
+%%     DieHosts = Chunklocations--HostnameList,    meaningless, we can do it in another loop, like orphan check,    
     
     OptionHosts =HostnameList--Chunklocations,
     %%TODO: selection needed, discussible.
-    Need = N-length(Chunklocations)+length(DieHosts),   
-    notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid).
+%%     Need = N-length(Chunklocations)+length(DieHosts),   
+    Need = N-length(Chunklocations),
+%%todo: source selecting policy,
+    Src = lists:nth(crypto:rand_uniform(1,length(Chunklocations)+1),Chunklocations),
+    SrcNode = meta_db:select_nodename_from_hostinfo(Src),
+    case SrcNode of 
+        []->
+            {error,"src not exist"};
+        _->
+            if length(chunklocations) =:= 0 ->                   
+                   {error,"no source,"};
+               true->
+                   notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid,SrcNode)
+            end                                    
+    end.
+    
 
-notify_dataserver(OptionHosts,Need,ID)->
+notify_dataserver(OptionHosts,Need,ID,SrcNode)->
     case Need of
         0 ->
             ok;
         Rest->
             %%TODO, select policy, random; first N; location            
             [H|T] = OptionHosts,
-            gen_server:cast({data_server,H#hostinfo.nodename},{replica,H#hostinfo.hostname,ID}),
-            notify_dataserver(T,Need-1,ID)
+            gen_server:cast({data_server,SrcNode},{replica,H#hostinfo.hostname,ID}),
+            notify_dataserver(T,Need-1,ID,SrcNode)    
     end.
 
-                                                        
+
+%%%%%%%%%%%%%==================================================================================================
+%% broadcast filemeta table 
+%%
+%%
 %% broad cast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
 broadcast() ->
     Mappings = select_all_from_Table(chunkmapping),
@@ -162,59 +188,51 @@ get_chunkid_from_chunkmapping(Nodes) ->
     [H#chunkmapping.chunkid]++get_chunkid_from_chunkmapping(T).
 
 
-%% old.
+%%=========================================================================================================
+
+% find orphanchunk every day.  
+%%  1 , hostdown, chunkmapping table record like {<<ID>>,[]} , delete from chunkmapping & filemeta.
+%%  2 , deleted filemeta record, chunkid still @chunkmapping    , delete from chunkmapping
+%%  3 ,  
 %% 
-%% checkHostHealth()->    
-%%     X = select_all_from_Table(hostinfo),
-%% 	foreach(fun checkThatHost/1,X).
-%% 
-%% 	% X#hostinfo = {hostinfo,{data_server,lt@lt},{192,168,0,111},1000000,2000000,{0,100}}
-%% checkThatHost(X)->
-%%     
-%%     S = X#hostinfo.status,
-%%     {_,Time,_} = now(),
-%%     C  = (Time-LastHeartBeat)*1000,  % C milisecond
-%%     case timeCheck(C) of        
-%%         false->
-%%             NewCounter = Counter-1,            
-%%             if NewCounter<0 ->   % host die
-%%                    delete_object_from_db(X),
-%%                    detach_from_chunk_mapping(X#hostinfo.procname);
-%%                true ->
-%%                    NewX = X#hostinfo{health={LastHeartBeat,NewCounter}},
-%%                    write_to_db(NewX)           
-%%             end;
-%%         _ ->
-%%             ok
-%% 	end.
-%%     
-%% timeCheck(C)->
-%%     if C < (?HEART_BEAT_TIMEOUT), C >= 0 ->
-%%            true;        
-%%        true ->
-%%            false
-%%     end.
-
+do_find_orphanchunk()->
+    % Get all chunks of chunkmapping table
+    GetAllChunkIdList = 
+        fun(ChunkMapping,Acm)->
+                case ChunkMapping#chunkmapping.chunklocations of
+                    []->
+                        mnesia:delete_object(ChunkMapping),
+                        %%TODO, delete filemeta record , or make a flag.
+                        Acm;
+                    _ ->
+                        [ChunkMapping#chunkmapping.chunkid | Acm]
+                end
+        end,
+    DogetAllChunkIdList = fun() -> mnesia:foldl(GetAllChunkIdList, [], chunkmapping) end,
+    {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
     
-%% check node status
-%% checkNodes() ->
-%%     io:format("check,nodes,every 10s.~n"),
-%%     receive 
-%%         {nodedown,Node} ->			%%TODO, Maybe we shall improve this.
-%%             io:format("node down ,node: ~p~n,",[Node]),           
-%%             X = select_from_hostinfo(Node),
-%%             delete_object_from_db(X),
-%%             detach_from_chunk_mapping(X#hostinfo.hostname),
-%%             {nodedown_deleted,X};
-%%         Any ->
-%%             Any
-%%     after 0 ->
-%%             {all_node_ok,[]}
-%%     end.            
-
-
-%% broadcast metainfo.
-%% metaserver choose one host , let him do the rest
-%%%%%%%
+    % filter out used chunks according to filemeta table
+	GetUsedChunkIdListInFilemeta =
+        fun(FileMeta, Acc) ->                
+                Acc--FileMeta#filemeta.chunklist                
+        end,        
+    DogetUsedChunkIdListInFilemeta = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemeta, AllChunkIdList, filemeta) end,
+    {atomic, ChunkNotInFilemeta} = mnesia:transaction(DogetUsedChunkIdListInFilemeta),
     
+    
+    % filter out used chunks according to filemeta_s table
+%% 	GetUsedChunkIdListInFilemetaS =
+%%         fun(FileMetaS, AcS) ->                
+%%                 AcS--FileMetaS#filemeta_s.chunklist                
+%%         end,        
+%%     DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
+%%     {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
+    
+    GetOrphanPair = 
+        fun(X) ->
+                NodeIpList = meta_db:select_nodeip_from_chunkmapping(X),
+                [meta_db:write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList], %%TODO, delete orphan table after debug
+                meta_db:delete_from_db({chunkmapping,X})
+        end,
+    [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
 

@@ -200,6 +200,10 @@ select_from_hostinfo(Hostname)->
               X||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
               ])).
 
+select_nodename_from_hostinfo(Hostname)->
+    do(qlc:q([
+              X#hostinfo.nodename||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
+              ])).
 
 select_chunkid_from_orphanchunk(Host) ->
     do(qlc:q([
@@ -212,12 +216,6 @@ select_all_from_orphanchunk(Host) ->
               X||X<-mnesia:table(orphanchunk),X#orphanchunk.chunklocation =:= Host
               ])).
 
-
-select_all_from_filemeta_ofDir(Dir)->
-     do(qlc:q([
-              X||X<-mnesia:table(filemeta),
-                 string:str(X#filemeta.name, Dir)>0
-              ])).
 
 %FileName - > fileid
 % @spec select_fileid_from_filemeta(FileName) ->  fileid
@@ -337,26 +335,10 @@ mnesia:transaction(F).
 %% --------------------------------------------------------------------
 
 
-%%		TODO:  log of all function. 
-%% 
-%% todomodifyHostLocation() ->
-%%     ModifyLoc =
-%%         fun(ChunkMapping, Acc) when is_atom(ChunkMapping#chunkmapping.chunklocations)->
-%%                 ChunkLoc = ChunkMapping#chunkmapping.chunklocations,
-%%                 mnesia:write(ChunkMapping#chunkmapping{chunklocations = [ChunkLoc]}),
-%%                 Acc;
-%%            (_, Acc) ->
-%%                 Acc
-%%         end,
-%%     ModifyFun = fun() -> mnesia:foldl(ModifyLoc, [], chunkmapping, write) end,
-%%     mnesia:transaction(ModifyFun).
-
-
-
-    
 %% add this node'chunklocation to chunk mapping table. 
 %% if chunkID in this node don't exist in table chunk mapping,  this chunkid is not added. (why?) 
 %% 
+%% called when, bootreport 
 do_register_dataserver(HostName,ChunkList)->
    AddHost =
         fun(ChunkMapping, Acc) ->
@@ -391,41 +373,6 @@ do_delete_filemeta_byID(FileID)->
     {ok,"File deleted"}.
     
 
-% find orphanchunk every day.
-do_find_orphanchunk()->
-    % Get all chunks of chunkmapping table
-    GetAllChunkIdList = 
-        fun(ChunkMapping,Acm)->
-                [ChunkMapping#chunkmapping.chunkid | Acm]
-        end,
-    DogetAllChunkIdList = fun() -> mnesia:foldl(GetAllChunkIdList, [], chunkmapping) end,
-    {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
-    
-    % filter out used chunks according to filemeta table
-	GetUsedChunkIdListInFilemeta =
-        fun(FileMeta, Acc) ->                
-                Acc--FileMeta#filemeta.chunklist                
-        end,        
-    DogetUsedChunkIdListInFilemeta = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemeta, AllChunkIdList, filemeta) end,
-    {atomic, ChunkNotInFilemeta} = mnesia:transaction(DogetUsedChunkIdListInFilemeta),
-    
-    
-    % filter out used chunks according to filemeta_s table
-%% 	GetUsedChunkIdListInFilemetaS =
-%%         fun(FileMetaS, AcS) ->                
-%%                 AcS--FileMetaS#filemeta_s.chunklist                
-%%         end,        
-%%     DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
-%%     {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
-    
-    GetOrphanPair = 
-        fun(X) ->
-                NodeIpList = select_nodeip_from_chunkmapping(X),
-                [write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList],
-                delete_from_db({chunkmapping,X})
-        end,
-    [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
-
 % delete orphanchunk record in orphanchunk table by host
 do_delete_orphanchunk_byhost(HostProcName)->
 	X = select_all_from_orphanchunk(HostProcName),
@@ -451,6 +398,7 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
                                 type = regular,
                                 parent = get_id(filename:dirname(FileRecord#filemeta.name))
                              },
+    %%uuid never repeat    
 	F = fun() ->
 		mnesia:write(Row),
 		lists:foreach(fun mnesia:write/1, ChunkMappingRecords)   
@@ -460,6 +408,21 @@ add_a_file_record(FileRecord, ChunkMappingRecords) ->
 	Val.
 
 
+append_a_file_record(FileRecord,ChunkMappingRecords) ->
+    CurrentT = erlang:localtime(),
+    [Old] = meta_db:select_all_from_filemeta_byID(FileRecord#filemeta.id),
+    New = Old#filemeta{
+                       mtime=CurrentT,
+                       size = FileRecord#filemeta.size,
+                       chunklist = Old#filemeta.chunklist++FileRecord#filemeta.chunklist
+                      },
+    F = fun() ->
+		mnesia:write(New),
+		lists:foreach(fun mnesia:write/1, ChunkMappingRecords)   
+	end,
+    {atomic, Val} = mnesia:transaction(F),
+	Val.
+    
 
 %% add record hostinfo to table hostinfo, no chunkmapping table change .
 add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
@@ -477,6 +440,18 @@ add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
             io:format("delete ok , begin to write,~n"),
             write_to_db(Row)
 	end.
+
+
+
+%%-record(filemeta,{id,name,chunklist,parent,size,type,access,atime,mtime,ctime,mode,links,inode,uid,gid})
+%% there's no "/" after DirName, 
+add_new_dir(ID,DirName,ParentID) ->
+    Row = #filemeta{id=ID,name=DirName,chunklist=[],parent=ParentID,size = -1 ,type=directory,mtime = calendar:local_time(),ctime = calendar:local_time()},
+    F = fun() ->
+                mnesia:write(Row)
+        end,
+    mnesia:transaction(F)
+.
 
 
 
@@ -664,15 +639,6 @@ get_direct_sub_files(FileID) ->
 	Result.
 
 
-%%-record(filemeta,{id,name,chunklist,parent,size,type,access,atime,mtime,ctime,mode,links,inode,uid,gid})
-%% there's no "/" after DirName, 
-add_new_dir(ID,DirName,ParentID) ->
-    Row = #filemeta{id=ID,name=DirName,chunklist=[],parent=ParentID,size = -1 ,type=directory,mtime = calendar:local_time(),ctime = calendar:local_time()},
-    F = fun() ->
-                mnesia:write(Row)
-        end,
-    mnesia:transaction(F)
-.
 
 
 %% spec add_heartbeat_info(HostName,State) -> {ok,_} |{error,_}

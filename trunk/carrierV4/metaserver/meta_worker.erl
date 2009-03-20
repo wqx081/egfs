@@ -45,8 +45,14 @@ handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) 
 %%     error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
 %%     error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
 %%     error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
-	Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords),
-    
+    case State#metaWorkerState.mod of
+        write ->
+            Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords);
+        append ->
+            Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords);
+        Any->
+            Reply = {error,"mode error while registerchunk,~p~n",[Any]}
+    end,
 %%    Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
 	{reply, Reply, State};
 
