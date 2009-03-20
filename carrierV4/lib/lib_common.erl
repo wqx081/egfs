@@ -74,8 +74,13 @@ get_file_handle({read, ChunkID}) ->
     
 get_file_handle({write, ChunkID}) ->
     {ok, Name} = get_file_name(ChunkID),
-    Result = file:open(Name, [binary, raw, write]),
-    Result.
+    Result = file:open(Name, [binary, raw, write, delayed_write]),
+    Result;
+    
+get_file_handle({append, ChunkID}) ->
+    {ok, Name} = get_file_name(ChunkID),
+    Result = file:open(Name, [binary, raw, append]),
+    Result.    
     
 get_file_name(ChunkID) ->
     <<D1:4, D2:4, D3:4, D4:4, Fn:112>> = ChunkID,
