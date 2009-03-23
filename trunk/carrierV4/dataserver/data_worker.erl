@@ -54,7 +54,7 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
 	{chan, MM, {append, Bytes}} ->
 		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
-		lib_chan:rpc(NextDataworkerPid,{append, Bytes}),
+		R = rpc:call(NextDataworkerPid,{append, Bytes}),
 	    MM ! {send, R}, 
 	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
 	{chan_closed, MM} ->
@@ -157,3 +157,4 @@ check_element(ChunkID, BloomFilter) ->
 			file:delete(FileName),
 			data_db:delete_chunkmeta_item(ChunkID)
 	end.
+
