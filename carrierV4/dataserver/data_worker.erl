@@ -11,17 +11,18 @@ run(MM, ArgC, _ArgS) ->
 		{read, ChunkID}	->
 			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
 		    loop_read(MM, ChunkHdl);
-		{append, ChunkID, []}	->
-			error_logger:info_msg("[~p, ~p]: append receive message:~p ~n", [?MODULE, ?LINE, {append, ChunkID, []}]),
-			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
-		    loop_append(MM, ChunkID, ChunkHdl);
 		{append, ChunkID, HostList}	->
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
-			error_logger:info_msg("[~p, ~p]: append Message:~p ~n", [?MODULE, ?LINE, {append, ChunkID, HostList}]),
-			%{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, HostList}),
-			{ok, NextDataworkerPid} = gen_server:call(data_server,{appendnext, ChunkID, HostList}),
-			error_logger:info_msg("[~p, ~p]: append NextDataworkPid ~p ~n", [?MODULE, ?LINE, NextDataworkerPid]),
-		    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
+			case HostList =:= [] of
+				true ->
+					loop_append(MM, [], ChunkID, ChunkHdl);
+				false ->
+					%{ok, NextDataworkerPid} = create_nextdataworker(ChunkID, HostList),
+					[NextHost|LeftHosts]=HostList,
+					{ok, NextDataworkerPid} = do_nextdataworker(fun() -> lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}) end),
+					error_logger:info_msg("[~p, ~p]: NextDataworkerPid ~p ~n", [?MODULE, ?LINE, NextDataworkerPid]),
+					loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl)
+			end;
 	    {replica, ChunkID, MD5} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
 			loop_replica(MM, ChunkID, MD5, ChunkHdl);
@@ -32,40 +33,6 @@ run(MM, ArgC, _ArgS) ->
 			{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, LeftHosts}),
 			loop_garbagecheck(MM, NextDataworkerPid, <<>> )			
 	end.
-
-loop_append(MM, ChunkID, ChunkHdl) ->
-    receive
-	{chan, MM, {append, Bytes}} ->
-		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
-		R = file:write(ChunkHdl, Bytes),
-	    MM ! {send, R}, 
-	    loop_append(MM, ChunkID, ChunkHdl);
-	{chan_closed, MM} ->
-		file:close(ChunkHdl),
-		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
-		{ok, MD5}		= lib_md5:file(FileName),
-		data_db:add_chunkmeta_item(ChunkID, MD5),		
-		error_logger:info_msg("[~p, ~p]: append dataworker  ~p stopping~n", [?MODULE, ?LINE,self()]),
-	    exit(normal)
-    end.	
-
-loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
-    receive
-	{chan, MM, {append, Bytes}} ->
-		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
-		R = file:write(ChunkHdl, Bytes),
-		R = rpc:call(NextDataworkerPid,{append, Bytes}),
-	    MM ! {send, R}, 
-	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
-	{chan_closed, MM} ->
-		file:close(ChunkHdl),
-		gen_server:call(data_server,{disconnect, NextDataworkerPid}),
-		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
-		{ok, MD5}		= lib_md5:file(FileName),
-		data_db:add_chunkmeta_item(ChunkID, MD5),		
-		error_logger:info_msg("[~p, ~p]: append dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
-	    exit(normal)
-    end.
 
 loop_write(MM, ChunkID, ChunkHdl) ->
     receive
@@ -158,3 +125,85 @@ check_element(ChunkID, BloomFilter) ->
 			data_db:delete_chunkmeta_item(ChunkID)
 	end.
 
+loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
+    receive
+	{chan, MM, {append, Bytes}} ->
+		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		R =file:write(ChunkHdl, Bytes),
+	 	if NextDataworkerPid =/= [] ->
+			RR = do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
+			error_logger:info_msg("[~p, ~p]: RR ~p ~n", [?MODULE, ?LINE, RR])
+		end,	
+   		MM ! {send, R}, 
+	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
+	{chan_closed, MM} ->
+		file:close(ChunkHdl),
+		if NextDataworkerPid =/= [] ->
+			%close_nextdataworker(NextDataworkerPid)	
+			do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
+		end,
+		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
+		{ok, MD5}		= lib_md5:file(FileName),
+		data_db:add_chunkmeta_item(ChunkID, MD5),		
+		error_logger:info_msg("[~p, ~p]: append dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+	    exit(normal)
+    end.
+
+do_nextdataworker(F) ->
+	error_logger:info_msg("[~p, ~p]: do nextdataworker~n", [?MODULE, ?LINE]),
+	Parent=self(),
+	Pid = spawn_link(fun() ->
+						Reply=F(),
+						error_logger:info_msg("[~p, ~p]:Subprocess Reply:~p~n", [?MODULE, ?LINE, Reply]),	
+						Parent!{reply, self(), Reply}
+					end),
+	receive
+		{reply, Pid, Reply} ->
+			Reply
+	after 10000->
+		error_logger:info_msg("[~p, ~p]:Timeout:AAABBBCCC~n", [?MODULE, ?LINE]),	
+		true
+	end.
+	
+create_nextdataworker(ChunkID, HostList) ->
+	error_logger:info_msg("[~p, ~p]: create nextdataworker~n", [?MODULE, ?LINE]),
+	Parent=self(),
+	Pid = spawn_link(fun() ->
+						[NextHost|LeftHosts]=HostList,
+						{ok,NextDataworkerPid}=lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
+						Parent!{nextdataworkerpid, self(), NextDataworkerPid}
+					end),
+	receive
+		{nextdataworkerpid, Pid, NextDataworkerPid} ->
+			{ok, NextDataworkerPid}
+	after 3000->
+		true
+	end.
+
+senddata_nextdataworker(NextDataworkerPid, Bytes) ->
+	error_logger:info_msg("[~p, ~p]: senddata nextdataworker~n", [?MODULE, ?LINE]),
+	Parent=self(),
+	Pid = spawn_link(fun() ->
+						Reply=lib_chan:rpc(NextDataworkerPid, {append, Bytes}),
+						Parent!{sendresult, self(), Reply}
+					end),
+	receive
+		{sendresult, Pid, Reply} ->
+			Reply
+	after 10000->
+		true
+	end.	
+
+close_nextdataworker(NextDataworkerPid) ->
+	error_logger:info_msg("[~p, ~p]: close nextdataworker~n", [?MODULE, ?LINE]),
+	Parent=self(),
+	Pid = spawn_link(fun() ->
+						Reply=lib_chan:rpc(NextDataworkerPid, {close}),
+						Parent!{closeresult, self(), Reply}
+					end),
+	receive
+		{closeresult, Pid, Reply} ->
+			Reply
+	after 3000->
+		true
+	end.		
