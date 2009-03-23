@@ -7,7 +7,7 @@
 %% define Chunk Size and Strip Size
 %-define(CHUNKSIZE, 33554432). % 32Mbytes, 32*1024*1024
 %-define(STRIP_SIZE, 8192).
--define(CHUNKSIZE, 2). % 32Mbytes, 32*1024*1024
+-define(CHUNKSIZE, 33554432). % 32Mbytes, 32*1024*1024
 -define(STRIP_SIZE, 131072). % 128Kbytes, 128*1024
 
 -define(DATA_PORT, 7777).
