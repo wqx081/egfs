@@ -59,7 +59,7 @@ handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) 
 
 handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
 %%     error_logger:info_msg("~~~~ in seekchunk~~~~n"),
-	Reply = meta_db:select_hosts_from_chunkmapping_id(ChunkID),
+	[Reply] = meta_db:select_hosts_from_chunkmapping_id(ChunkID),   %% select result = [{},{}]
 	{reply, Reply, State};
 	
 handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
@@ -140,7 +140,8 @@ do_close(From,State) ->
 
     case State#metaWorkerState.mod of
         read->                      
-            Clients = State#metaWorkerState.clients--[From],
+%%             Clients = State#metaWorkerState.clients--[From],
+            Clients = State#metaWorkerState.clients,
 %%             error_logger:info_msg("mod = read , Clients = ",[Clients]),
             case Clients of
                 []->

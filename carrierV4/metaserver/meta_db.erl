@@ -183,8 +183,6 @@ select_all_from_Table(T)->
               ])).  %result [L]
 %%[ {},{},{},{}  ]
 
-
-
 select_all_from_filemeta_byID(FileID) ->    %result [L]
     do(qlc:q([
               X||X<-mnesia:table(filemeta),X#filemeta.id =:= FileID
@@ -264,8 +262,18 @@ select_nodeip_from_chunkmapping(ChunkID) ->
 select_item_from_chunkmapping_id(ChunkID) ->    
     do(qlc:q([X||X<-mnesia:table(chunkmapping),X#chunkmapping.chunkid =:= ChunkID])).
 
+select_chunkid_from_chunkmapping()->
+    do(
+      qlc:q([X#chunkmapping.chunkid||X<-mnesia:table(chunkmapping)])
+      ).
 
 
+
+select_nodename_from_hostinfo()->
+    do(
+      qlc:q([X#hostinfo.nodename||X<-mnesia:table(hostinfo)])
+      ).
+    
 
 
 %% %clear chunks from filemeta
