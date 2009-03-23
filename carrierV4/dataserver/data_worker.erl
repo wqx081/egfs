@@ -74,8 +74,9 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
 				void;
 			_Any ->
 				error_logger:info_msg("[~p, ~p]: BBB~n", [?MODULE, ?LINE]),		
-				do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
-				error_logger:info_msg("[~p, ~p]: CCC~n", [?MODULE, ?LINE])		
+				%do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
+				R=lib_chan:rpc(NextDataworkerPid, {append, Bytes}),
+				error_logger:info_msg("[~p, ~p]: CCC R=~p~n", [?MODULE, ?LINE,R])		
 				%Pid = spawn_link(fun() -> NextDataworkerPid!{send, {append, Bytes}} end),
 		end,	
 	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
@@ -87,8 +88,8 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
 				void;
 			_Any ->
 				error_logger:info_msg("[~p, ~p]: EEE~n", [?MODULE, ?LINE]),		
-				%do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
-				lib_chan:rpc(NextDataworkerPid, {close})
+				do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
+				%lib_chan:rpc(NextDataworkerPid, {close})
 		end,
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
