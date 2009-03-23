@@ -136,22 +136,24 @@ select_host(ChunkMappingItem,HostnameList,N) ->
         []->
             {error,"src not exist"};
         _->
-            if length(chunklocations) =:= 0 ->                   
+            if 
+               length(Chunklocations) =:= 0 ->                   
                    {error,"no source,"};
                true->
-                   notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid,SrcNode)
+                   notify_dataserver(OptionHosts,Need,ChunkMappingItem#chunkmapping.chunkid,lists:nth(1, SrcNode))
             end                                    
     end.
     
 
 notify_dataserver(OptionHosts,Need,ID,SrcNode)->
+    error_logger:info_msg("notify_dataserver,OptionHosts,Need,ID,SrcNode,~p~p~p~n",[OptionHosts,Need,ID,SrcNode]),
     case Need of
         0 ->
             ok;
-        Rest->
+        _Rest->
             %%TODO, select policy, random; first N; location            
             [H|T] = OptionHosts,
-            gen_server:cast({data_server,SrcNode},{replica,H#hostinfo.hostname,ID}),
+            gen_server:cast({data_server,SrcNode},{replica,H,ID}),
             notify_dataserver(T,Need-1,ID,SrcNode)    
     end.
 
@@ -235,4 +237,38 @@ do_find_orphanchunk()->
                 meta_db:delete_from_db({chunkmapping,X})
         end,
     [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
+
+
+%%=========================================================================================================
+%% broadcast_bloom
+%% 1 make bloomInit
+%% 2 add element chunkids
+%% 3 broadcast
+broadcast_bloom()->
+    ChunkNumber = length(meta_db:select_all_from_Table(chunkmapping)),
+    BloomInit = lib_bloom:new(ChunkNumber,0.01),    
+    ChunkIDList = meta_db:select_chunkid_from_chunkmapping(),    
+    BloomRes = bloom_add_list(BloomInit,ChunkIDList),   
+    error_logger:info_msg("before Cast,~nbloom Res: _~p~n",[BloomRes]),
+    BloomRes.
+%%     do_broadcast(BloomRes).
+    
+do_broadcast(BloomRes)->
+    NodesList = meta_db:select_nodename_from_hostinfo(),
+    [H|T] = NodesList,    
+    gen_server:cast({data_server,H},{bloom,BloomRes,T}),
+    BloomRes.
+
+bloom_add_list(Init,[])->
+    Init;
+bloom_add_list(B0,List)->
+    [H|T] = List,
+    B1 = lib_bloom:add_element(H,B0),
+    bloom_add_list(B1,T).
+    
+
+                         
+                         
+    
+
 
