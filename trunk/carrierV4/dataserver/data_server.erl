@@ -56,6 +56,11 @@ handle_call({appendnext, ChunkID, HostList}, _From, State) ->
 	[NextHost|LeftHosts]=HostList,
 	{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
 	{reply, {ok, NextDataworkerPid}, State};
+	
+handle_call({disconnect, DataworkerPid}, _From, State) ->
+	error_logger:info_msg("[~p, ~p]:receive close message:~p ~n", [?MODULE, ?LINE, {disconnect, DataworkerPid}]),	
+	lib_chan:disconnect(DataworkerPid),
+	{reply, ok, State};	
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
