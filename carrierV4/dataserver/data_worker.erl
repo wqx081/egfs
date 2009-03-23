@@ -17,7 +17,9 @@ run(MM, ArgC, _ArgS) ->
 		{append, ChunkID, HostList}	->
 			[NextHost|THosts]=HostList,
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
+			error_logger:info_msg("[~p, ~p]: append NextHost ~p Message:~p ~n", [?MODULE, ?LINE, NextHost,{append, ChunkID, THosts}]),
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, THosts}),
+			error_logger:info_msg("[~p, ~p]: append NextDataworkPid ~p ~n", [?MODULE, ?LINE, NextDataworkPid]),
 		    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);
 	    {replica, ChunkID, MD5} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
