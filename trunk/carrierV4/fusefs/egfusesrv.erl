@@ -24,7 +24,7 @@
 -include_lib("fuserl.hrl").
 -include("../include/header.hrl").
 
--record(egfsrv, {inodes, names}).
+-record(egfsrv, {inodes, names, pids}).
 
 %%-define(PREFIX, "/home/lt/erlangDev/fuse/fuserl-2.0.4/tests/eunit").
 
@@ -36,7 +36,8 @@ start_link(LinkedIn, Dir, MountOpts) ->
 
 init([]) ->
     State = #egfsrv{ inodes = gb_trees:from_orddict([{ 1, []}]),
-	             names = gb_trees:empty() },
+	             names = gb_trees:empty() 
+		     pids = ets:new(workers, [])},
     {ok, State}.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
@@ -45,6 +46,7 @@ terminate(_Reason, _State) -> ok.
 
 -define (ROOTATTR, #stat{ st_ino = 1,
                           st_mode = ?S_IFDIR bor 8#0555,
+			  st_size = 4096,
 			  st_nlink = 2}).
 
 getattr(_, 1, _, State) ->
@@ -130,11 +132,34 @@ lookup(_, X, BName, _, State) ->
 	    {#fuse_reply_err{err = enoent}, State}
     end.
     
+construct_worker(Path, Flags) ->
+    case Flags band ?O_ACCMODE of
+	?O_RDONLY ->
+	    clientlib:open(Path, read);
+	_->
+	    clientlib:open(Paht, write)
+    end.
+
+get_worker(Hdl, Pids) ->
+    case ets:lookup(Pids, Hdl) of
+	[H|_] ->
+	    {_, Pid} = H,
+	    {ok, Pid};
+	[] ->
+	    {error, none}
+    end.
+
 open(_, X, Fi = #fuse_file_info{}, _, State) ->
     %%io:format("[~p, ~p] ~p~n", [?MODULE, ?LINE, X]),
     case gb_trees:lookup(X, State#egfsrv.inodes) of
-	{value, {_Parent, _Name} } ->
-	    {#fuse_reply_open{fuse_file_info = Fi}, State};
+	{value, {Parent, Name} } ->
+	    LocalName = Parent ++ Name,
+	    {ok, WorkerPid} = construct_worker(LocalName, Fi#fuse_file_info.flags),
+	    Hdl = crypto:rand_bytes(8),
+	    ets:insert(State#egfsrv.pids, {Hdl, WorkerPid}),
+
+	    NFi = Fi#fuse_file_info{fh = Hdl},
+	    {#fuse_reply_open{fuse_file_info = NFi}, State};
 	none ->
 	    {#fuse_reply_err{err = enoent}, State}
     end.
@@ -151,7 +176,8 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 		    Len = FileInfo#filemeta.size,
 		    if 
 			Offset < Len ->
-			    {ok, IoDev} = clientlib:open(LocalName, read),
+			    {ok, IoDev} = get_worker(Fi#fuse_file_info.fh, State#egfsrv.pids),
+			    %%{ok, IoDev} = clientlib:open(LocalName, read),
 			    if 
 				Offset + Size > Len ->
 				    Take = Len - Offset,
@@ -159,7 +185,7 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 				true ->
 				    {ok, Data} = clientlib:pread(IoDev, Offset, Size)
 			    end,
-			    clientlib:close(IoDev);
+			    %%clientlib:close(IoDev);
 		    true ->
 			Data = <<>>
 		    end,
@@ -465,3 +491,6 @@ rename(_, PIno, BName, NPIno, BNewName, _, State) ->
 	{error, Reason} ->
 	    {#fuse_reply_err{ err = Reason}, State}
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%crypto:rand_uniform(1,18446744073709551616),
