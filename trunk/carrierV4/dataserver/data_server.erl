@@ -51,17 +51,6 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call({appendnext, ChunkID, HostList}, _From, State) ->
-	error_logger:info_msg("[~p, ~p]:receive append message:~p ~n", [?MODULE, ?LINE, {append, ChunkID, HostList}]),	
-	[NextHost|LeftHosts]=HostList,
-	{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
-	{reply, {ok, NextDataworkerPid}, State};
-	
-handle_call({disconnect, NextDataworkerPid}, _From, State) ->
-	error_logger:info_msg("[~p, ~p]:receive close message:~p ~n", [?MODULE, ?LINE, {disconnect, NextDataworkerPid}]),	
-	lib_chan:disconnect(NextDataworkerPid),
-	{reply, ok, State};	
-
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
