@@ -268,11 +268,6 @@ write_data(FileContext, Bytes) ->
 			{ok, NewFC}			
 	end.
 
-generate_chunkmapping_record([],[]) ->
-	[];
-generate_chunkmapping_record([CH|CT],[NH|NT]) ->
-	[#chunkmapping{chunkid=CH, chunklocations=[NH]}] ++ generate_chunkmapping_record(CT,NT).
-
 do_position(FileContext, Location) ->
 	#filecontext{	offset   = Offset,
 					filesize = FileSize,
@@ -360,6 +355,7 @@ read_data(FileContext, Number, L) ->
 			read_data(NewFC, Number-ReadLength, L1)
 	end.	
 	
+	
 % if the data is null, append finish.
 append_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
 	error_logger:info_msg("[~p, ~p]:A append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
@@ -380,9 +376,9 @@ append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= u
 											host    = SelectedHost};
 				false ->
 					error_logger:info_msg("[~p, ~p]:C append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
-					[[SelectedHost]|LeftHosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),	
-					{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
-					FileContext#filecontext{dataworkerpid  = DataWorkPid,
+					[SelectedHost|LeftHosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),	
+					{ok, DataWorkerPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
+					FileContext#filecontext{dataworkerpid  = DataWorkerPid,
 											chunkid=[],
 											host = []}
 			end,
@@ -400,19 +396,16 @@ append_data(FileContext, Bytes) ->
 	Number		= size(Bytes),
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
-		true ->		 
+		true ->	 
 			error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
-			lib_chan:rpc(DataWorkerPid,{write,Right}),
+			lib_chan:rpc(DataWorkerPid,{append,Right}),
 			% close the data worker and reset the FileContext
 			lib_chan:disconnect(DataWorkerPid),	
-			error_logger:info_msg("[~p, ~p]:D0 ChunkID ~p~n", [?MODULE, ?LINE, ChunkID]),			
 			[NewChunkList, NewNodeList] = 	case ChunkID of
 												[] ->
-													error_logger:info_msg("[~p, ~p]:D1 append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 													[ChunkList, NodeList];
 												_Any ->
-													error_logger:info_msg("[~p, ~p]:D2 append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 													[ChunkList ++ [ChunkID], NodeList ++ [Host]]
 											end,	
 			NewFC= FileContext#filecontext{	offset = Offset+ReadLength, 
@@ -426,8 +419,13 @@ append_data(FileContext, Bytes) ->
 			append_data(NewFC, Left);
 		false ->
 			error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
-			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
+			lib_chan:rpc(DataWorkerPid,{append,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
 			{ok, NewFC}			
 	end.	
+	
+generate_chunkmapping_record([],[]) ->
+	[];
+generate_chunkmapping_record([CH|CT],[NH|NT]) ->
+	[#chunkmapping{chunkid=CH, chunklocations=[NH]}] ++ generate_chunkmapping_record(CT,NT).	
