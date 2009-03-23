@@ -19,7 +19,6 @@ run(MM, ArgC, _ArgS) ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 			error_logger:info_msg("[~p, ~p]: append Message:~p ~n", [?MODULE, ?LINE, {append, ChunkID, HostList}]),
 			%{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, HostList}),
-			%{ok, NextDataworkerPid} = lib_chan:connect(zyb, 7777, dataworker,"carrier",  {append, <<19,226,176,207,28,220,75,155,132,90,148,193,61,5,213,154>> , []}),
 			{ok, NextDataworkerPid} = gen_server:call(data_server,{appendnext, ChunkID, HostList}),
 			error_logger:info_msg("[~p, ~p]: append NextDataworkPid ~p ~n", [?MODULE, ?LINE, NextDataworkerPid]),
 		    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
@@ -30,8 +29,8 @@ run(MM, ArgC, _ArgS) ->
 			loop_garbagecheck(MM, <<>> );			
 	    {garbagecheck, HostList} ->
 	    	[NextHost|LeftHosts]=HostList,
-			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, LeftHosts}),
-			loop_garbagecheck(MM, NextDataworkPid, <<>> )			
+			{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, LeftHosts}),
+			loop_garbagecheck(MM, NextDataworkerPid, <<>> )			
 	end.
 
 loop_append(MM, ChunkID, ChunkHdl) ->
@@ -60,7 +59,7 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
 	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
 	{chan_closed, MM} ->
 		file:close(ChunkHdl),
-		lib_chan:disconnect(NextDataworkerPid),
+		gen_server:call(data_server,{disconnect, NextDataworkerPid}),
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
 		data_db:add_chunkmeta_item(ChunkID, MD5),		
