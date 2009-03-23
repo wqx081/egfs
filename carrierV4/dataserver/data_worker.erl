@@ -12,6 +12,7 @@ run(MM, ArgC, _ArgS) ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({read, ChunkID}),
 		    loop_read(MM, ChunkHdl);
 		{append, ChunkID, []}	->
+			error_logger:info_msg("[~p, ~p]: append receive message:~p ~p ~n", [?MODULE, ?LINE, {append, ChunkID, []}]),
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 		    loop_append(MM, ChunkID, ChunkHdl);
 		{append, ChunkID, HostList}	->
@@ -19,6 +20,7 @@ run(MM, ArgC, _ArgS) ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 			error_logger:info_msg("[~p, ~p]: append NextHost ~p Message:~p ~n", [?MODULE, ?LINE, NextHost,{append, ChunkID, THosts}]),
 			{ok, NextDataworkPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, THosts}),
+			%{ok, NextDataworkPid} = lib_chan:connect(zyb, 7777, dataworker,"carrier",  {append, <<19,226,176,207,28,220,75,155,132,90,148,193,61,5,213,154>> , []}),
 			error_logger:info_msg("[~p, ~p]: append NextDataworkPid ~p ~n", [?MODULE, ?LINE, NextDataworkPid]),
 		    loop_append(MM, NextDataworkPid, ChunkID, ChunkHdl);
 	    {replica, ChunkID, MD5} ->
