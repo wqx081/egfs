@@ -17,7 +17,8 @@ run(MM, ArgC, _ArgS) ->
 				[] ->
 					loop_append(MM, [], ChunkID, ChunkHdl);
 				[NextHost|LeftHosts] ->
-					{ok, NextDataworkerPid} = do_nextdataworker(fun() -> lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}) end),
+					%{ok, NextDataworkerPid} = do_nextdataworker(fun() -> lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}) end),
+					{ok, NextDataworkerPid} =lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}),
 					error_logger:info_msg("[~p, ~p]: NextDataworkerPid ~p ~n", [?MODULE, ?LINE, NextDataworkerPid]),
 					loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl)
 			end;
@@ -69,25 +70,25 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
    		MM ! {send, R}, 		
 		case NextDataworkerPid of
 			[] ->
+				error_logger:info_msg("[~p, ~p]: AAA~n", [?MODULE, ?LINE]),					
 				void;
 			_Any ->
-				RR = do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
-				error_logger:info_msg("[~p, ~p]: RR ~p ~n", [?MODULE, ?LINE, RR])		
+				error_logger:info_msg("[~p, ~p]: BBB~n", [?MODULE, ?LINE]),		
+				do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
+				error_logger:info_msg("[~p, ~p]: CCC~n", [?MODULE, ?LINE])		
 				%Pid = spawn_link(fun() -> NextDataworkerPid!{send, {append, Bytes}} end),
 		end,	
-
 	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
-    {reply, Pid, Reply} ->
-        error_logger:info_msg("[~p, ~p]:Receive:~p~p~n", [?MODULE, ?LINE,{reply, Pid, Reply}]),
-        Reply
-    ;        
 	{chan_closed, MM} ->
 		file:close(ChunkHdl),
 		case NextDataworkerPid of
 			[] ->
+				error_logger:info_msg("[~p, ~p]: DDD~n", [?MODULE, ?LINE]),		
 				void;
 			_Any ->
-				do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
+				error_logger:info_msg("[~p, ~p]: EEE~n", [?MODULE, ?LINE]),		
+				%do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
+				lib_chan:rpc(NextDataworkerPid, {close})
 		end,
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
@@ -162,26 +163,4 @@ check_element(ChunkID, BloomFilter) ->
 
 do_nextdataworker(F) ->
 	error_logger:info_msg("[~p, ~p]: do nextdataworker~n", [?MODULE, ?LINE]),
-	Parent=self(),
-	Pid = spawn_link(fun() ->
-						Reply=F(),
-						error_logger:info_msg("[~p, ~p]:Subprocess Reply:~p~n", [?MODULE, ?LINE, Reply]),	
-						Parent!{reply, self(), Reply}
-					end),
-    ok.
-
-%% 	loop_receive(Pid).
-%% 
-%% loop_receive(Pid) ->	
-%% 	receive
-%% 		{reply, Pid, Reply} ->
-%% 			error_logger:info_msg("[~p, ~p]:Receive:~p~n", [?MODULE, ?LINE,{reply, Pid, Reply}]),	
-%% 			Reply;
-%% 		Any ->
-%% 			error_logger:info_msg("[~p, ~p]:Other Message:~p~n", [?MODULE, ?LINE,Any]),	
-%% 			loop_receive(Pid)
-%% 	after 10000->
-%% 		error_logger:info_msg("[~p, ~p]:Timeout:AAABBBCCC~n", [?MODULE, ?LINE]),	
-%% 		true
-%% 	end.
-%% 		
+	spawn_link(fun() ->	Reply=F(), error_logger:info_msg("[~p, ~p]:Subprocess Reply:~p~n", [?MODULE, ?LINE, Reply])	end).
