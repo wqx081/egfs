@@ -15,12 +15,10 @@ run(MM, ArgC, _ArgS) ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({append, ChunkID}),
 			case HostList of
 				[] ->
-					loop_append(MM, [], ChunkID, ChunkHdl);
+					loop_append(MM, undefined, ChunkID, ChunkHdl);
 				[NextHost|LeftHosts] ->
-					%{ok, NextDataworkerPid} = do_nextdataworker(fun() -> lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}) end),
-					{ok, NextDataworkerPid} =lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, {append, ChunkID, LeftHosts}),
-					error_logger:info_msg("[~p, ~p]: NextDataworkerPid ~p ~n", [?MODULE, ?LINE, NextDataworkerPid]),
-					loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl)
+					{ok, NextDataworkerPid} = gen_server:call(data_server,{connectnext, NextHost, {append, ChunkID, LeftHosts}}),
+					loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl)	
 			end;
 	    {replica, ChunkID, MD5} ->
 			{ok, ChunkHdl} = lib_common:get_file_handle({write, ChunkID}),
@@ -32,6 +30,42 @@ run(MM, ArgC, _ArgS) ->
 			{ok, NextDataworkerPid} = lib_chan:connect(NextHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbagecheck, LeftHosts}),
 			loop_garbagecheck(MM, NextDataworkerPid, <<>> )			
 	end.
+
+loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
+    receive
+	{chan, MM, {append, Bytes}} ->
+		error_logger:info_msg("[~p, ~p]: append ~p NextDataworkerPid ~p~n", [?MODULE, ?LINE, Bytes,NextDataworkerPid]),
+		R=file:write(ChunkHdl, Bytes),
+		case NextDataworkerPid of
+			undefined ->
+				error_logger:info_msg("[~p, ~p]: No next dataworker to append~n", [?MODULE, ?LINE]),					
+				MM ! {send, R};
+			_Any ->
+				case gen_server:call(data_server,{rpcnext, NextDataworkerPid, {append, Bytes}}) of
+					ok ->
+						error_logger:info_msg("[~p, ~p]: append next dataworker successfully~n", [?MODULE, ?LINE]),
+						MM ! {send, R};
+					_Error ->
+						MM ! {send, error}		
+				end   	
+		end,		
+	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
+	{chan_closed, MM} ->
+		file:close(ChunkHdl),
+		case NextDataworkerPid of
+			undefined ->
+				error_logger:info_msg("[~p, ~p]: No next dataworker to close~n", [?MODULE, ?LINE]),					
+				void;
+			_Any ->
+				gen_server:cast(data_server,{closenext, NextDataworkerPid}),
+				error_logger:info_msg("[~p, ~p]: close next dataworker successfully~n", [?MODULE, ?LINE])
+		end,  
+		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
+		{ok, MD5}		= lib_md5:file(FileName),
+		data_db:add_chunkmeta_item(ChunkID, MD5),		
+		error_logger:info_msg("[~p, ~p]: append dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+	    exit(normal)
+    end.
 
 loop_write(MM, ChunkID, ChunkHdl) ->
     receive
@@ -62,41 +96,7 @@ loop_read(MM, ChunkHdl) ->
 	    exit(normal)
     end.
 
-loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
-    receive
-	{chan, MM, {append, Bytes}} ->
-		error_logger:info_msg("[~p, ~p]: append size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
-		R =file:write(ChunkHdl, Bytes),
-   		MM ! {send, R}, 		
-		case NextDataworkerPid of
-			[] ->
-				error_logger:info_msg("[~p, ~p]: AAA~n", [?MODULE, ?LINE]),					
-				void;
-			_Any ->
-				error_logger:info_msg("[~p, ~p]: BBB~n", [?MODULE, ?LINE]),		
-				%do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {append, Bytes}) end),
-				R=lib_chan:rpc(NextDataworkerPid, {append, Bytes}),
-				error_logger:info_msg("[~p, ~p]: CCC R=~p~n", [?MODULE, ?LINE,R])		
-				%Pid = spawn_link(fun() -> NextDataworkerPid!{send, {append, Bytes}} end),
-		end,	
-	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
-	{chan_closed, MM} ->
-		file:close(ChunkHdl),
-		case NextDataworkerPid of
-			[] ->
-				error_logger:info_msg("[~p, ~p]: DDD~n", [?MODULE, ?LINE]),		
-				void;
-			_Any ->
-				error_logger:info_msg("[~p, ~p]: EEE~n", [?MODULE, ?LINE]),		
-				do_nextdataworker(fun() -> lib_chan:rpc(NextDataworkerPid, {close}) end)
-				%lib_chan:rpc(NextDataworkerPid, {close})
-		end,
-		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
-		{ok, MD5}		= lib_md5:file(FileName),
-		data_db:add_chunkmeta_item(ChunkID, MD5),		
-		error_logger:info_msg("[~p, ~p]: append dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
-	    exit(normal)
-    end.
+
 
 loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
     receive
@@ -159,9 +159,3 @@ check_element(ChunkID, BloomFilter) ->
 			file:delete(FileName),
 			data_db:delete_chunkmeta_item(ChunkID)
 	end.
-
-
-
-do_nextdataworker(F) ->
-	error_logger:info_msg("[~p, ~p]: do nextdataworker~n", [?MODULE, ?LINE]),
-	spawn_link(fun() ->	Reply=F(), error_logger:info_msg("[~p, ~p]:Subprocess Reply:~p~n", [?MODULE, ?LINE, Reply])	end).

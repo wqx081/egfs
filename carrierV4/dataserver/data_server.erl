@@ -51,34 +51,40 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+handle_call({connectnext, NextHost, Msg}, _From, State) ->
+    Reply = connectnext(NextHost, Msg),
+    {reply, Reply, State};
+    
+handle_call({rpcnext,NextDataworkerPid, Msg}, _From, State) ->
+    Reply = rpcnext(NextDataworkerPid, Msg),
+    {reply, Reply, State};
+
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
+
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast({replica, string(), binary()}, State) -> {noreply, State} 
 %% Description: This message is casted from Meta Server. 
 %%				Ask the local data server writes a new replica to DestHost.
 %%--------------------------------------------------------------------
+handle_cast({closenext,NextDataworkerPid}, State) ->
+    closenext(NextDataworkerPid),
+    {noreply, State}; 
+    
 handle_cast({replica, DestHost, ChunkID}, State) ->
 	%error_logger:info_msg("[~p, ~p]: receive replica DestHost:~p ChunkID~p~n", [?MODULE, ?LINE, DestHost, ChunkID]),	
 	case data_db:select_md5_from_chunkmeta_id(ChunkID) of
 		[MD5] ->
-			{ok, DataWorkPid} = lib_chan:connect(DestHost, ?DATA_PORT, dataworker,?PASSWORD, {replica, ChunkID,MD5}),
+			{ok, DataWorkerPid} = connectnext(DestHost, {replica, ChunkID,MD5}),
 			{ok, ChunkHdl}=	lib_common:get_file_handle({read, ChunkID}),
-			loop_replica(DataWorkPid,ChunkHdl),
+			loop_replica(DataWorkerPid,ChunkHdl),
 			{noreply, State};
 		[] ->
 			{noreply, State}
 	end;
 	
-
-handle_cast({debug,MSG},State)->
-    error_logger:info_msg("in debug, MSG: ~p~n",[MSG]),
-    {noreply,State};
-
-handle_cast({stop, Reason,_}, State) ->
-	{stop, Reason, State};	
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -118,15 +124,22 @@ code_change(_OldVsn, State, _Extra) ->
 loop_replica(DataWorkerPid, ChunkHdl) ->
 	case file:read(ChunkHdl,?STRIP_SIZE) of % read 128K every time 
 		{ok, Data} ->
-			lib_chan:rpc(DataWorkerPid,{replica,Data}), 	
+			rpcnext(DataWorkerPid,{replica,Data}), 	
 			loop_replica(DataWorkerPid, ChunkHdl);
 		eof ->
-			lib_chan:disconnect(DataWorkerPid),
+			closenext(DataWorkerPid),
 			file:close(ChunkHdl);
 		{error,Reason} ->
 			error_logger:error_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE, Reason]),	 
-			lib_chan:disconnect(DataWorkerPid),
+			closenext(DataWorkerPid),
 			file:close(ChunkHdl)
 	end.	
 	
-	
+connectnext(NextHost, Msg) ->
+	lib_chan:connect(NextHost, 8888, dataworker, ?PASSWORD, Msg).
+
+rpcnext(NextDataworkerPid, Msg) ->
+	lib_chan:rpc(NextDataworkerPid, Msg).
+
+closenext(NextDataworkerPid) ->
+	lib_chan:disconnect(NextDataworkerPid).
