@@ -164,11 +164,18 @@ do_nextdataworker(F) ->
 						error_logger:info_msg("[~p, ~p]:Subprocess Reply:~p~n", [?MODULE, ?LINE, Reply]),	
 						Parent!{reply, self(), Reply}
 					end),
+	loop_receive(Pid).
+
+loop_receive(Pid) ->	
 	receive
 		{reply, Pid, Reply} ->
-			Reply
+			error_logger:info_msg("[~p, ~p]:Receive:~p~n", [?MODULE, ?LINE,{reply, Pid, Reply}]),	
+			Reply;
+		Any ->
+			error_logger:info_msg("[~p, ~p]:Other Message:~p~n", [?MODULE, ?LINE,Any]),	
+			loop_receive(Pid)
 	after 10000->
 		error_logger:info_msg("[~p, ~p]:Timeout:AAABBBCCC~n", [?MODULE, ?LINE]),	
 		true
 	end.
-
+		
