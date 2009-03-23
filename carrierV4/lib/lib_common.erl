@@ -37,7 +37,7 @@ idToAtom(Bin,Mode)->
     list_to_atom(ModeList).
 
 generate_processname(Filename,Mode)->
-    error_logger:info_msg("lib_common:generate_processname_~p, ~p~n",[Filename,Mode]),
+%%     error_logger:info_msg("lib_common:generate_processname_~p, ~p~n",[Filename,Mode]),
     ModePreFix= case Mode of 
 					read -> r@@@;
 					write -> w@@@;
