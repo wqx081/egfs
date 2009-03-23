@@ -75,7 +75,7 @@ handle_cast({replica, DestHost, ChunkID}, State) ->
 
 handle_cast({debug,MSG},State)->
     error_logger:info_msg("in debug, MSG: ~p~n",[MSG]),
-    {noreply,State}
+    {noreply,State};
 
 handle_cast({stop, Reason,_}, State) ->
 	{stop, Reason, State};	
