@@ -130,7 +130,7 @@ loop_garbagecheck(MM, NextDataworkerPid, Bin) ->
 		case NextDataworkerPid of
 			undefined ->
 				error_logger:info_msg("[~p, ~p]: No next dataworker to close~n", [?MODULE, ?LINE]),					
-				void;
+				MM ! {send, ok};
 			_Any ->
 				case gen_server:call(data_server,{rpcnext, NextDataworkerPid, {garbagecheck, BFBytes}}) of
 					ok ->
@@ -158,10 +158,12 @@ loop_garbagecheck(MM, NextDataworkerPid, Bin) ->
     end.    
 
 check_element(ChunkID, BloomFilter) ->
-	case bloom:is_element(ChunkID, BloomFilter) of
+	case lib_bloom:is_element(ChunkID, BloomFilter) of
 		true ->
+			error_logger:info_msg("[~p, ~p]: A:ChunID ~p is element~n", [?MODULE, ?LINE,ChunkID]),
 			void;
 		false ->
+			error_logger:info_msg("[~p, ~p]: B:ChunID ~p is not element~n", [?MODULE, ?LINE,ChunkID]),
 			{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 			file:delete(FileName),
 			data_db:delete_chunkmeta_item(ChunkID)
