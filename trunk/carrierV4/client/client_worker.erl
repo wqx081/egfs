@@ -325,7 +325,7 @@ read_data(FileContext, Number, L) when FileContext#filecontext.dataworkerpid =:=
 				 metaworkerpid = MetaWorkerPid} = FileContext,
 	Index 	= Offset div ?CHUNKSIZE,
 	ChunkID = lists:nth(Index+1, ChunkList),
-	[Hosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),
+	Hosts = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),
 	[Host|_T] = Hosts,
 	{ok, DataWorkPid} = lib_chan:connect(Host, ?DATA_PORT, dataworker,?PASSWORD, {read, ChunkID}),
 	NewFC= FileContext#filecontext{	dataworkerpid  = DataWorkPid, 
