@@ -101,7 +101,7 @@ loop_read(MM, ChunkHdl) ->
 loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
     receive
 	{chan, MM, {replica, Bytes}} ->
-		%error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
+		error_logger:info_msg("[~p, ~p]: replica size ~p ~n", [?MODULE, ?LINE, size(Bytes)]),
 		R = file:write(ChunkHdl, Bytes),
 	    MM ! {send, R}, 
 	    loop_replica(MM, ChunkID, MD5, ChunkHdl);
@@ -117,7 +117,7 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 			false ->
 				file:delete(FileName)
 		end,	
-		%error_logger:info_msg("[~p, ~p]: replica dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		error_logger:info_msg("[~p, ~p]: replica dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 

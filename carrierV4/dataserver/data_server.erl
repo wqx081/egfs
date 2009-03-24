@@ -74,7 +74,7 @@ handle_cast({closenext,NextDataworkerPid}, State) ->
     {noreply, State}; 
     
 handle_cast({replica, DestHost, ChunkID}, State) ->
-	%error_logger:info_msg("[~p, ~p]: receive replica DestHost:~p ChunkID~p~n", [?MODULE, ?LINE, DestHost, ChunkID]),	
+	error_logger:info_msg("[~p, ~p]: receive replica DestHost:~p ChunkID~p~n", [?MODULE, ?LINE, DestHost, ChunkID]),	
 	case data_db:select_md5_from_chunkmeta_id(ChunkID) of
 		[MD5] ->
 			{ok, DataWorkerPid} = connectnext(DestHost, {replica, ChunkID,MD5}),
@@ -136,7 +136,7 @@ loop_replica(DataWorkerPid, ChunkHdl) ->
 	end.	
 	
 connectnext(NextHost, Msg) ->
-	lib_chan:connect(NextHost, 8888, dataworker, ?PASSWORD, Msg).
+	lib_chan:connect(NextHost, ?DATA_PORT, dataworker, ?PASSWORD, Msg).
 
 rpcnext(NextDataworkerPid, Msg) ->
 	lib_chan:rpc(NextDataworkerPid, Msg).
