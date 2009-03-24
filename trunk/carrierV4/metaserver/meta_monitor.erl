@@ -146,7 +146,7 @@ select_host(ChunkMappingItem,HostnameList,N) ->
     
 
 notify_dataserver(OptionHosts,Need,ID,SrcNode)->
-    error_logger:info_msg("notify_dataserver,OptionHosts,Need,ID,SrcNode,~p~p~p~n",[OptionHosts,Need,ID,SrcNode]),
+    error_logger:info_msg("notify_dataserver,OptionHosts,Need,ID,SrcNode,~p~p~p~p~n",[OptionHosts,Need,ID,SrcNode]),
     case Need of
         0 ->
             ok;
@@ -163,32 +163,32 @@ notify_dataserver(OptionHosts,Need,ID,SrcNode)->
 %%
 %%
 %% broad cast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
-broadcast() ->
-    Mappings = select_all_from_Table(chunkmapping),
-    MappingsNum = length(Mappings),
-    if         
-        (MappingsNum =< 0) ->
-            {erroe, "no chunkid in chunkmapping table"};
-        true ->
-            _ChunkIdList = get_chunkid_from_chunkmapping(Mappings),
-            ChunkMapping = lists:nth(1,Mappings),
-            _FirstHost =lists:nth(1,ChunkMapping#chunkmapping.chunklocations), 
-            %% use lib_chan & lib_bloom
-            
-            todo
-            %%code:add_patha("d:/EclipseWorkS/edu.tsinghua.carrier/carrierV4/lib"),            
-            %%{ok, DataWorkPid} = lib_chan:connect(FirstHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbageCollect})
-            %%TODO:
-            
-    end.
+%% broadcast() ->
+%%     Mappings = select_all_from_Table(chunkmapping),
+%%     MappingsNum = length(Mappings),
+%%     if         
+%%         (MappingsNum =< 0) ->
+%%             {erroe, "no chunkid in chunkmapping table"};
+%%         true ->
+%%             ChunkIdList = get_chunkid_from_chunkmapping(Mappings),
+%%             ChunkMapping = lists:nth(1,Mappings),
+%%             FirstHost =lists:nth(1,ChunkMapping#chunkmapping.chunklocations), 
+%%             %% use lib_chan & lib_bloom
+%%             
+%%             todo
+%%             %%code:add_patha("d:/EclipseWorkS/edu.tsinghua.carrier/carrierV4/lib"),            
+%%             %%{ok, DataWorkPid} = lib_chan:connect(FirstHost, ?DATA_PORT, dataworker,?PASSWORD,  {garbageCollect})
+%%             %%TODO:
+%%             
+%%     end.
             
             
 %% function for broadcast,
 %% @spect get_chunckid_from_chunkmapping( Node#chunkmapping ) -> ChunkIDList :[chunk1,chunk2]
-get_chunkid_from_chunkmapping(Nodes) ->
-    [H|T] = Nodes,
-    [H#chunkmapping.chunkid]++get_chunkid_from_chunkmapping(T).
-
+%% get_chunkid_from_chunkmapping(Nodes) ->
+%%     [H|T] = Nodes,
+%%     [H#chunkmapping.chunkid]++get_chunkid_from_chunkmapping(T).
+%% 
 
 %%=========================================================================================================
 
@@ -253,14 +253,33 @@ broadcast_bloom()->
     do_broadcast(BloomRes).
     
 do_broadcast(BloomRes)->
+    error_logger:info_msg("in do_broadcast~n"),
     HostsList = meta_db:select_hostname_from_hostinfo(),
-    [H|T] = HostsList,
+    [H|T] = HostsList,    
+    error_logger:info_msg("data Server:~p~n,HostsListLeft: ~p~n",[H,T]),
+    case lib_chan:connect(H,?DATA_PORT,dataworker,?PASSWORD,{garbagecheck, T}) of
+        {ok, DataWorkerPid}->
+            BinaryBloom = term_to_binary(BloomRes),
+            error_logger:info_msg("BinaryBloom,size: ~p~n",[size(BinaryBloom)]),
+            loop_write_bf(DataWorkerPid,BinaryBloom);
+        Any->
+            {error,"Any",[Any]}
+    end.
+            
+
+loop_write_bf(DataWorkerPid,BinaryBloom) when size(BinaryBloom)=:=0 ->
+    error_logger:info_msg("loop_write_bf ok,~n"),
+    lib_chan:disconnect(DataWorkerPid),
+    ok;
+loop_write_bf(DataWorkerPid,BinaryBloom)->
+    Number		= size(BinaryBloom),
+    ReadLength	= lists:min([Number, 10]),  %% STRIP_SIZE = 128k
+    {Left,Right} = erlang:split_binary(BinaryBloom,ReadLength),
+    lib_chan:rpc(DataWorkerPid,{garbagecheck,Left}),    
+    loop_write_bf(DataWorkerPid,Right).
     
-    {ok, DataWorkPid} = lib_chan:connect(H,?DATA_PORT,dataworker,?PASSWORD,{garbagecheck, HostsList}),
     
-%%     lib_chan:connect("", _, _, _, _)
-%%     gen_server:cast({data_server,H},{bloom,BloomRes,T}),
-    BloomRes.
+    
 
 bloom_add_list(Init,[])->
     Init;
