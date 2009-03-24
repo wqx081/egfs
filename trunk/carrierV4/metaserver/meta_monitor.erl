@@ -250,13 +250,16 @@ broadcast_bloom()->
     ChunkIDList = meta_db:select_chunkid_from_chunkmapping(),    
     BloomRes = bloom_add_list(BloomInit,ChunkIDList),   
     error_logger:info_msg("before Cast,~nbloom Res: _~p~n",[BloomRes]),
-    BloomRes.
-%%     do_broadcast(BloomRes).
+    do_broadcast(BloomRes).
     
 do_broadcast(BloomRes)->
-    NodesList = meta_db:select_nodename_from_hostinfo(),
-    [H|T] = NodesList,    
-    gen_server:cast({data_server,H},{bloom,BloomRes,T}),
+    HostsList = meta_db:select_hostname_from_hostinfo(),
+    [H|T] = HostsList,
+    
+    {ok, DataWorkPid} = lib_chan:connect(H,?DATA_PORT,dataworker,?PASSWORD,{garbagecheck, HostsList}),
+    
+%%     lib_chan:connect("", _, _, _, _)
+%%     gen_server:cast({data_server,H},{bloom,BloomRes,T}),
     BloomRes.
 
 bloom_add_list(Init,[])->
