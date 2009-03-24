@@ -246,21 +246,28 @@ do_find_orphanchunk()->
 %% 3 broadcast
 broadcast_bloom()->
     ChunkNumber = length(meta_db:select_all_from_Table(chunkmapping)),
-    BloomInit = lib_bloom:new(ChunkNumber,0.01),    
+%%     BloomInit = lib_bloom:new(ChunkNumber,0.01),
+    BloomInit = lib_bloom:new(32*32*32*32*32,0.01),
+    error_logger:info_msg("1~n"),
     ChunkIDList = meta_db:select_chunkid_from_chunkmapping(),    
-    BloomRes = bloom_add_list(BloomInit,ChunkIDList),   
-    error_logger:info_msg("before Cast,~nbloom Res: _~p~n",[BloomRes]),
+    error_logger:info_msg("111~n"),
+    BloomRes = bloom_add_list(BloomInit,ChunkIDList),
+    error_logger:info_msg("x~n"),
+%%     error_logger:info_msg("before Cast,~nbloom Res: _~p~n",[BloomRes]),
     do_broadcast(BloomRes).
     
 do_broadcast(BloomRes)->
     error_logger:info_msg("in do_broadcast~n"),
+    error_logger:info_msg("broadcast start time: ~p~n",[erlang:localtime()]),
     HostsList = meta_db:select_hostname_from_hostinfo(),
     [H|T] = HostsList,    
     error_logger:info_msg("data Server:~p~n,HostsListLeft: ~p~n",[H,T]),
     case lib_chan:connect(H,?DATA_PORT,dataworker,?PASSWORD,{garbagecheck, T}) of
         {ok, DataWorkerPid}->
+            error_logger:info_msg("2~n"),
             BinaryBloom = term_to_binary(BloomRes),
-            error_logger:info_msg("BinaryBloom,size: ~p~n",[size(BinaryBloom)]),
+            error_logger:info_msg("3~n"),
+%%             error_logger:info_msg("BinaryBloom,size: ~p~n",[size(BinaryBloom)]),
             loop_write_bf(DataWorkerPid,BinaryBloom);
         Any->
             {error,"Any",[Any]}
@@ -270,12 +277,15 @@ do_broadcast(BloomRes)->
 loop_write_bf(DataWorkerPid,BinaryBloom) when size(BinaryBloom)=:=0 ->
     error_logger:info_msg("loop_write_bf ok,~n"),
     lib_chan:disconnect(DataWorkerPid),
+    error_logger:info_msg("broadcast start end: ~p~n",[erlang:localtime()]),
     ok;
 loop_write_bf(DataWorkerPid,BinaryBloom)->
+    error_logger:info_msg("4~n"),
     Number		= size(BinaryBloom),
-    ReadLength	= lists:min([Number, 10]),  %% STRIP_SIZE = 128k
+    ReadLength	= lists:min([Number, ?STRIP_SIZE]),  %% STRIP_SIZE = 128k
     {Left,Right} = erlang:split_binary(BinaryBloom,ReadLength),
-    lib_chan:rpc(DataWorkerPid,{garbagecheck,Left}),    
+    lib_chan:rpc(DataWorkerPid,{garbagecheck,Left}),
+    error_logger:info_msg("5~n"),
     loop_write_bf(DataWorkerPid,Right).
     
     
@@ -285,7 +295,9 @@ bloom_add_list(Init,[])->
     Init;
 bloom_add_list(B0,List)->
     [H|T] = List,
+    error_logger:info_msg("????H:~p~n",[H]),
     B1 = lib_bloom:add_element(H,B0),
+    error_logger:info_msg("????H2:~p~n",[H]),
     bloom_add_list(B1,T).
     
 

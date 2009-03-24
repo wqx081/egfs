@@ -473,7 +473,12 @@ do_append_open(FileName,UserName) ->
                     {error,"NO TARGET FILE EXSIT.~p~n",[FileName]};
                 [Meta]->
                     {ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [Meta, append,UserName], []),
-                    {ok,Meta#filemeta.id,Meta#filemeta.size,lists:last(Meta#filemeta.chunklist),MetaWorkerPid}
+                    case Meta#filemeta.chunklist of 
+                        []->
+                            {ok,Meta#filemeta.id,Meta#filemeta.size,[],MetaWorkerPid};
+                        _Any ->
+                            {ok,Meta#filemeta.id,Meta#filemeta.size,lists:last(Meta#filemeta.chunklist),MetaWorkerPid}
+                    end
             		%%{ ok,id,size,lastchunkid,MetaWorkerPid}
             end;
         _AnyPid->
