@@ -197,6 +197,11 @@ select_from_hostinfo(Hostname)->
     do(qlc:q([
               X||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
               ])).
+%% 
+%% select_hostname_from_hostinfo(Hostname)->
+%%     do(qlc:q([
+%%               X#hostinfo.hostname||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
+%%               ])).
 
 select_nodename_from_hostinfo(Hostname)->
     do(qlc:q([
@@ -350,13 +355,13 @@ mnesia:transaction(F).
 do_register_dataserver(HostName,ChunkList)->
    AddHost =
         fun(ChunkMapping, Acc) ->
-                ChunkID = ChunkMapping#chunkmapping.chunkid,                
+                ChunkID = ChunkMapping#chunkmapping.chunkid,
                 Guard = lists:member(ChunkID,Acc),                
                 if Guard =:= true ->
 %%                        Acc = ChunkList--[ChunkID],
-                       ChunkLocations = 
-                           lists:usort(ChunkMapping#chunkmapping.chunklocations++[HostName]),
-                       
+                       error_logger:info_msg("Old :~p~n",[ChunkMapping#chunkmapping.chunklocations]),
+                       ChunkLocations =lists:delete(HostName,ChunkMapping#chunkmapping.chunklocations)++[HostName], %%better solution
+                       error_logger:info_msg("chunklocations: ~p~n,",[ChunkLocations]),
                        ok = mnesia:write(
                               ChunkMapping#chunkmapping{chunklocations = ChunkLocations}),
                        Acc--[ChunkID];
