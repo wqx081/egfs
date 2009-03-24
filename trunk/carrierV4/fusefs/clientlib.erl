@@ -12,6 +12,7 @@
 	  mkdir/1,
 	  deldir/1,
 	  move/2,
+	  copy/2,
 	  chmod/4]).
 
 -define(CLIENT_SERVER, {client_server, ltclient1@lt}).
@@ -200,3 +201,14 @@ move(Src, Dst) ->
     CSrc = rm_slash(Src),
     CDst = rm_slash(Dst),
     gen_server:call(?CLIENT_SERVER, {move, CSrc, CDst, UserName}).
+
+%% --------------------------------------------------------------------
+%% Function: copy/2 ->  ok | {error, Reason} 
+%% Description: copy file and dir
+%% Returns: ok | {error, Reason}
+%% --------------------------------------------------------------------	
+copy(Src, Dst) ->
+    UserName = any,
+    CSrc = rm_slash(Src),
+    CDst = rm_slash(Dst),
+    gen_server:call(?CLIENT_SERVER, {copy, CSrc, CDst, UserName}).

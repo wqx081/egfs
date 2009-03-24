@@ -11,6 +11,7 @@
 	  create/7,
 	  unlink/5,
 	  open/5,
+	  release/5,
 	  read/7,
 	  write/7,
 	  flush/5,
@@ -36,7 +37,7 @@ start_link(LinkedIn, Dir, MountOpts) ->
 
 init([]) ->
     State = #egfsrv{ inodes = gb_trees:from_orddict([{ 1, []}]),
-	             names = gb_trees:empty() 
+	             names = gb_trees:empty(), 
 		     pids = ets:new(workers, [])},
     {ok, State}.
 
@@ -108,7 +109,8 @@ make_inode(GFName, State) ->
 	    NewInodes = gb_trees:insert(Max + 1, GFName, Inodes),
 	    Names = State#egfsrv.names,
 	    NewNames = gb_trees:insert(GFName, Max+1, Names),
-	    {Max+1, State#egfsrv{inodes = NewInodes, names = NewNames}}
+	    NewState = State#egfsrv{inodes = NewInodes, names = NewNames},
+	    {Max+1, NewState}
     end.
 
 lookup(_, X, BName, _, State) ->
@@ -132,16 +134,23 @@ lookup(_, X, BName, _, State) ->
 	    {#fuse_reply_err{err = enoent}, State}
     end.
     
-construct_worker(Path, Flags) ->
+open_file(Path, Flags, State) ->
     case Flags band ?O_ACCMODE of
 	?O_RDONLY ->
-	    clientlib:open(Path, read);
-	_->
-	    clientlib:open(Paht, write)
-    end.
+	    {ok, WorkerPid} = clientlib:open(Path, read);
+	?O_WRONLY->
+	    {ok, WorkerPid} = clientlib:open(Path, write);
+	_ ->
+	    {ok, WorkerPid} = clientlib:open(Path, append)
+    end,
 
-get_worker(Hdl, Pids) ->
-    case ets:lookup(Pids, Hdl) of
+    %%Hdl = crypto:rand_bytes(8),
+    Hdl = crypto:rand_uniform(1, 18446744073709551616),
+    ets:insert(State#egfsrv.pids, {Hdl, WorkerPid}),
+    {ok, Hdl}.
+
+get_worker(Hdl, State) ->
+    case ets:lookup(State#egfsrv.pids, Hdl) of
 	[H|_] ->
 	    {_, Pid} = H,
 	    {ok, Pid};
@@ -154,18 +163,25 @@ open(_, X, Fi = #fuse_file_info{}, _, State) ->
     case gb_trees:lookup(X, State#egfsrv.inodes) of
 	{value, {Parent, Name} } ->
 	    LocalName = Parent ++ Name,
-	    {ok, WorkerPid} = construct_worker(LocalName, Fi#fuse_file_info.flags),
-	    Hdl = crypto:rand_bytes(8),
-	    ets:insert(State#egfsrv.pids, {Hdl, WorkerPid}),
-
+	    {ok, Hdl} = open_file(LocalName, Fi#fuse_file_info.flags, State),
 	    NFi = Fi#fuse_file_info{fh = Hdl},
 	    {#fuse_reply_open{fuse_file_info = NFi}, State};
 	none ->
 	    {#fuse_reply_err{err = enoent}, State}
     end.
 	
+release(_, _X, Fi, _, State) ->
+    Hdl = Fi#fuse_file_info.fh,
+    case get_worker(Hdl, State) of
+	{ok, WorkerPid} ->
+	    clientlib:close(WorkerPid),
+	    ets:delete(State#egfsrv.pids, Hdl);
+	_ ->
+	    ok
+    end,
+    {#fuse_reply_err{ err = ok}, State}.
 
-read(_, X, Size, Offset, _Fi, _, State) ->
+read(_, X, Size, Offset, Fi, _, State) ->
     %%io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, Size, Offset]),
     case gb_trees:lookup(X, State#egfsrv.inodes) of
 	{value, {Parent, Name}} ->
@@ -176,7 +192,7 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 		    Len = FileInfo#filemeta.size,
 		    if 
 			Offset < Len ->
-			    {ok, IoDev} = get_worker(Fi#fuse_file_info.fh, State#egfsrv.pids),
+			    {ok, IoDev} = get_worker(Fi#fuse_file_info.fh, State),
 			    %%{ok, IoDev} = clientlib:open(LocalName, read),
 			    if 
 				Offset + Size > Len ->
@@ -184,7 +200,7 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 				    {ok, Data} = clientlib:pread(IoDev, Offset, Take);
 				true ->
 				    {ok, Data} = clientlib:pread(IoDev, Offset, Size)
-			    end,
+			    end;
 			    %%clientlib:close(IoDev);
 		    true ->
 			Data = <<>>
@@ -199,7 +215,7 @@ read(_, X, Size, Offset, _Fi, _, State) ->
 	    {#fuse_reply_err{ err = enoent}, State}
     end.
 
-write(_, Inode, Data, Offset, _Fi, _, State) ->
+write(_, Inode, Data, Offset, Fi, _, State) ->
     io:format("[~p, ~p] write~n", [?MODULE, ?LINE]),
     %%io:format("[~p, ~p] ~p~n", [?MODULE, ?LINE, Data]),
     case gb_trees:lookup(Inode, State#egfsrv.inodes) of
@@ -208,9 +224,8 @@ write(_, Inode, Data, Offset, _Fi, _, State) ->
 	    {ok, FileInfo} = clientlib:read_file_info(LocalName),
 	    case FileInfo#filemeta.type of
 		regular ->
-		    {ok, IoDev} = clientlib:open(LocalName, write),
+		    {ok, IoDev} = get_worker(Fi#fuse_file_info.fh, State),
 		    ok = clientlib:pwrite(IoDev, Offset, Data),
-		    clientlib:close(IoDev),
 		    {#fuse_reply_write{count = erlang:size(Data)}, State};
 		_ ->
 		    {#fuse_reply_err{ err = eisdir}, State}
@@ -328,9 +343,11 @@ create(_, PIno, BName, _Mode, Fi, _, State) ->
     FullPath = Parent ++ Name,
     {ok, Io} = clientlib:open(FullPath, write),
     clientlib:close(Io),
+    {ok, Hdl} = open_file(FullPath, ?O_RDWR, State),
+    NFi = Fi#fuse_file_info{fh = Hdl},
     {Attr, NewState} = my_get_attr({Parent, Name}, State), 
     {#fuse_reply_create{
-	fuse_file_info = Fi,
+	fuse_file_info = NFi,
 	fuse_entry_param = #fuse_entry_param{ 
 	    ino = Attr#stat.st_ino,
 	    generation = 1,
@@ -377,15 +394,16 @@ try_set_mtime(_, OldAttr, _) ->
     OldAttr.
 
 my_set_attr({Parent, Name}, NewAttr) ->
-    _LocalName = Parent ++ Name,
-    _FileInfo = #file_info{
+    LocalName = Parent ++ Name,
+    FileInfo = #file_info{
 		    mode = NewAttr#stat.st_mode,
 		    size = NewAttr#stat.st_size,
 		    atime = seconds_to_datetime(NewAttr#stat.st_atime),
 		    mtime = seconds_to_datetime(NewAttr#stat.st_mtime),
 		    uid = NewAttr#stat.st_uid,
 		    gid = NewAttr#stat.st_gid},
-    io:format("[~p, ~p]setatt not implemented.~n", [?MODULE, ?LINE]).
+    ok.
+    %% io:format("[~p, ~p]setatt not implemented.~n", [?MODULE, ?LINE]).
     %%file:write_file_info(FullName, FileInfo).
 
 setattr(_, Ino, Attr, Toset, _Fi, _, State) ->
