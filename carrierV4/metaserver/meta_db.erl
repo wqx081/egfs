@@ -51,12 +51,10 @@ do_this_once() ->
     mnesia:create_table(orphanchunk, [{type,bag},{attributes, record_info(fields,orphanchunk)},
                                       {disc_copies,[node()]}
                                      ]),
-    
-    
-    reset_tables(),
 
     LOG = #metalog{logtime = calendar:local_time(),logfunc="start_mnesia",logarg=[]},
     mnesia:wait_for_tables([filemeta,chunkmapping,hostinfo,metalog,orphanchunk], 14000),
+    reset_tables(),
     logF(LOG).
 
 
@@ -193,15 +191,15 @@ select_all_from_filemeta_byName(FileName) ->
               X||X<-mnesia:table(filemeta),X#filemeta.name =:= FileName
               ])).
 
-select_from_hostinfo(Hostname)->
+select_all_from_hostinfo_byHostname(Hostname)->
     do(qlc:q([
               X||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
               ])).
 %% 
-%% select_hostname_from_hostinfo(Hostname)->
-%%     do(qlc:q([
-%%               X#hostinfo.hostname||X<-mnesia:table(hostinfo),X#hostinfo.hostname =:= Hostname
-%%               ])).
+select_hostname_from_hostinfo()->
+    do(qlc:q([
+              X#hostinfo.hostname||X<-mnesia:table(hostinfo)
+              ])).
 
 select_nodename_from_hostinfo(Hostname)->
     do(qlc:q([
@@ -443,7 +441,7 @@ add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
 	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
 	io:format("From : ~p~n",[From]),
     
-	case select_from_hostinfo(HostName) of
+	case select_all_from_hostinfo_byHostname(HostName) of
 		[] -> 
             io:format("first time register of this host: ~p~n",[HostName]),    
 			write_to_db(Row);
@@ -656,7 +654,7 @@ get_direct_sub_files(FileID) ->
 
 %% spec add_heartbeat_info(HostName,State) -> {ok,_} |{error,_}
 update_heartbeat(HostName,State) ->
-    case select_from_hostinfo(HostName) of
+    case select_all_from_hostinfo_byHostname(HostName) of
         [Host]-> %%update            
             Row = Host#hostinfo{status = State,life = ?HOST_INIT_LIFE},
     		F = fun() ->
