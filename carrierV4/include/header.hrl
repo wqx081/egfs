@@ -56,7 +56,7 @@
 -record(orphanchunk,{chunkid,chunklocation}).
 -record(metalog,{logtime,logfunc,logarg}).
 
--record(chunkmeta, {chunkid, md5}).
+-record(chunkmeta, {chunkid, md5, chunksize}).
 
 -record(garbageinfo, {chunk_id, insert_time}).
 -define(GARBAGE_AUTO_COLLECT_PERIOD,	7000).    % 5000 milisecond = 5 second
@@ -65,7 +65,8 @@
 -define(GARBAGE_AUTO_COLLECT_WAIT_TIME,	7000).    % 5000 milisecond = 5 second
 
 -define(MD5CHECK_TIMER,	86400000).    % 5000 milisecond = 5 second
--define(HEARTBEAT_TIMER,	5000).
+-define(SPACEREPORT_TIMER,	300000).  % 300000 ms = 5 mins?
+-define(HEARTBEAT_TIMER,	10000).
 -define(NODE_CHECK_INTERVAL,10000). %% 10second. chech monitor_node result.
 -define(CHUNKMAPPING_BROADCAST_INTERVAL,86400000).  %%1day = 24h = 24*3600s = 1000*24*3600 = 86,400,000
 -define(HOSTLIFE_AUTO_DECREASE_INTERVAL,5000).
