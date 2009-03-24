@@ -1,5 +1,5 @@
 -module(egfusesrv).
--export([start_link/2, start_link/3]).
+-export([start_link/2, start_link/3, run/0]).
 %-behaviour(fuserl).
 -export([ code_change/3,
 	  handle_info/2,
@@ -27,7 +27,8 @@
 
 -record(egfsrv, {inodes, names, pids}).
 
-%%-define(PREFIX, "/home/lt/erlangDev/fuse/fuserl-2.0.4/tests/eunit").
+run() ->
+    start_link(true, "test").
 
 start_link(LinkedIn, Dir) ->
     start_link(LinkedIn, Dir, "").
@@ -216,7 +217,6 @@ read(_, X, Size, Offset, Fi, _, State) ->
     end.
 
 write(_, Inode, Data, Offset, Fi, _, State) ->
-    io:format("[~p, ~p] write~n", [?MODULE, ?LINE]),
     %%io:format("[~p, ~p] ~p~n", [?MODULE, ?LINE, Data]),
     case gb_trees:lookup(Inode, State#egfsrv.inodes) of
 	{value, {Parent, Name}} ->
@@ -394,8 +394,8 @@ try_set_mtime(_, OldAttr, _) ->
     OldAttr.
 
 my_set_attr({Parent, Name}, NewAttr) ->
-    LocalName = Parent ++ Name,
-    FileInfo = #file_info{
+    _LocalName = Parent ++ Name,
+    _FileInfo = #file_info{
 		    mode = NewAttr#stat.st_mode,
 		    size = NewAttr#stat.st_size,
 		    atime = seconds_to_datetime(NewAttr#stat.st_atime),
@@ -408,6 +408,7 @@ my_set_attr({Parent, Name}, NewAttr) ->
 
 setattr(_, Ino, Attr, Toset, _Fi, _, State) ->
     %%io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, Ino, Attr]),
+    io:format("[~p, ~p]setatt not implemented.~n", [?MODULE, ?LINE]),
     case gb_trees:lookup(Ino, State#egfsrv.inodes) of
 	{value, {Parent, Name}} ->
 	    {OldAttr, NewState} = my_get_attr({Parent, Name}, State),
@@ -432,13 +433,14 @@ delete_info({Parent, Name}, State) ->
 	    NewInodes = gb_trees:delete_any(Ino, Inodes),
 	    Names = State#egfsrv.names,
 	    NewNames = gb_trees:delete_any({Parent, Name}, Names),
-	    #egfsrv{inodes = NewInodes, names = NewNames};
+	    NewState = State#egfsrv{inodes = NewInodes, names = NewNames},
+	    NewState;
 	none ->
 	    State
     end.
 
 unlink(_, PIno, BName, _, State) ->
-    %%io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, PIno, BName]),
+    io:format("[~p, ~p] ~p ~p~n", [?MODULE, ?LINE, PIno, BName]),
     Name = binary_to_list(BName),
     Parent = get_parent(PIno, State),
     LocalName = Parent ++ Name,
@@ -501,7 +503,7 @@ rename(_, PIno, BName, NPIno, BNewName, _, State) ->
     NParent = get_parent(NPIno, State),
     FullName = Parent ++ Name,
     NewFullName = NParent ++ NewName,
-    case clientlib:rename(FullName, NewFullName) of
+    case clientlib:move(FullName, NewFullName) of
 	ok ->
 	    State1 = delete_info({Parent, Name}, State),
 	    {_, NewState} = make_inode({NParent, NewName}, State1),
@@ -511,4 +513,3 @@ rename(_, PIno, BName, NPIno, BNewName, _, State) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%crypto:rand_uniform(1,18446744073709551616),
