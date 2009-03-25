@@ -509,7 +509,8 @@ rename(_, PIno, BName, NPIno, BNewName, _, State) ->
 	    {_, NewState} = make_inode({NParent, NewName}, State1),
 	    {#fuse_reply_err{ err = ok }, NewState};
 	{error, Reason} ->
-	    {#fuse_reply_err{ err = Reason}, State}
+	    {#fuse_reply_err{ err = ok }, State}
+	    %%{#fuse_reply_err{ err = Reason}, State}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -15,7 +15,8 @@
 	  copy/2,
 	  chmod/4]).
 
--define(CLIENT_SERVER, {client_server, flyclient1@fly}).
+%% -define(CLIENT_SERVER, {client_server, flyclient1@fly}).
+-define(CLIENT_SERVER, {client_server, ltclient1@lt}).
 
 min(A, B) ->
     if 
