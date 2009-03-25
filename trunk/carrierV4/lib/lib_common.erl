@@ -7,8 +7,10 @@
 %%%-------------------------------------------------------------------
 -module(lib_common).
 -include("../include/header.hrl").
+-include_lib("kernel/include/file.hrl").
 -export([generate_processname/2,
 		 get_local_ip/0,
+		 get_file_size/1,
 		 get_file_handle/1,
 		 get_file_name/1,
 		 generate_dirs/2,
@@ -37,7 +39,7 @@ idToAtom(Bin,Mode)->
     list_to_atom(ModeList).
 
 generate_processname(Filename,Mode)->
-%%     error_logger:info_msg("lib_common:generate_processname_~p, ~p~n",[Filename,Mode]),
+    error_logger:info_msg("lib_common:generate_processname_~p, ~p~n",[Filename,Mode]),
     ModePreFix= case Mode of 
 					read -> r@@@;
 					write -> w@@@;
@@ -66,6 +68,14 @@ get_local_ip() ->
     {ok, Host} = inet:gethostname(),
     {ok, IP} = inet:getaddr(Host, inet),
 	{ok, IP}.
+	
+get_file_size(FileName) ->
+    case file:read_file_info(FileName) of
+	{ok, F} ->
+	    {ok, F#file_info.size};
+	Other ->
+	    Other
+    end.
 	
 get_file_handle({read, ChunkID}) ->
     {ok, Name} = get_file_name(ChunkID),
@@ -103,4 +113,5 @@ generate_dirs(Cur, [H|T]) ->
     generate_dirs(Cur2, T);
 generate_dirs(Cur, []) ->
     Cur.
+
 
