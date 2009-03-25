@@ -437,18 +437,18 @@ append_a_file_record(FileRecord,ChunkMappingRecords) ->
 %% add record hostinfo to table hostinfo, no chunkmapping table change .
 %% when meta_host , gen_server_call, register_dataserver
 add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
-    io:format("in side add_hostiofo_item.~n"),
+%%     io:format("in side add_hostiofo_item.~n"),
 	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
-	io:format("From : ~p~n",[From]),
+%% 	io:format("From : ~p~n",[From]),
     
 	case select_all_from_hostinfo_byHostname(HostName) of
 		[] -> 
-            io:format("first time register of this host: ~p~n",[HostName]),    
+%%             io:format("first time register of this host: ~p~n",[HostName]),    
 			write_to_db(Row);
 		[_Any] ->
-            io:format("host with same name was deleted first,~p~n",[HostName]),
+%%             io:format("host with same name was deleted first,~p~n",[HostName]),
             delete_from_db({hostinfo,HostName}),            
-            io:format("delete ok , begin to write,~n"),
+%%             io:format("delete ok , begin to write,~n"),
             write_to_db(Row)
 	end.
 
