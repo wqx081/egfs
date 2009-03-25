@@ -92,7 +92,9 @@ handle_cast({stop,_Reason,From}, State) ->
     readerleave  = do_close(From,State),
     case do_close(From,State) of
         readerleave->
+            error_logger:info_msg("[~p, ~p]: one reader exist, ~n", [?MODULE, ?LINE]),
             NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},
+            error_logger:info_msg("[~p, ~p]: reader online: ~p ~n", [?MODULE, ?LINE,NewState#metaWorkerState.clients]),
             {noreply, NewState};        
         _Other->
             {noreply,State}
