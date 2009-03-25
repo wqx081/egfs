@@ -45,6 +45,10 @@ select_md5_from_chunkmeta_id(ChunkID) ->
     
 select_chunklist_from_chunkmeta() ->    
     do(qlc:q([X#chunkmeta.chunkid||X<-mnesia:table(chunkmeta)])). 
+    
+select_chunkspace_from_chunkmeta() ->    
+    L= do(qlc:q([X#chunkmeta.chunksize||X<-mnesia:table(chunkmeta)])),
+    lists:sum(L).
 
 is_exsit_in_chunkmeta(ChunkID, MD5) ->    
 	R = do(qlc:q([X||X<-mnesia:table(chunkmeta),
@@ -59,8 +63,8 @@ is_exsit_in_chunkmeta(ChunkID, MD5) ->
 %%====================================================================
 %% add item into table
 %%====================================================================
-add_chunkmeta_item(ChunkID, MD5) ->
-   	Row = #chunkmeta{chunkid=ChunkID, md5=MD5},
+add_chunkmeta_item(ChunkID, MD5, ChunkSize) ->
+   	Row = #chunkmeta{chunkid=ChunkID, md5=MD5, chunksize=ChunkSize},
 	F = fun() ->
 		mnesia:write(Row)
 	end,

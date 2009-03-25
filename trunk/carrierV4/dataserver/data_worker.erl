@@ -64,7 +64,8 @@ loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
 		end,  
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
-		data_db:add_chunkmeta_item(ChunkID, MD5),		
+		{ok, ChunkSize} = lib_common:get_file_size(FileName),
+		data_db:add_chunkmeta_item(ChunkID, MD5, ChunkSize),		
 		error_logger:info_msg("[~p, ~p]: append dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
@@ -80,8 +81,9 @@ loop_write(MM, ChunkID, ChunkHdl) ->
 		file:close(ChunkHdl),
 		{ok, FileName} 	= lib_common:get_file_name(ChunkID),
 		{ok, MD5}		= lib_md5:file(FileName),
-		data_db:add_chunkmeta_item(ChunkID, MD5),		
-		%error_logger:info_msg("[~p, ~p]: write dataworker  ~p stopping~n", [?MODULE, ?LINE,self()]),
+		{ok, ChunkSize} = lib_common:get_file_size(FileName),
+		data_db:add_chunkmeta_item(ChunkID, MD5, ChunkSize),		
+		error_logger:info_msg("[~p, ~p]: write dataworker  ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -94,7 +96,7 @@ loop_read(MM, ChunkHdl) ->
 	    loop_read(MM, ChunkHdl);
 	{chan_closed, MM} ->
 		file:close(ChunkHdl),
-		%error_logger:info_msg("[~p, ~p]: read dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		error_logger:info_msg("[~p, ~p]: read dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -113,13 +115,14 @@ loop_replica(MM, ChunkID, MD5, ChunkHdl) ->
 		{ok, LocalMD5}	= lib_md5:file(FileName),
 		case LocalMD5 =:= MD5 of
 			true ->
-				data_db:add_chunkmeta_item(ChunkID, MD5),
+				{ok, ChunkSize} = lib_common:get_file_size(FileName),
+				data_db:add_chunkmeta_item(ChunkID, MD5, ChunkSize),
 				{ok, HostName}= inet:gethostname(),
 				gen_server:call(?META_SERVER, {registerchunk, ChunkID, list_to_atom(HostName)});
 			false ->
 				file:delete(FileName)
 		end,	
-		%error_logger:info_msg("[~p, ~p]: replica dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
+		error_logger:info_msg("[~p, ~p]: replica dataworker ~p stopping~n", [?MODULE, ?LINE,self()]),
 	    exit(normal)
     end.
 
@@ -141,7 +144,7 @@ loop_garbagecheck(MM, NextDataworkerPid, Bin) ->
 				end
 		end, 
 		Bin1 = list_to_binary(binary_to_list(Bin) ++ binary_to_list(BFBytes)),
-		error_logger:info_msg("[~p, ~p]: Bin1:~p~n", [?MODULE, ?LINE, Bin1]),		
+		%error_logger:info_msg("[~p, ~p]: Bin1:~p~n", [?MODULE, ?LINE, Bin1]),		
 	    loop_garbagecheck(MM, NextDataworkerPid, Bin1);
 	{chan_closed, MM} ->
 		case NextDataworkerPid of
