@@ -1,6 +1,6 @@
 -module(data_timer).
 -include("../include/header.hrl").
--export([heartbeat/0, bootreport/0, md5check/0]).
+-export([heartbeat/0, bootreport/0, spacereport/0, md5check/0]).
 
 heartbeat() ->
 	{ok, Hosts} = application:get_env(data_app, metaserver),
@@ -10,7 +10,10 @@ heartbeat() ->
     {ok, HostName}= inet:gethostname(),
 	case gen_server:call(?HOST_SERVER, {heartbeat, list_to_atom(HostName), uplink}) of
 		needreport ->
-			gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), node(), undefined, undefined, uplink}),
+		    {ok, TotalSpace} = application:get_env(data_app, totalspace),	
+		    ChunkSpace = data_db:select_chunkspace_from_chunkmeta(),
+		    FreeSpace = TotalSpace - ChunkSpace,
+			gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), node(), TotalSpace, FreeSpace, uplink}),
 			bootreport();
 		_Any ->
 			void
@@ -26,6 +29,14 @@ bootreport() ->
     		gen_server:cast(?META_SERVER, {bootreport,  list_to_atom(HostName), ChunkList})
 	end.
 
+spacereport() ->
+    {ok, HostName}= inet:gethostname(),
+    {ok, TotalSpace} = application:get_env(data_app, totalspace),	
+    ChunkSpace = data_db:select_chunkspace_from_chunkmeta(),
+    FreeSpace = TotalSpace - ChunkSpace,
+	gen_server:call(?HOST_SERVER, {register_dataserver, list_to_atom(HostName), node(), TotalSpace, FreeSpace, uplink}).
+
+	
 md5check() ->
 	Root = getrootpath(),
 	md5check(Root).
