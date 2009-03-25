@@ -527,7 +527,8 @@ do_read_open(FileName,UserName)->
 					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileMeta,read,UserName], []),
 					{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, MetaWorkerPid}
 			end;
-        Pid->			% pid exist, set this pid process as the meta worker           
+        Pid->			% pid exist, set this pid process as the meta worker  
+            error_logger:info_msg("[~p, ~p]:Read process found,Pid: ~p~n",[?MODULE, ?LINE,Pid]),
 %%          [FileMeta] = meta_db:select_all_from_filemeta_byName(FileName),
             FileMeta = gen_server:call(Pid, {joinNewReader}),
        		{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, Pid}

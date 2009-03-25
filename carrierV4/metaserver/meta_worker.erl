@@ -35,7 +35,7 @@ init([FileRecord,Mod,_UserName]) ->
     
 %%     {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
     
-	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=0},
+	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=1},
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
@@ -84,34 +84,60 @@ handle_call({debug},{_From, _},State)->
 %%     Reply = do_allocate_chunk(FileID,From),
 %%     {reply, Reply, State}.
 
+%% 
+%% handle_cast({stop,_Reason,From}, State) ->
+%% %%     error_logger:info_msg("Reason: ~p~n",[Reason]),
+%% %%     error_logger:info_msg("State: ~p~n",[State]),
+%%     %%TODO.
+%%     
+%%     end
+%%     
+%%     case do_close(From,State) of
+%%         readerleave->
+%%             error_logger:info_msg("[~p, ~p]: one reader exist, ~n", [?MODULE, ?LINE]),
+%%             NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},
+%%             error_logger:info_msg("[~p, ~p]: reader online: ~p ~n", [?MODULE, ?LINE,NewState#metaWorkerState.clients]),
+%%             {noreply, NewState};        
+%%         Other->
+%%             error_logger:info_msg("[~p, ~p]: other: ~p,  ~n", [?MODULE, ?LINE,Other]),
+%%             {noreply,State}
+%%     end;
+%% 
+%% handle_cast({close,_Reason,From}, State) ->
+%% %%     error_logger:info_msg("Reason: ~p~n",[Reason]),
+%% %%     error_logger:info_msg("State: ~p~n",[State]),
+%%     %%TODO.
+%%     
+%%     case do_close(From,State) of
+%%         readerleave->
+%%             error_logger:info_msg("[~p, ~p]: one reader exist, ~n", [?MODULE, ?LINE]),
+%%             NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},
+%%             error_logger:info_msg("[~p, ~p]: reader online: ~p ~n", [?MODULE, ?LINE,NewState#metaWorkerState.clients]),
+%%             {noreply, NewState};        
+%%         Other->
+%%             error_logger:info_msg("[~p, ~p]: other: ~p,  ~n", [?MODULE, ?LINE,Other]),
+%%             {noreply,State}
+%%     end;
 
-handle_cast({stop,_Reason,From}, State) ->
-%%     error_logger:info_msg("Reason: ~p~n",[Reason]),
-%%     error_logger:info_msg("State: ~p~n",[State]),
-    %%TODO.
-    readerleave  = do_close(From,State),
-    case do_close(From,State) of
-        readerleave->
-            error_logger:info_msg("[~p, ~p]: one reader exist, ~n", [?MODULE, ?LINE]),
-            NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},
-            error_logger:info_msg("[~p, ~p]: reader online: ~p ~n", [?MODULE, ?LINE,NewState#metaWorkerState.clients]),
-            {noreply, NewState};        
-        _Other->
-            {noreply,State}
-    end;
-
-handle_cast(_Msg, State) ->
+handle_cast(_Msg, State) ->    
     {noreply, State}.
 
-handle_info({'EXIT', _Pid, _Why}, State) ->
-%%     error_logger:info_msg("EXiT.~n"),
-	{stop, normal, State};	
+handle_info({'EXIT', _Pid, Why}, State) ->   %%
+     error_logger:info_msg("[~p, ~p]: EXiT. Why: ~p~n",[?MODULE, ?LINE,Why]),     
+     NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},     
+     case NewState#metaWorkerState.clients of
+         0 ->
+             {stop,Why,NewState};
+         _C ->
+             {noreply,NewState}	%%TODO: reader client exit
+     end;
+
 handle_info(_Info, State) ->
 %%     error_logger:info_msg("handle_info.~n"),
     {noreply, State}.
 
-terminate(_Reason, _State) ->
-%% 	error_logger:info_msg("[~p, ~p]: close metaworker ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	
+terminate(Reason, _State) ->
+ 	error_logger:info_msg("[~p, ~p]: close metaworker ~p since ~p~n", [?MODULE, ?LINE, self(),Reason]),	
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -141,28 +167,28 @@ do_get_chunk(FileID, ChunkIdx)->
     end.
 
 
-do_close(_From,State) ->
-%%     error_logger:info_msg("-- meta_worker  do_close"),
-%%     error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
-%%     error_logger:info_msg("From: ~p~n",[From]),
-
-    case State#metaWorkerState.mod of
-        read->                      
-%%             Clients = State#metaWorkerState.clients--[From],
-            Clients = State#metaWorkerState.clients-1,
-%%             error_logger:info_msg("mod = read , Clients = ",[Clients]),
-            case Clients of
-                0->
-                    exit(normal);    %%use handle_info instead of handle_cast, avoid crash
-                _ ->
-                    readerleave
-            end;
-        write->
-%%             error_logger:info_msg("mod = write"),
-            exit(normal);
-        append->
-            exit(normal)
-    end.
+%% do_close(_From,State) ->
+%%      error_logger:info_msg("-- meta_worker  do_close"),
+%%      error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
+%% %%     error_logger:info_msg("From: ~p~n",[From]),
+%% 
+%%     case State#metaWorkerState.mod of
+%%         read->                      
+%% %%             Clients = State#metaWorkerState.clients--[From],
+%%             Clients = State#metaWorkerState.clients-1,
+%% %%             error_logger:info_msg("mod = read , Clients = ",[Clients]),
+%%             case Clients of
+%%                 0->
+%%                     exit(normal);    %%use handle_info instead of handle_cast, avoid crash
+%%                 _ ->
+%%                     readerleave
+%%             end;
+%%         write->
+%% %%             error_logger:info_msg("mod = write"),
+%%             exit(normal);
+%%         append->
+%%             exit(normal)
+%%     end.
 
 %% try_close(ID) ->
 %%     error_logger:info_msg("trying to close this worker(FileID: ~p ). every 100s~n",[ID]).
