@@ -361,7 +361,7 @@ read_data(FileContext, Number, L) ->
 	
 % if the data is null, append finish.
 append_data(FileContext, Bytes) when size(Bytes) =:= 0 ->	
-	error_logger:info_msg("[~p, ~p]:A append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+	%error_logger:info_msg("[~p, ~p]:A append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 	{ok, FileContext};
 % if the data is appended into a new chunkFileContext#filecontext
 append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= undefined ->
@@ -370,7 +370,7 @@ append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= u
 					metaworkerpid = MetaWorkerPid} = FileContext,	
 	NewFC= 	case (Offset rem ?CHUNKSIZE=:=0) of
 				true ->
-					error_logger:info_msg("[~p, ~p]:B append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+					%error_logger:info_msg("[~p, ~p]:B append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 					NewChunkID=lib_uuid:gen(),
 					{ok,SelectedHost} = gen_server:call(?HOST_SERVER, {allocate_dataserver}),
 					{ok, DataWorkPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, NewChunkID, []}),
@@ -378,7 +378,7 @@ append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= u
 											chunkid	= NewChunkID,
 											host    = SelectedHost};
 				false ->
-					error_logger:info_msg("[~p, ~p]:C append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+					%error_logger:info_msg("[~p, ~p]:C append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 					[SelectedHost|LeftHosts] = gen_server:call(MetaWorkerPid, {seekchunk, ChunkID}),	
 					{ok, DataWorkerPid} = lib_chan:connect(SelectedHost, ?DATA_PORT, dataworker,?PASSWORD,  {append, ChunkID, LeftHosts}),
 					FileContext#filecontext{dataworkerpid  = DataWorkerPid,
@@ -400,7 +400,7 @@ append_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->	 
-			error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+			%error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			lib_chan:rpc(DataWorkerPid,{append,Right}),
 			% close the data worker and reset the FileContext
@@ -421,7 +421,7 @@ append_data(FileContext, Bytes) ->
 			% write the left data
 			append_data(NewFC, Left);
 		false ->
-			error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
+			%error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
 			lib_chan:rpc(DataWorkerPid,{append,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
