@@ -112,7 +112,12 @@ init([]) ->
     {ok, []}.
 
 handle_call({open, FileName, Mode, UserName}, _From, State) ->
-	Reply=gen_server:start(client_worker, [FileName, Mode, UserName], []),
+	Reply=	case lists:member(Mode,[read,write,append]) of
+				true ->
+					gen_server:start(client_worker, [FileName, Mode, UserName], []);
+				false ->
+					{error, "open mode error, mode must be read|write|append"}
+			end,	
 	{reply, Reply, State};	
 
 handle_call({delete, FileName, UserName}, _From, State)  ->
