@@ -61,6 +61,9 @@ handle_call({write, Bytes}, _From, FileContext) ->
 		write ->
 			{ok, NewFileContext} = write_data(FileContext, Bytes),	
 			{reply, ok, NewFileContext};
+		append ->
+			{ok, NewFileContext} = append_data(FileContext, Bytes),	
+			{reply, ok, NewFileContext};
 		_Any ->
 			{reply, {error, "write open mode error"}, FileContext}
 	end;
