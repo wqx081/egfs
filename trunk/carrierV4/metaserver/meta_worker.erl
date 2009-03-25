@@ -35,17 +35,13 @@ init([FileRecord,Mod,_UserName]) ->
     
 %%     {ok,_Tref} = timer:apply_interval(100000,meta_worker,try_close,[FileRecord#filemeta.id]), % check host health every 5 second
     
-	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=[]},
+	State=#metaWorkerState{filemeta=FileRecord,mod=Mod,clients=0},
     {ok, State}.
 
 handle_call({registerchunk,FileRecord, ChunkMappingRecords}, {_From, _}, State) ->
-    error_logger:info_msg("~~~~ in registerchunk~~~~n"),
-    error_logger:info_msg("checking...~n"),
-    error_logger:info_msg("FileRecord:~p~n",[FileRecord]),
-    error_logger:info_msg("ChunkMappingRecords:~p~n",[ChunkMappingRecords]),
-    error_logger:info_msg("mod:    ~p~n",[State#metaWorkerState.mod]),
-    error_logger:info_msg("FILEID: ~p~n",[(State#metaWorkerState.filemeta)#filemeta.id]),
-    error_logger:info_msg("submit: ~p~n",[FileRecord#filemeta.id]),
+    error_logger:info_msg("~~~~ in registerchunk~~~~n"),    
+    error_logger:info_msg("FileRecord:~p ,ChunkMappingRecords:~p ,mod:    ~p,FILEID: ~p,submit: ~p ~n",
+                          [FileRecord,ChunkMappingRecords,State#metaWorkerState.mod,(State#metaWorkerState.filemeta)#filemeta.id,FileRecord#filemeta.id]),
     case State#metaWorkerState.mod of
         write ->
             Reply = meta_db:add_a_file_record(FileRecord, ChunkMappingRecords);
@@ -62,10 +58,13 @@ handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
 	[Reply] = meta_db:select_hosts_from_chunkmapping_id(ChunkID),   %% select result = [{},{}]
 	{reply, Reply, State};
 	
-handle_call({getfileinfo,FileName}, {_From, _}, State) ->     
-%% 	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),
-    Reply  = meta_db:select_all_from_filemeta_byName(FileName),
-	{reply, Reply, State};
+handle_call({joinNewReader}, {_From, _}, State) ->     
+%% 	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),    
+    NewState = State#metaWorkerState{clients=State#metaWorkerState.clients+1},
+    Reply = State#metaWorkerState.filemeta,    
+%%     Reply  = meta_db:select_all_from_filemeta_byName(FileName),
+    
+	{reply, Reply, NewState};
 
 
 handle_call({locatechunk,FileID, ChunkIndex}, {_From, _}, State) ->
@@ -90,8 +89,15 @@ handle_cast({stop,_Reason,From}, State) ->
 %%     error_logger:info_msg("Reason: ~p~n",[Reason]),
 %%     error_logger:info_msg("State: ~p~n",[State]),
     %%TODO.
-    do_close(From,State),
-	{noreply, State};	
+    readerleave  = do_close(From,State),
+    case do_close(From,State) of
+        readerleave->
+            NewState = State#metaWorkerState{clients=State#metaWorkerState.clients-1},
+            {noreply, NewState};        
+        _Other->
+            {noreply,State}
+    end;
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -133,7 +139,7 @@ do_get_chunk(FileID, ChunkIdx)->
     end.
 
 
-do_close(From,State) ->
+do_close(_From,State) ->
 %%     error_logger:info_msg("-- meta_worker  do_close"),
 %%     error_logger:info_msg(" metaworkerstate.clients : ~p~n",[State#metaWorkerState.clients]),
 %%     error_logger:info_msg("From: ~p~n",[From]),
@@ -141,13 +147,13 @@ do_close(From,State) ->
     case State#metaWorkerState.mod of
         read->                      
 %%             Clients = State#metaWorkerState.clients--[From],
-            Clients = State#metaWorkerState.clients,
+            Clients = State#metaWorkerState.clients-1,
 %%             error_logger:info_msg("mod = read , Clients = ",[Clients]),
             case Clients of
-                []->
+                0->
                     exit(normal);    %%use handle_info instead of handle_cast, avoid crash
                 _ ->
-                    nil
+                    readerleave
             end;
         write->
 %%             error_logger:info_msg("mod = write"),

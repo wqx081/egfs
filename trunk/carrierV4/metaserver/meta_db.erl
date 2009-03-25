@@ -461,7 +461,8 @@ add_new_dir(ID,DirName,ParentID) ->
     F = fun() ->
                 mnesia:write(Row)
         end,
-    mnesia:transaction(F)
+    mnesia:transaction(F),
+    {ok,"created a new Dir"}
 .
 
 
@@ -549,17 +550,6 @@ get_time(ID) ->
 .
 
 
-%% checked it's a dir before function called. 
-get_all_dir_sub_files(FileName)->
-    L = length(FileName),
-    Result = do(qlc:q([
-                               {X#filemeta.type,X#filemeta.id,X#filemeta.name}
-                      		||X<-mnesia:table(filemeta), 
-                              string:equal(string:left(X#filemeta.name,L+1),FileName++"/"),
-                              X#filemeta.name =/= FileName
-                      ])),
-    Result.				%%[{}{}{}{}{}{}{}{}{}{}]
-    
 
 %% easier one , useing powerful qlc.
 get_all_sub_files_byID(FileID) ->
@@ -649,6 +639,17 @@ get_direct_sub_files(FileID) ->
                ),
 	Result.
 
+%% checked it's a dir before function called. 
+%% get_all_dir_sub_files(FileName)->
+%%     L = length(FileName),
+%%     Result = do(qlc:q([
+%%                                {X#filemeta.type,X#filemeta.id,X#filemeta.name}
+%%                       		||X<-mnesia:table(filemeta), 
+%%                               string:equal(string:left(X#filemeta.name,L+1),FileName++"/"),  %% mabe slow
+%%                               X#filemeta.name =/= FileName
+%%                       ])),
+%%     Result.				%%[{}{}{}{}{}{}{}{}{}{}]
+%%     
 
 
 

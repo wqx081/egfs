@@ -45,7 +45,7 @@ do_open(FilePathName, Mode, UserName) ->
                     end;                
                 directory ->
                     {error, "you are opening a dir"};
-                Any -> %% create a file.
+                _Any -> %% create a file.
 %%                     error_logger:info_msg(" tag = ~p , file not exist ~n",[Any]),
                     
                     ParentDir = filename:dirname(RealPath),
@@ -138,18 +138,17 @@ call_meta_check(list,File)->   %% return ok || ThatFileID
 %%	copy a file : just add a new file record into table filemeta 
 %%  @spec copy_a_file(Fullsrc,SrcUnderDst,DesDir)-> "Msg"
 %%  Fullsrc : a file name, checked before this function being called
-%%	SrcUnderDst: file name of that Creating
-%%	DesDir : a dir name , checked , 
-copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
-	error_logger:info_msg("[~p, ~p]: copy_a_file ~p~n", [?MODULE, ?LINE ,{Fullsrc,SrcUnderDst,DesDir}]),    
-    error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
+%%	FileName: file name of that Creating
+%%	ParentDir : a dir name , checked , 
+copy_a_file(Fullsrc,FileName,ParentDir)->
+	error_logger:info_msg("[~p, ~p]: copy_a_file ~p~n", [?MODULE, ?LINE ,{Fullsrc,FileName,ParentDir}]),    
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
     {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,_MreateT,_CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
     NewFileID = lib_uuid:gen(),
-    ParentID = meta_db:get_id(DesDir),
+    ParentID = meta_db:get_id(ParentDir),
     NewFileMeta = #filemeta{
                             id=NewFileID,
-                            name = SrcUnderDst,
+                            name = FileName,
                             chunklist = Chunklist,
                             parent = ParentID,                            
                             size = FileSize,
@@ -165,7 +164,7 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
                             gid = 0                         
                          },
 %%	check before write.     
-    case check_process_byName(SrcUnderDst) of
+    case check_process_byName(FileName) of
         {ok,_}->
             meta_db:write_to_db(NewFileMeta),            
             {ok,"copy finished"};
@@ -196,13 +195,14 @@ copy_a_dir(Fullsrc,SrcUnderDst,DesDir) ->
     case meta_db:select_all_from_filemeta_byName(SrcUnderDst) of
         []->
             DirID = lib_uuid:gen(),
+            %%TODO: if desdir deleted by someone while copying..
             ParentID = meta_db:get_id(DesDir),
             meta_db:add_new_dir(DirID,SrcUnderDst,ParentID),            
             copy_file_crowd(ResList,SrcUnderDst),
             error_logger:info_msg("copy dir :~p finished~n",[Fullsrc]),
             ok;
         _Any->
-            {error,"Destination Dir exist."}
+            {error,"please Fix related code, Destination Dir exist."} %%  won't be here , if system running as we designed
     end.
 
 copy_file_crowd([],DesDir)->
@@ -226,16 +226,24 @@ copy_file_crowd(ResList,DesDir)->
 
 
 do_copy(FullSrc, FullDst, _UserName)->	
+    %% TODO: lock src file and dst dirs , no one delete them wile copying
+    
     error_logger:info_msg("[~p, ~p]: ~n,In Do_Copy, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
     error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
     case CheckResult of
-        {ok, caseFileToDir, SrcUnderDst} ->
-            copy_a_file(FullSrc,SrcUnderDst,FullDst),
-            {ok,single_file_copy};        
-        {ok, caseDirToDir, SrcUnderDst} ->
-            copy_a_dir(FullSrc,SrcUnderDst,FullDst),
-            {ok,dir_copy};        
+        {ok,caseRegularToRegular,ParentDir} ->
+            copy_a_file(FullSrc,FullDst,ParentDir);
+        
+        {ok,caseRegularToDirectory,NewFileName}->
+            copy_a_file(FullSrc,NewFileName,FullDst);
+        
+        {ok,caseDirectoryToDirectory,NewDir}->
+            copy_a_dir(FullSrc,NewDir,FullDst);
+        
+        {ok,caseDirectoryToNull,ParentDirName}->
+            copy_a_dir(FullSrc,FullDst,ParentDirName);
+        
         {error,Msg}->
             error_logger:info_msg("copy fail: ~n"),
             error_logger:info_msg(Msg++"~n"),
@@ -266,6 +274,105 @@ do_move(FullSrc, FullDst, _UserName)->
 .
 
 
+
+check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
+	case SrcTag of
+        regular->		%% file to xxx
+            case DesTag of
+                regular ->    %% file to existing file ,  overwrite it                    
+                    %%TODO : we shall remind user of this case , maybe some warning before delete
+                    %% 1: delete old one
+                    do_delete(DstFullPath,[]),
+                    %% 2: write new one
+                    ParentDir = filename:dirname(DstFullPath),
+                    {ok,caseRegularToRegular,ParentDir};                
+                directory->
+                    NewFileName = filename:join(DstFullPath,filename:basename(SrcFullPath)),
+                    case meta_db:select_all_from_filemeta_byName(NewFileName) of
+                        []->
+                            {ok,caseRegularToDirectory,NewFileName};
+                        _Exist->
+                            %%TODO : we shall remind user of this case , maybe some warning before delete
+                            %% 1: delete old one
+                            case do_delete(NewFileName,[]) of
+                                {ok,_}->
+                                    {ok,caseRegularToDirectory,NewFileName};
+                                {error,_}->
+                                    {error,"delete destination file fail , copy/move suspend"}
+                            end
+                    end;                    
+                null->
+                    {error,"dst don't exist, illegal"}                    
+            end;        
+        directory->		%% dir to xxx
+            case DesTag of
+                regular ->
+                    {error,"dst is an existing regular file"};
+                directory->		%%keep base name of src directory file  :           src /a/b   dst /c/d   res  /c/d/a
+                    Newdir = filename:join(DstFullPath,filename:basename(SrcFullPath)),
+                    case meta_db:select_all_from_filemeta_byName(Newdir) of
+                        []->
+                            {ok,caseDirectoryToDirectory,Newdir};
+                        Exist->
+                            {error,"target directory Exist",Exist}
+                    end;                
+                null->			%% dont keep base name of src directory file:       src /a/b   dst /c/notexist  res: create dir notexist , put files under /a/b to /c/notexist
+                    %%1  mkdir
+                    case do_mkdir(DstFullPath,[]) of
+                        {ok,_}->
+                            %%2 get parent dir
+                            ParentDirName = filename:dirname(DstFullPath),		%%dst = / , parent =/
+                            {ok,caseDirectoryToNull,ParentDirName};
+                        {error,_}->
+                            {error,"create target dir fail, copy/move suspend "}
+                    end
+            end
+    end.
+
+
+%% filename:dirname("/a") -> "/" ,  ("/a/")->"/a"  ,"//" ->"/" , ""->"."
+%%		-> conclude: .  | File | Dir        
+%% filename:basename("/") ->[] , ("/a/")->"a" ("/a")->a
+%%		-> conclude: [] | File | Dir
+
+%%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
+check_op_type(SrcFullPathIn, DstFullPathIn) ->
+        
+    SrcFullPath = lib_common:get_rid_of_last_slash(SrcFullPathIn), %% op faile if src dont exist
+    SrcTag = meta_db:get_tag(SrcFullPath),
+    
+    DstFullPath = lib_common:get_rid_of_last_slash(DstFullPathIn), %% op fail if des do not exist in filemeta table
+    DstTag = meta_db:get_tag(DstFullPath),
+
+	SrcequalDes = string:equal(SrcFullPath,DstFullPath),
+    
+    ParentDir = filename:dirname(DstFullPath),
+    ParentTag = meta_db:get_tag(ParentDir),
+    
+    SubIndex = string:rstr(DstFullPath,SrcFullPath++"/"),		%% if SubIndex >0 ,  recursive happen								 
+    %% TODO: copy dir /hxm to dir /hxm/copy is not allowed , but /hxm -> /hxmOtherdir is allowed,
+    
+
+    
+    if
+        SrcTag =:= null				%%src don't exist,
+          ->
+            {error, "SRC dont exist"};
+        ParentTag =/= dirctory				%%des not available
+          ->
+            {error,"DES illegal"};
+        SubIndex > 0  				%% copy entire directory to sub directory
+          ->
+            {error,"des is subdirectory of src"};
+		SrcequalDes
+		  ->
+			{error,"src = dst"};
+        true
+          ->
+            check_op_type(SrcFullPath,SrcTag,DstFullPath,DstTag)
+    end.
+
+
 do_list(FilePathName,_UserName)->
     error_logger:info_msg("[~p, ~p]: do_list~p~n", [?MODULE, ?LINE,{FilePathName}]),
     %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
@@ -290,7 +397,7 @@ do_mkdir(PathName, _UserName)->
                 true ->
                     meta_db:add_new_dir(lib_uuid:gen(),PathName,meta_db:get_id(ParentDirName));
                 false ->
-                    {error, "sorry, you are not authorized to do this operation "}
+                    {error, "sorry, you are not authorized to do this operation ; Parent not a dir"}
             end;
         _Any ->
             {error, "file with this name exists already"}
@@ -320,75 +427,6 @@ get_acl() ->
 .
 
 
-
-
-%% filename:dirname("/a") -> "/" ,  ("/a/")->"/a"  ,"//" ->"/" , ""->"."
-%%		-> conclude: .  | File | Dir        
-%% filename:basename("/") ->[] , ("/a/")->"a" ("/a")->a
-%%		-> conclude: [] | File | Dir
-
-%%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
-check_op_type(SrcFullPath, DstFullPath) ->
-    SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),    
-    SrcTag = meta_db:get_tag(SrcFullPath),
-    DstTag = meta_db:get_tag(DstFullPath),
-    SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
-    
-%%     error_logger:info_msg("SrcUnderDst:~p,SrcTag:~p,DstTag:~p,SrcUnderDstTag:~p~n",[SrcUnderDst,SrcTag,DstTag,SrcUnderDstTag]),
-    
-    CaseSrcequalDes = string:equal(SrcFullPath,DstFullPath),
-
-    CaseFileToUnFile = (SrcTag=:=regular) and (DstTag=:=null),
-    CaseFileToDir = (SrcTag=:=regular) and (DstTag=:=directory) and (SrcUnderDstTag=:=null),
-    CaseDirToDir = (SrcTag=:=directory) and (DstTag=:=directory) and (SrcUnderDstTag=:=null) 
-									and (string:rstr(DstFullPath,SrcFullPath++"/")=:=0), 
-    %% TODO: copy dir /hxm to dir /hxm/copy is not allowed , but /hxm -> /hxmOtherdir is allowed, 
-    																			
-    CaseDirToUnDir = (SrcTag=:=directory) and (DstTag=:=null), 
-    if       
-        CaseSrcequalDes ->
-            {error," Src = Des."};
-        CaseFileToUnFile ->
-            {error," rename not supported"};
-        CaseFileToDir ->
-            {ok, caseFileToDir, SrcUnderDst};
-        CaseDirToDir ->
-            {ok, caseDirToDir, SrcUnderDst};
-        CaseDirToUnDir ->
-            {error, "destination error"};
-        true ->
-            {error, "wrong input"}
-    end
-.
- 
-%%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
-%% check_op_type_hiatusV(SrcFullPath, DstFullPath) ->
-%%     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),
-%%     DstParent = filename:dirname(DstFullPath),
-%%     
-%%     SrcTag = meta_db:get_tag(SrcFullPath),
-%%     DstTag = meta_db:get_tag(DstFullPath),
-%%     SrcUnderDstTag = meta_db:get_tag(SrcUnderDst),
-%%     DstParentTag = meta_db:get_tag(DstParent),
-%% 
-%%     CaseFileToUnFile = (SrcTag=:=file) and (DstTag=:=null) and (DstParentTag=:=dir),
-%%     CaseFileToDir = (SrcTag=:=file) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
-%%     CaseDirToDir = (SrcTag=:=dir) and (DstTag=:=dir) and (SrcUnderDstTag=:=null) and (string:rstr(DstFullPath,SrcFullPath)=:=0),
-%%     CaseDirToUnDir = (SrcTag=:=dir) and (DstTag=:=null) and (DstParentTag=:=dir),
-%%     if
-%%         CaseFileToUnFile ->
-%%             {ok, caseFileToUnFile, DstParent, DstParent};
-%%         CaseFileToDir ->
-%%             {ok, caseFileToDir, DstFullPath, DstFullPath};
-%%         CaseDirToDir ->
-%%             {ok, caseDirToDir, DstFullPath, SrcUnderDst};
-%%         CaseDirToUnDir ->
-%%             {ok, caseDirToUnDir, DstParent, DstFullPath};
-%%         true ->
-%%             {error, "wrong input"}
-%%     end
-%% .
-
 %%%%%%%%%%%%%%%%
 
 
@@ -415,25 +453,6 @@ check_process_byName(FileName) ->
         _->
             {error,"someone writing this file."}
     end.    
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%meta_server
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-%%from old meta_server ;   handle these function.
-
-%% do_file_open(FileName,Mod,UserName)-> 
-%%     case Mod of
-%%         read ->            
-%%             do_read_open(FileName,UserName);
-%%         write ->
-%%             do_write_open(FileName,UserName);
-%%         append->
-%%             do_append_open(FileName,UserName);
-%%         _->
-%%             {error,"unkown open mode"}
-%%     end.
-
 
 %% checked, no file exist , go ahead and write, no one reading or appending
 do_write_open(FileName,UserName)->    
@@ -475,11 +494,12 @@ do_append_open(FileName,UserName) ->
     ProcessName = lib_common:generate_processname(FileName,append),
     case whereis(ProcessName) of
         undefined->
+            error_logger:info_msg("[~p, ~p]:processName undefined ~n", [?MODULE, ?LINE]),
             case meta_db:select_all_from_filemeta_byName(FileName) of
                 [] ->
                     {error,"NO TARGET FILE EXSIT.~p~n",[FileName]};
                 [Meta]->
-                    {ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [Meta, append,UserName], []),
+                    {ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [Meta,append,UserName], []),
                     case Meta#filemeta.chunklist of 
                         []->
                             {ok,Meta#filemeta.id,Meta#filemeta.size,[],MetaWorkerPid};
@@ -507,8 +527,9 @@ do_read_open(FileName,UserName)->
 					{ok, MetaWorkerPid}=gen_server:start({local,ProcessName}, meta_worker, [FileMeta,read,UserName], []),
 					{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, MetaWorkerPid}
 			end;
-        Pid->			% pid exist, set this pid process as the meta worker
-        	FileMeta = gen_server:call(Pid, {getfileinfo,FileName}),
+        Pid->			% pid exist, set this pid process as the meta worker           
+%%          [FileMeta] = meta_db:select_all_from_filemeta_byName(FileName),
+            FileMeta = gen_server:call(Pid, {joinNewReader}),
        		{ok, FileMeta#filemeta.id, FileMeta#filemeta.size, FileMeta#filemeta.chunklist, Pid}
    end.
 
