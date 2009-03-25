@@ -22,6 +22,9 @@
 
 do_open(FilePathName, Mode, UserName) ->
     %% gen_server:call(?ACL_SERVER, {Mode, FilePathName, _UserName})
+    
+    error_logger:info_msg("[~p, ~p]:open ~p~n", [?MODULE, ?LINE,{FilePathName, Mode, UserName}]),    
+    
     case get_acl() of
         true ->
             RealPath = lib_common:get_rid_of_last_slash(FilePathName),
@@ -64,6 +67,7 @@ do_open(FilePathName, Mode, UserName) ->
 .
 
 do_delete(FilePathName, _UserName)->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
@@ -137,7 +141,7 @@ call_meta_check(list,File)->   %% return ok || ThatFileID
 %%	SrcUnderDst: file name of that Creating
 %%	DesDir : a dir name , checked , 
 copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
-    error_logger:info_msg("copying a file.~n"),
+	error_logger:info_msg("[~p, ~p]: ~n", [?MODULE, ?LINE]),    
     error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
     {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,_MreateT,_CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
@@ -183,8 +187,8 @@ copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
 %% 	3 dir: copy_a_dir
 %%	4 TODO: mass acl and collision problems. 
 copy_a_dir(Fullsrc,SrcUnderDst,DesDir) ->
-    error_logger:info_msg("copying a dir.~n"),
-    error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
+	error_logger:info_msg("[~p, ~p]: ~n", [?MODULE, ?LINE]),    
+    error_logger:info_msg("copying a dir.~n Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     %% 1 
     ParentFileID = meta_db:get_id(Fullsrc),
     ResList = meta_db:get_direct_sub_files(ParentFileID),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}
@@ -221,8 +225,8 @@ copy_file_crowd(ResList,DesDir)->
     copy_file_crowd(T,DesDir).      
 
 
-do_copy(FullSrc, FullDst, _UserName)->
-    error_logger:info_msg("In Do_Copy, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
+do_copy(FullSrc, FullDst, _UserName)->	
+    error_logger:info_msg("[~p, ~p]: ~n,In Do_Copy, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
     error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
     case CheckResult of
@@ -240,6 +244,7 @@ do_copy(FullSrc, FullDst, _UserName)->
 %% do_copy + do_delete.
 %% TODO: file modifytime?
 do_move(FullSrc, FullDst, _UserName)->
+	error_logger:info_msg("[~p, ~p]: ~n,In Do_Move, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     error_logger:info_msg("In Do_Move, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
     error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
@@ -262,6 +267,7 @@ do_move(FullSrc, FullDst, _UserName)->
 
 
 do_list(FilePathName,_UserName)->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
     case get_acl() and (meta_db:get_tag(FilePathName)=:=directory) of
         true ->
@@ -275,6 +281,7 @@ do_list(FilePathName,_UserName)->
 .
 
 do_mkdir(PathName, _UserName)->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     case meta_db:get_tag(PathName) of
         null ->
             ParentDirName = filename:dirname(PathName),
@@ -291,6 +298,7 @@ do_mkdir(PathName, _UserName)->
 .
 
 do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     case meta_db:get_tag(FileName) of
         null ->
             {error, "file not exists"};
@@ -321,9 +329,6 @@ get_acl() ->
 
 %%@spec check_op_type(Src,Dst)-> {ok,type} ||{error,...}
 check_op_type(SrcFullPath, DstFullPath) ->
-    
-    
-    
     SrcUnderDst = filename:join(DstFullPath,filename:basename(SrcFullPath)),    
     SrcTag = meta_db:get_tag(SrcFullPath),
     DstTag = meta_db:get_tag(DstFullPath),
@@ -432,6 +437,7 @@ check_process_byName(FileName) ->
 
 %% checked, no file exist , go ahead and write, no one reading or appending
 do_write_open(FileName,UserName)->    
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     ProcessName = lib_common:generate_processname(FileName,write),
 %%    io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
@@ -465,6 +471,7 @@ do_write_open(FileName,UserName)->
 %% don't care someone reading,
 %% also go ahead and do append,
 do_append_open(FileName,UserName) ->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     ProcessName = lib_common:generate_processname(FileName,append),
     case whereis(ProcessName) of
         undefined->
@@ -487,6 +494,7 @@ do_append_open(FileName,UserName) ->
 
 %%go ahead and read, if file exist(means no one writing, maybe someone appending)  
 do_read_open(FileName,UserName)->		
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
 %%     error_logger:info_msg("in do_read_open~n"),
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
@@ -529,6 +537,7 @@ do_dataserver_bootreport(HostRecord, ChunkList)->
 
 %%
 do_register_replica(ChunkID,Host) ->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     error_logger:info_msg("in do_register_replica,~p,~p~n",[ChunkID,Host]),
     case meta_db:select_item_from_chunkmapping_id(ChunkID) of
         []->            
@@ -545,18 +554,18 @@ do_register_replica(ChunkID,Host) ->
 
 %% 
 %%
-do_collect_orphanchunk(HostProcName)->
-    % get orphanchunk from orphanchunk table
-    OrphanChunkList = meta_db:select_chunkid_from_orphanchunk(HostProcName),
-    % delete notified orphanchunk from orphanchunk table
-    meta_db:do_delete_orphanchunk_byhost(HostProcName),
-    OrphanChunkList.
+%% do_collect_orphanchunk(HostProcName)->
+%%     % get orphanchunk from orphanchunk table
+%%     OrphanChunkList = meta_db:select_chunkid_from_orphanchunk(HostProcName),
+%%     % delete notified orphanchunk from orphanchunk table
+%%     meta_db:do_delete_orphanchunk_byhost(HostProcName),
+%%     OrphanChunkList.
 
 %% 
 %% debug 
 %% 
 do_debug(Arg) ->
-    io:format("in func do_debug~n"),
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),    
     case Arg of
         wait ->
             io:format("111 ,~n"),
@@ -575,6 +584,7 @@ do_debug(Arg) ->
     end.
 
 do_showWorker(FileName,Mod)->
+    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
     ProcessName = lib_common:generate_processname(FileName,Mod),
     case whereis(ProcessName) of
         undefined ->		% no meta worker , create one worker to server this writing request.
@@ -585,18 +595,18 @@ do_showWorker(FileName,Mod)->
    end.
 
 
-
-seperate_file_dir([]) ->
-    [[],[],[],[]];
-seperate_file_dir(FileList) ->
-    [{Tag, ID,Name}|Left] = FileList,
-    [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
-    case Tag of
-        regular ->
-            [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
-        directory ->
-            [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
-    end
-.
+%% 
+%% seperate_file_dir([]) ->
+%%     [[],[],[],[]];
+%% seperate_file_dir(FileList) ->
+%%     [{Tag, ID,Name}|Left] = FileList,
+%%     [LeftFiles,LeftDirs,LeftFileNames,LeftDirNames] = seperate_file_dir(Left),
+%%     case Tag of
+%%         regular ->
+%%             [lists:append([ID],LeftFiles),LeftDirs,lists:append([Name],LeftFileNames),LeftDirNames];
+%%         directory ->
+%%             [LeftFiles,lists:append([ID],LeftDirs),LeftFileNames,lists:append([Name],LeftDirNames)]
+%%     end
+%% .
 
     
