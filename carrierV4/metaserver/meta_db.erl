@@ -305,16 +305,15 @@ detach_from_chunk_mapping(Host) ->
                 Guard = lists:member(Host,ChunkLoc),
                 if Guard =:= true ->
                        ChunkLocList = ChunkLoc -- [Host],
-                       ok = mnesia:write(ChunkMapping#chunkmapping{chunklocations = ChunkLocList}),
-                       if 
-                           ChunkLocList =:= [] ->
-                               Acc ++ [ChunkMapping#chunkmapping.chunkid];
-                           true ->
-                               Acc
-                       end; 
-                   true ->
-                    	Acc   
-                end
+                       case ChunkLocList of
+                           []->
+                               %delete chunkid record
+                               ok = mnesia:delete(ChunkMapping);
+                           _Any->
+                               ok = mnesia:write(ChunkMapping#chunkmapping{chunklocations = ChunkLocList})
+                       end
+                end,
+                Acc 
         end,
     DoDel = fun() -> mnesia:foldl(DelHost, [], chunkmapping, write) end,
     mnesia:transaction(DoDel).
@@ -436,6 +435,7 @@ append_a_file_record(FileRecord,ChunkMappingRecords) ->
     
 
 %% add record hostinfo to table hostinfo, no chunkmapping table change .
+%% when meta_host , gen_server_call, register_dataserver
 add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
     io:format("in side add_hostiofo_item.~n"),
 	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
