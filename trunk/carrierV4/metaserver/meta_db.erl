@@ -665,7 +665,7 @@ update_heartbeat(HostName,State) ->
 %%          write_to_db(Row), too many log ...
             ok;
         []->
-            error_logger:error_msg("no info of this host, neeeedreport,"),
+%%             error_logger:error_msg("no info of this host, neeeedreport,"),
             needreport
     
     end.
