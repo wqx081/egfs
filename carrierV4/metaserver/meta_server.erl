@@ -130,7 +130,8 @@ handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
     {reply, Reply, State};
 
 handle_call({getfileinfo,FileName,_UserName}, {_From, _}, State) -> 
-%%     error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),
+%%  error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),
+    
     Reply  = meta_db:select_all_from_filemeta_byName(FileName),
 	{reply, Reply, State};
 
