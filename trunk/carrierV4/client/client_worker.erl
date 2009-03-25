@@ -150,7 +150,7 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=wri
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
+	%gen_server:cast(MetaWorkerPid, {close,normal,self()}),	
 	{stop, normal, Reply, #filecontext{}};
 	
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=append ->
@@ -184,7 +184,7 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=app
 	end,
 	ChunkMappingRecords = generate_chunkmapping_record(ChunkList, NodeList),
 	Reply = gen_server:call(MetaWorkerPid, {registerchunk, FileRecord, ChunkMappingRecords}),
-	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),	
+	%gen_server:cast(MetaWorkerPid, {close,normal,self()}),	
 	{stop, normal, Reply, #filecontext{}};
 	
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=read ->
@@ -197,7 +197,7 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=rea
 		false ->
 			lib_chan:disconnect(DataWorkerPid)
 	end,
-	gen_server:cast(MetaWorkerPid, {stop,normal,self()}),		
+	%gen_server:cast(MetaWorkerPid, {close,normal,self()}),		
 	{stop, normal, ok, #filecontext{}}.
 
 handle_cast(_Msg, FileContext) ->
@@ -275,7 +275,7 @@ do_position(FileContext, Location) ->
 	#filecontext{	offset   = Offset,
 					filesize = FileSize,
 				 	dataworkerpid = DataWorkerPid} = FileContext,
-	case Location =<  FileSize of
+	case (Location =<  FileSize) and (Location >=0) of
 	    true ->
 			TargetChunkIndex= Location div ?CHUNKSIZE,
 			CurrentChunkIndex= Offset div ?CHUNKSIZE,
