@@ -148,6 +148,10 @@ handle_call({getfileinfo, FileName, UserName}, _From, State)  ->
 handle_call({chmod, FileName, UserName, UserType, CtrlACL}, {_From, _}, State) ->
 	error_logger:info_msg("[~p, ~p]: chmod FileName:~p~n UserName:~p~n UserType:~p~n CtrlACL:~p~n", [?MODULE, ?LINE, [FileName, UserName, UserType, CtrlACL]]),
     Reply = gen_server:call(?META_SERVER, {chmod, FileName, UserName, UserType, CtrlACL}),	    
+    {reply, Reply, State};
+    
+handle_call({close,ClientWorkerPid}, {_From, _}, State) ->
+    Reply = gen_server:call(ClientWorkerPid, {close}),	    
     {reply, Reply, State}.
 
 handle_cast(_Msg, State) ->
