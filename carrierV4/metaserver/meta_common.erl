@@ -67,7 +67,7 @@ do_open(FilePathName, Mode, UserName) ->
 .
 
 do_delete(FilePathName, _UserName)->
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]: do_delete ~p~n", [?MODULE, ?LINE,{FilePathName}]),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
@@ -141,7 +141,7 @@ call_meta_check(list,File)->   %% return ok || ThatFileID
 %%	SrcUnderDst: file name of that Creating
 %%	DesDir : a dir name , checked , 
 copy_a_file(Fullsrc,SrcUnderDst,DesDir)->
-	error_logger:info_msg("[~p, ~p]: ~n", [?MODULE, ?LINE]),    
+	error_logger:info_msg("[~p, ~p]: copy_a_file ~p~n", [?MODULE, ?LINE ,{Fullsrc,SrcUnderDst,DesDir}]),    
     error_logger:info_msg("Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
     {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,_MreateT,_CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
@@ -267,7 +267,7 @@ do_move(FullSrc, FullDst, _UserName)->
 
 
 do_list(FilePathName,_UserName)->
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]: do_list~p~n", [?MODULE, ?LINE,{FilePathName}]),
     %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
     case get_acl() and (meta_db:get_tag(FilePathName)=:=directory) of
         true ->
@@ -437,7 +437,7 @@ check_process_byName(FileName) ->
 
 %% checked, no file exist , go ahead and write, no one reading or appending
 do_write_open(FileName,UserName)->    
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]:do_write_open ~p~n", [?MODULE, ?LINE,{FileName,UserName}]),
     ProcessName = lib_common:generate_processname(FileName,write),
 %%    io:format("FileName: ~p~n;ProcessName~p~n",[FileName,ProcessName]),
     case whereis(ProcessName) of
@@ -471,7 +471,7 @@ do_write_open(FileName,UserName)->
 %% don't care someone reading,
 %% also go ahead and do append,
 do_append_open(FileName,UserName) ->
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]:do_append_open ~p~n", [?MODULE, ?LINE,{FileName,UserName}]),
     ProcessName = lib_common:generate_processname(FileName,append),
     case whereis(ProcessName) of
         undefined->
@@ -494,7 +494,7 @@ do_append_open(FileName,UserName) ->
 
 %%go ahead and read, if file exist(means no one writing, maybe someone appending)  
 do_read_open(FileName,UserName)->		
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]: do_read_open~p~n", [?MODULE, ?LINE,{FileName,UserName}]),
 %%     error_logger:info_msg("in do_read_open~n"),
     ProcessName = lib_common:generate_processname(FileName,read),
     case whereis(ProcessName) of
@@ -537,7 +537,7 @@ do_dataserver_bootreport(HostRecord, ChunkList)->
 
 %%
 do_register_replica(ChunkID,Host) ->
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+    error_logger:info_msg("[~p, ~p]:do_register_replica ~p~n", [?MODULE, ?LINE,{ChunkID,Host}]),
     error_logger:info_msg("in do_register_replica,~p,~p~n",[ChunkID,Host]),
     case meta_db:select_item_from_chunkmapping_id(ChunkID) of
         []->            
