@@ -245,31 +245,41 @@ do_copy(FullSrc, FullDst, _UserName)->
             copy_a_dir(FullSrc,FullDst,ParentDirName);
         
         {error,Msg}->
-            error_logger:info_msg("copy fail: ~n"),
-            error_logger:info_msg(Msg++"~n"),
+            error_logger:info_msg("copy fail: "++Msg++"~n"),            
             {error,Msg}
     end.
 %% do_copy + do_delete.
 %% TODO: file modifytime?
-do_move(FullSrc, FullDst, _UserName)->
+do_move(FullSrc, FullDst, UserName)->
 	error_logger:info_msg("[~p, ~p]: ~n,In Do_Move, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     error_logger:info_msg("In Do_Move, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
     error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
     %% acl as copy.   if can write , just gen new file first, then think about delete
     case CheckResult of
-        {ok, caseFileToDir, SrcUnderDst} ->
-            copy_a_file(FullSrc,SrcUnderDst,FullDst),
-            do_delete(FullSrc, _UserName), %% with acl check in function.
-            {ok,single_file_move};        
-        {ok, caseDirToDir, SrcUnderDst} ->
-            copy_a_dir(FullSrc,SrcUnderDst,FullDst),
-            do_delete(FullSrc,_UserName),
-            {ok,dir_move};        
+        {ok,caseRegularToRegular,ParentDir} ->
+            copy_a_file(FullSrc,FullDst,ParentDir),
+            do_delete(FullSrc, UserName),
+            {ok,single_file_move};
+        
+        {ok,caseRegularToDirectory,NewFileName}->
+            copy_a_file(FullSrc,NewFileName,FullDst),
+            do_delete(FullSrc, UserName),
+            {ok,single_file_move};
+        
+        {ok,caseDirectoryToDirectory,NewDir}->
+            copy_a_dir(FullSrc,NewDir,FullDst),
+            do_delete(FullSrc,UserName),
+            {ok,dir_move}; 
+
+        {ok,caseDirectoryToNull,ParentDirName}->
+            copy_a_dir(FullSrc,FullDst,ParentDirName),
+            do_delete(FullSrc,UserName),
+            {ok,dir_move}; 
+
         {error,Msg}->
-            error_logger:info_msg("move fail, copy fail.: ~n"),
-            error_logger:info_msg(Msg++"~n"),
-            {error_movefilefail,Msg}        
+            error_logger:info_msg("move fail: "++Msg++"~n"),            
+            {error,Msg}             
     end
 .
 
