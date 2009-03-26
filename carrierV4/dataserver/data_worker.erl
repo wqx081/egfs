@@ -30,25 +30,25 @@ run(MM, ArgC, _ArgS) ->
 				[NextHost|LeftHosts] ->
 					{ok, NextDataworkerPid} = gen_server:call(data_server,{connectnext, NextHost, {garbagecheck, LeftHosts}}),
 					loop_garbagecheck(MM, NextDataworkerPid, <<>> )
-			end				
+			end
 	end.
 
 loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl) ->
     receive
-	{chan, MM, {append, Bytes}} ->
+	{chan, MM, {append, Start, Bytes}} ->
 		%error_logger:info_msg("[~p, ~p]: append ~p NextDataworkerPid ~p~n", [?MODULE, ?LINE, Bytes,NextDataworkerPid]),
-		R=file:write(ChunkHdl, Bytes),
+		R=file:pwrite(ChunkHdl, Start, Bytes),
 		case NextDataworkerPid of
 			undefined ->
 				%error_logger:info_msg("[~p, ~p]: No next dataworker to append~n", [?MODULE, ?LINE]),					
 				MM ! {send, R};
 			_Any ->
-				case gen_server:call(data_server,{rpcnext, NextDataworkerPid, {append, Bytes}}) of
+				case gen_server:call(data_server,{rpcnext, NextDataworkerPid, {append, Start, Bytes}}) of
 					ok ->
 						%error_logger:info_msg("[~p, ~p]: append next dataworker successfully~n", [?MODULE, ?LINE]),
 						MM ! {send, R};
 					_Error ->
-						MM ! {send, error}		
+						MM ! {send, {error,eacces}}		
 				end   	
 		end,		
 	    loop_append(MM, NextDataworkerPid, ChunkID, ChunkHdl);
