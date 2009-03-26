@@ -43,6 +43,9 @@ select_item_from_chunkmeta_id(ChunkID) ->
 select_md5_from_chunkmeta_id(ChunkID) ->    
     do(qlc:q([X#chunkmeta.md5||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).
     
+select_chunksize_from_chunkmeta_id(ChunkID) ->    
+    do(qlc:q([X#chunkmeta.chunksize||X<-mnesia:table(chunkmeta),X#chunkmeta.chunkid =:= ChunkID])).    
+    
 select_chunklist_from_chunkmeta() ->    
     do(qlc:q([X#chunkmeta.chunkid||X<-mnesia:table(chunkmeta)])). 
     
