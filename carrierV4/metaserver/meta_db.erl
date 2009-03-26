@@ -384,14 +384,14 @@ do_delete_filemeta_byID(FileID)->
     
 
 % delete orphanchunk record in orphanchunk table by host
-do_delete_orphanchunk_byhost(HostProcName)->
-	X = select_all_from_orphanchunk(HostProcName),
-	io:format("~p ~n", [list_to_tuple(X)]),
-	delete_object_from_db(listrecord,X).
+%% do_delete_orphanchunk_byhost(HostProcName)->
+%% 	X = select_all_from_orphanchunk(HostProcName),
+%% 	io:format("~p ~n", [list_to_tuple(X)]),
+%% 	delete_object_from_db(listrecord,X).
 
 % find orphanchunk in orphanchunk table by host
-do_get_orphanchunk_byhost(HostProcName) ->
-    select_all_from_orphanchunk(HostProcName).
+%% do_get_orphanchunk_byhost(HostProcName) ->
+%%     select_all_from_orphanchunk(HostProcName).
 
 
 %%====================================================================
