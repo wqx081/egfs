@@ -175,7 +175,6 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=app
 							name = FileName,
 							size = FileSize,
 							chunklist = ChunkList},
-	error_logger:info_msg("[~p, ~p]: FileRecord ChunkList ~p ~n", [?MODULE, ?LINE, FileRecord#filemeta.chunklist]),	
 	case DataWorkerPid =:= undefined of
 		true ->
 			void;
@@ -249,7 +248,7 @@ write_data(FileContext, Bytes) ->
 		true ->		 
 			%error_logger:info_msg("[~p, ~p]:C write ~p~n", [?MODULE, ?LINE, size(Bytes)]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
-			lib_chan:rpc(DataWorkerPid,{write,Right}),
+			ok = lib_chan:rpc(DataWorkerPid,{write,Right}),
 			% close the data worker and reset the FileContext
 			lib_chan:disconnect(DataWorkerPid),		
 			NewChunkList= ChunkList ++ [ChunkID],			
@@ -385,7 +384,7 @@ append_data(FileContext, Bytes) when FileContext#filecontext.dataworkerpid =:= u
 											chunkid=[],
 											host = []}
 			end,
-	append_data(NewFC, Bytes);	
+	append_data(NewFC, Bytes);
 % if the data is appended into a existed chunk
 append_data(FileContext, Bytes) ->
 	#filecontext{	offset = Offset,
@@ -399,10 +398,10 @@ append_data(FileContext, Bytes) ->
 	Number		= size(Bytes),
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
-		true ->	 
-			%error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, size(Bytes)]),
+		true ->
+			error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, Bytes]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
-			lib_chan:rpc(DataWorkerPid,{append,Right}),
+			ok = lib_chan:rpc(DataWorkerPid,{append, Start, Right}),
 			% close the data worker and reset the FileContext
 			lib_chan:disconnect(DataWorkerPid),	
 			[NewChunkList, NewNodeList] = 	case ChunkID of
@@ -421,8 +420,8 @@ append_data(FileContext, Bytes) ->
 			% write the left data
 			append_data(NewFC, Left);
 		false ->
-			%error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
-			ok = lib_chan:rpc(DataWorkerPid,{append,Bytes}),
+			error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Bytes]),
+			ok = lib_chan:rpc(DataWorkerPid,{append, Start, Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
 			{ok, NewFC}			
