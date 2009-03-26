@@ -265,7 +265,7 @@ write_data(FileContext, Bytes) ->
 			write_data(NewFC, Left);
 		false ->
 			%error_logger:info_msg("[~p, ~p]:D write ~p~n", [?MODULE, ?LINE, Number]),
-			lib_chan:rpc(DataWorkerPid,{write,Bytes}),
+			ok = lib_chan:rpc(DataWorkerPid,{write,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
 			{ok, NewFC}			
@@ -422,7 +422,7 @@ append_data(FileContext, Bytes) ->
 			append_data(NewFC, Left);
 		false ->
 			%error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Number]),
-			lib_chan:rpc(DataWorkerPid,{append,Bytes}),
+			ok = lib_chan:rpc(DataWorkerPid,{append,Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
 			{ok, NewFC}			
