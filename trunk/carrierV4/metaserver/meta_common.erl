@@ -77,7 +77,12 @@ do_delete(FilePathName, _UserName)->
         DeleteDir->            
             ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
             %% acl.            
-            call_meta_delete(list,ResList);            
+            case call_meta_delete(list,ResList) of
+                {ok,_}->
+                    meta_db:do_delete_filemeta_byID(meta_db:get_id(FilePathName));
+                {error,_}->
+                    {error,"sub file delete fail"}
+            end;
         DeleteFile->
             FileID = meta_db:get_id(FilePathName),
             case check_process_byID(FileID) of
@@ -143,26 +148,32 @@ call_meta_check(list,File)->   %% return ok || ThatFileID
 copy_a_file(Fullsrc,FileName,ParentDir)->
 	error_logger:info_msg("[~p, ~p]: copy_a_file ~p~n", [?MODULE, ?LINE ,{Fullsrc,FileName,ParentDir}]),    
     [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),
-    {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,_MreateT,_CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
+%%     {filemeta,_ID,_N,Chunklist,_Parent,FileSize,_Type,_,_,MreateT,CodifyT,_,_,_,_,_} = SrcFile#filemeta{},
     NewFileID = lib_uuid:gen(),
     ParentID = meta_db:get_id(ParentDir),
-    NewFileMeta = #filemeta{
-                            id=NewFileID,
-                            name = FileName,
-                            chunklist = Chunklist,
-                            parent = ParentID,                            
-                            size = FileSize,
-                            type = regular,
-                            access = 0,
-                            atime = 0,
-                            mtime = calendar:local_time(),
-                            ctime = calendar:local_time(),
-                            mode = 0,
-                            links = 1,
-                            inode = 0,
-                            uid = 0,
-                            gid = 0                         
-                         },
+    NewFileMeta = SrcFile#filemeta{
+                                   id = NewFileID,
+                                   name = FileName,
+                                   parent = ParentID,
+                                   ctime = erlang:localtime()       
+                         },    
+%%     NewFileMeta = #filemeta{
+%%                             id=NewFileID,
+%%                             name = FileName,
+%%                             chunklist = Chunklist,
+%%                             parent = ParentID,                            
+%%                             size = FileSize,
+%%                             type = regular,
+%%                             access = read,
+%%                             atime = {{1970,1,1},{8,0,0}},
+%%                             mtime = MreateT,
+%%                             ctime = erlang:localtime(),
+%%                             mode = 0,
+%%                             links = 1,
+%%                             inode = 0,
+%%                             uid = 0,
+%%                             gid = 0                         
+%%                          },
 %%	check before write.     
     case check_process_byName(FileName) of
         {ok,_}->
@@ -173,6 +184,26 @@ copy_a_file(Fullsrc,FileName,ParentDir)->
             {error,NewFileMeta}         
     end.
 
+move_a_file(Fullsrc,FileName,ParentDir,Opt)->
+  	error_logger:info_msg("[~p, ~p]: move_a_file ~p~n", [?MODULE, ?LINE ,{Fullsrc,FileName,ParentDir}]),    
+    [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),  
+    case Opt of
+        []->
+            ParentID = meta_db:get_id(ParentDir),
+            NewFileMeta = SrcFile#filemeta{                            
+                            name = FileName,                            
+                            parent = ParentID        
+                         },
+            meta_db:write_to_db(NewFileMeta);
+        subdir->
+            NewFileMeta = SrcFile#filemeta{                            
+                            name = FileName
+                         },
+            meta_db:write_to_db(NewFileMeta);
+        Any->
+            {error,"..."}
+    end.
+    
 
 %%	copy a dir: copy sub dirs/files to Dstdir 
 %%  @spec copy_a_dir(Fullsrc,SrcUnderDst,DesDir)-> "Msg"
@@ -185,29 +216,64 @@ copy_a_file(Fullsrc,FileName,ParentDir)->
 %%	2 file: copy_a_file
 %% 	3 dir: copy_a_dir
 %%	4 TODO: mass acl and collision problems. 
-copy_a_dir(Fullsrc,SrcUnderDst,DesDir) ->
+copy_a_dir(Fullsrc,FileName,ParentDir) ->
 	error_logger:info_msg("[~p, ~p]: ~n", [?MODULE, ?LINE]),    
-    error_logger:info_msg("copying a dir.~n Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,SrcUnderDst,DesDir]),
+    error_logger:info_msg("copying a dir.~n Src: ~p ,Res: ~p ,Des : ~p~n",[Fullsrc,FileName,ParentDir]),
     %% 1 
     ParentFileID = meta_db:get_id(Fullsrc),
     ResList = meta_db:get_direct_sub_files(ParentFileID),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}
     %% 2 acl & collision
-    case meta_db:select_all_from_filemeta_byName(SrcUnderDst) of
+    case meta_db:select_all_from_filemeta_byName(FileName) of
         []->
             DirID = lib_uuid:gen(),
             %%TODO: if desdir deleted by someone while copying..
-            ParentID = meta_db:get_id(DesDir),
-            meta_db:add_new_dir(DirID,SrcUnderDst,ParentID),            
-            copy_file_crowd(ResList,SrcUnderDst),
+            ParentID = meta_db:get_id(ParentDir),
+            meta_db:add_new_dir(DirID,FileName,ParentID),            
+            copy_file_crowd(ResList,FileName),
             error_logger:info_msg("copy dir :~p finished~n",[Fullsrc]),
             ok;
         _Any->
             {error,"please Fix related code, Destination Dir exist."} %%  won't be here , if system running as we designed
     end.
 
+move_a_dir(Fullsrc,FileName,ParentDir,Opt) ->
+	error_logger:info_msg("[~p, ~p]:move: Fullsrc,SrcUnderDst,DesDir:~p, ~n", [?MODULE, ?LINE,{Fullsrc,FileName,ParentDir}]),
+    %% 1 
+    %% top dir , his parentid change,  %% all sub files only change name( file absolute path)    
+    [SrcFile] = meta_db:select_all_from_filemeta_byName(Fullsrc),        
+        
+               
+    %% 2 acl & collision
+    case meta_db:select_all_from_filemeta_byName(FileName) of
+        []->
+            case Opt of
+                []->	%% top dir
+                    ParentID = meta_db:get_id(ParentDir),
+                    NewFileMeta = SrcFile#filemeta{                                                     
+                            name = FileName,                            
+                            parent = ParentID        
+                         },    
+                    meta_db:write_to_db(NewFileMeta);  %% top dir name changed
+                subdir->	%% sub dir
+                    NewFileMeta = SrcFile#filemeta{                                                     
+                            name = FileName      
+                         },    
+                    meta_db:write_to_db(NewFileMeta);  %%
+                Any->
+                    {error,"..."}
+            end,                    
+            ResList = meta_db:get_direct_sub_files(SrcFile#filemeta.id),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}            
+            move_file_crowd(ResList,FileName),
+            error_logger:info_msg("move dir :~p finished~n",[Fullsrc]),
+            ok;
+        _Any->
+            {error,"please Fix related code, Destination Dir exist."} %%  won't be here , if system running as we designed
+    end.
+
+
 copy_file_crowd([],DesDir)->
-    error_logger:info_msg("end of the list. Dst: ~p~n",DesDir),    
-    welcome;
+    error_logger:info_msg("copy: end of the list. Dst: ~p~n",DesDir),    
+    ok;
 copy_file_crowd(ResList,DesDir)->
     error_logger:info_msg("copying a list,."),    
     [HeadFile|T] = ResList,
@@ -222,7 +288,30 @@ copy_file_crowd(ResList,DesDir)->
         Any ->
             error_logger:info_msg("error,wtf....~p,~n",[Any])
     end,
-    copy_file_crowd(T,DesDir).      
+    copy_file_crowd(T,DesDir).
+
+
+move_file_crowd([],DesDir)->
+    error_logger:info_msg("move: end of the list. Dst: ~p~n",DesDir),    
+    ok;
+move_file_crowd(ResList,DesDir)->
+    error_logger:info_msg("moving a list of file"),
+    [HeadFile|T] = ResList,
+    {Tag,_FileID,FileName} = HeadFile,
+    case Tag of 
+        regular ->
+            ResFileName = filename:join(DesDir,filename:basename(FileName)),
+            move_a_file(FileName,ResFileName,DesDir,subdir); %% subdir, no parnet change ,
+        directory ->
+            ResFileName = filename:join(DesDir,filename:basename(FileName)),
+            move_a_dir(FileName,ResFileName,DesDir,subdir);  %% subdir, no parnet change ,
+        Any ->
+            error_logger:info_msg("error,wtf....~p,~n",[Any])
+    
+    end,
+    move_file_crowd(T,DesDir).
+    
+
 
 
 do_copy(FullSrc, FullDst, _UserName)->	
@@ -248,8 +337,8 @@ do_copy(FullSrc, FullDst, _UserName)->
             error_logger:info_msg("copy fail: "++Msg++"~n"),            
             {error,Msg}
     end.
-%% do_copy + do_delete.
-%% TODO: file modifytime?
+
+
 do_move(FullSrc, FullDst, UserName)->
 	error_logger:info_msg("[~p, ~p]: ~n,In Do_Move, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     error_logger:info_msg("In Do_Move, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
@@ -258,30 +347,25 @@ do_move(FullSrc, FullDst, UserName)->
     %% acl as copy.   if can write , just gen new file first, then think about delete
     case CheckResult of
         {ok,caseRegularToRegular,ParentDir} ->
-            copy_a_file(FullSrc,FullDst,ParentDir),
-            do_delete(FullSrc, UserName),
+            move_a_file(FullSrc,FullDst,ParentDir,[]),            
             {ok,single_file_move};
         
         {ok,caseRegularToDirectory,NewFileName}->
-            copy_a_file(FullSrc,NewFileName,FullDst),
-            do_delete(FullSrc, UserName),
+            move_a_file(FullSrc,NewFileName,FullDst,[]),            
             {ok,single_file_move};
         
         {ok,caseDirectoryToDirectory,NewDir}->
-            copy_a_dir(FullSrc,NewDir,FullDst),
-            do_delete(FullSrc,UserName),
+            move_a_dir(FullSrc,NewDir,FullDst,[]),            
             {ok,dir_move}; 
 
         {ok,caseDirectoryToNull,ParentDirName}->
-            copy_a_dir(FullSrc,FullDst,ParentDirName),
-            do_delete(FullSrc,UserName),
+            move_a_dir(FullSrc,FullDst,ParentDirName,[]),           
             {ok,dir_move}; 
 
         {error,Msg}->
             error_logger:info_msg("move fail: "++Msg++"~n"),            
             {error,Msg}             
-    end
-.
+    end.
 
 
 
@@ -368,7 +452,7 @@ check_op_type(SrcFullPathIn, DstFullPathIn) ->
         SrcTag =:= null				%%src don't exist,
           ->
             {error, "SRC dont exist"};
-        ParentTag =/= dirctory				%%des not available
+        ParentTag =/= directory				%%des not available
           ->
             {error,"DES illegal"};
         SubIndex > 0  				%% copy entire directory to sub directory
@@ -398,21 +482,26 @@ do_list(FilePathName,_UserName)->
 .
 
 do_mkdir(PathName, _UserName)->
-    error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
-    case meta_db:get_tag(PathName) of
-        null ->
-            ParentDirName = filename:dirname(PathName),
-            %%gen_server:call(?ACL_SERVER, {write, ParentDirName, _UserName})
-            case get_acl()  and (meta_db:get_tag(ParentDirName)=:=directory) of
-                true ->
-                    meta_db:add_new_dir(lib_uuid:gen(),PathName,meta_db:get_id(ParentDirName));
-                false ->
-                    {error, "sorry, you are not authorized to do this operation ; Parent not a dir"}
-            end;
-        _Any ->
-            {error, "file with this name exists already"}
-    end
-.
+    case string:right(PathName,1)=:="/" of
+        true->
+            {error,"illegal PathName . (end with a slash)"};
+        Other->
+            error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+            case meta_db:get_tag(PathName) of
+                null ->
+                    ParentDirName = filename:dirname(PathName),
+                    %%gen_server:call(?ACL_SERVER, {write, ParentDirName, _UserName})                    
+                    case get_acl()  and (meta_db:get_tag(ParentDirName)=:=directory) of
+                        true ->
+                            meta_db:add_new_dir(lib_uuid:gen(),filename:join(ParentDirName,filename:basename(PathName)),meta_db:get_id(ParentDirName));
+                        false ->
+                            {error, "sorry, you are not authorized to do this operation ; Parent not a dir"}
+                    end;
+                _Any ->
+                    {error, "file with this name exists already"}
+            end
+    end.
+
 
 do_chmod(FileName, _UserName, _UserType, _CtrlACL) ->
     error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),

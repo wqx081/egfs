@@ -109,12 +109,12 @@ reset_tables() ->
     mnesia:transaction(F).
 
 %add_orphan_item
-add_orphan_item(Chunkid,Chunklocation)->
-    I = #orphanchunk{chunkid=Chunkid,chunklocation=Chunklocation},
-    F = fun() ->
-		mnesia:write(I)
-	end,
- 	mnesia:transaction(F).
+%% add_orphan_item(Chunkid,Chunklocation)->
+%%     I = #orphanchunk{chunkid=Chunkid,chunklocation=Chunklocation},
+%%     F = fun() ->
+%% 		mnesia:write(I)
+%% 	end,
+%%  	mnesia:transaction(F).
 
 %% write a record 
 %% 
@@ -150,17 +150,17 @@ delete_from_db(X)->
         end,
     mnesia:transaction(F).
   
-delete_from_db(listrecord,[X|T])->
-    delete_from_db(X),
-    delete_from_db(listrecord,T);
-delete_from_db(listrecord,[])->
-	done.
-
-delete_object_from_db(listrecord,[X|T])->
-    delete_object_from_db(X),
-    delete_object_from_db(listrecord,T);
-delete_object_from_db(listrecord,[])->
-	done.
+%% delete_from_db(listrecord,[X|T])->
+%%     delete_from_db(X),
+%%     delete_from_db(listrecord,T);
+%% delete_from_db(listrecord,[])->
+%% 	done.
+%% 
+%% delete_object_from_db(listrecord,[X|T])->
+%%     delete_object_from_db(X),
+%%     delete_object_from_db(listrecord,T);
+%% delete_object_from_db(listrecord,[])->
+%% 	done.
 
 
 delete_hostinfo_item(HostName) ->
