@@ -399,7 +399,7 @@ append_data(FileContext, Bytes) ->
 	ReadLength	= lists:min([Number, WantLength]),
 	case Start+ReadLength =:= ?CHUNKSIZE of
 		true ->
-			error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, Bytes]),
+			%error_logger:info_msg("[~p, ~p]:D append ~p~n", [?MODULE, ?LINE, Bytes]),
 			{Right, Left} = split_binary(Bytes, ReadLength),
 			ok = lib_chan:rpc(DataWorkerPid,{append, Start, Right}),
 			% close the data worker and reset the FileContext
@@ -420,7 +420,7 @@ append_data(FileContext, Bytes) ->
 			% write the left data
 			append_data(NewFC, Left);
 		false ->
-			error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Bytes]),
+			%error_logger:info_msg("[~p, ~p]:E append ~p~n", [?MODULE, ?LINE, Bytes]),
 			ok = lib_chan:rpc(DataWorkerPid,{append, Start, Bytes}),
 			NewFC= FileContext#filecontext{	offset = Offset + ReadLength,
 											filesize=Offset + ReadLength},
