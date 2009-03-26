@@ -63,6 +63,8 @@ delete(FileName)->
     case gen_server:call(?CLIENT_SERVER, {delete, CFName, UserName}) of
 	{ok, _} ->
 	    ok;
+	{error, enoent} ->
+		ok;
 	{error, Reason} ->
 	    {error, Reason}
     end.
@@ -120,7 +122,7 @@ mkdir(Dir) ->
     UserName = any,
     CDir = rm_slash(Dir),
     case gen_server:call(?CLIENT_SERVER, {mkdir, CDir, UserName}) of
-	{atomic, ok} ->
+	{ok, _} ->
 	    ok;
 	{error, _} ->
 	    {error, enoent}
@@ -162,7 +164,7 @@ pread(WorkerPid, Offset, Size) ->
 	{ok, Data} ->
 	    loop_read([Data | []], WorkerPid, Offset + Len, Size - Len);
 	eof ->
-	    eof;
+		eof;
 	{error, Reason} ->
 	    {error, Reason}
     end.
