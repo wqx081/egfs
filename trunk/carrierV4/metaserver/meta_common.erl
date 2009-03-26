@@ -71,55 +71,54 @@ do_delete(FilePathName, _UserName)->
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
-    DeleteFile = ((meta_db:get_tag(FilePathName)=:=regular) and get_acl()),
-    error_logger:info_msg("DeleteDir and DeleteFile_~p,~p,~n",[DeleteDir,DeleteFile]),
+    DeleteFile = ((meta_db:get_tag(FilePathName)=:=regular) and get_acl()),    
     if
         DeleteDir->            
             ResList = meta_db:get_all_sub_files_byName(FilePathName),    %%ResList = {}{}...{}{}    , {} = {tag,id,name}
             %% acl.            
             case call_meta_delete(list,ResList) of
-                {ok,_}->
+                ok->
                     meta_db:do_delete_filemeta_byID(meta_db:get_id(FilePathName)),
                     ok;
-                {error,_}->
+                {error,Reason}->
                     error_logger:info_msg(",sub file delete fail"),
-                    {error,ebusy}
-            		
+                    {error,Reason}
             end;
         DeleteFile->
             FileID = meta_db:get_id(FilePathName),
             case check_process_byID(FileID) of
-                {ok,_}->
+                ok->
                      meta_db:do_delete_filemeta_byID(FileID),
                      ok;
-                {error,_}->
-                    {error,ebusy}
+                {error,Reason}->
+                    {error,Reason}
             end;
         true ->
             error_logger:info_msg("file does not exist or you are not authorized to do this operation"),            
-            {error,ebusy}
+            {error,enoent}
     end
 .
 
 call_meta_delete(list,FileIDList) ->
     case call_meta_check(list,FileIDList) of
-        {ok,_} ->
+        ok ->
             call_meta_do_delete(list,FileIDList);
         {error,FileID} ->
-            {error, "sorry, someone is using this file, unable to delete it now .~n FileID: ~p~n",[FileID]}
+            error_logger:info_msg("sorry, someone is using this file, unable to delete it now .~n FileID: ~p~n",[FileID]),
+            {error,eacces}
     end.
 
 
 %% really, do_delete,
 call_meta_do_delete(list,[]) ->    
-    {ok,"success"};
+    ok;
 call_meta_do_delete(list,FileList)->   %% return ok || ThatFileID    
-    [FileHead|T] = FileList,
-    case call_meta_do_delete(FileHead) of
+    [FileHead|T] = FileList,    
+    case call_meta_do_delete(FileHead) of        
         {ok,_}->
             call_meta_do_delete(list,T);
-        {error,_}->
-            {error,FileHead}
+        {aborted,Reason}->
+            {error,Reason}
     end.
 call_meta_do_delete(File)->
     error_logger:info_msg("deleting file: ~p~n",[File]),
@@ -331,6 +330,9 @@ do_copy(FullSrc, FullDst, _UserName)->
         
         {ok,caseRegularToDirectory,NewFileName}->
             copy_a_file(FullSrc,NewFileName,FullDst);
+         
+        {ok,caseRegularToNull,ParentDir} ->
+            copy_a_file(FullSrc,FullDst,ParentDir);
         
         {ok,caseDirectoryToDirectory,NewDir}->
             copy_a_dir(FullSrc,NewDir,FullDst);
@@ -357,6 +359,10 @@ do_move(FullSrc, FullDst, UserName)->
         
         {ok,caseRegularToDirectory,NewFileName}->
             move_a_file(FullSrc,NewFileName,FullDst,[]),            
+            {ok,single_file_move};
+        
+        {ok,caseRegularToNull,ParentDir} ->
+            move_a_file(FullSrc,FullDst,ParentDir),
             {ok,single_file_move};
         
         {ok,caseDirectoryToDirectory,NewDir}->
@@ -401,7 +407,8 @@ check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
                             end
                     end;                    
                 null->
-                    {error,"dst don't exist, illegal"}                    
+                    ParentDir = filename:dirname(DstFullPath),
+					{ok,caseRegularToNull,ParentDir}
             end;        
         directory->		%% dir to xxx
             case DesTag of
@@ -451,15 +458,13 @@ check_op_type(SrcFullPathIn, DstFullPathIn) ->
     SubIndex = string:rstr(DstFullPath,SrcFullPath++"/"),		%% if SubIndex >0 ,  recursive happen								 
     %% TODO: copy dir /hxm to dir /hxm/copy is not allowed , but /hxm -> /hxmOtherdir is allowed,
     
-
-    
     if
         SrcTag =:= null				%%src don't exist,
           ->
             {error, "SRC dont exist"};
         ParentTag =/= directory				%%des not available
           ->
-            {error,"DES illegal"};
+            {error,"DES illegal (parent not a dir)"};
         SubIndex > 0  				%% copy entire directory to sub directory
           ->
             {error,"des is subdirectory of src"};

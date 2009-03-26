@@ -149,6 +149,7 @@ delete_from_db(X)->
                 mnesia:delete(X)
         end,
     mnesia:transaction(F).
+
   
 %% delete_from_db(listrecord,[X|T])->
 %%     delete_from_db(X),
@@ -379,8 +380,8 @@ do_register_dataserver(HostName,ChunkList)->
 do_delete_filemeta_byID(FileID)->
     LOG = #metalog{logtime = calendar:local_time(),logfunc="do_delete_filemeta/1",logarg=[FileID]},
     logF(LOG),
-    delete_from_db({filemeta,FileID}),				%return {atomic,ok} . always
-    {ok,"File deleted"}.
+    delete_from_db({filemeta,FileID}).				%return {atomic,ok|Val.} .  | {aborted, Reason}
+    
     
 
 % delete orphanchunk record in orphanchunk table by host
