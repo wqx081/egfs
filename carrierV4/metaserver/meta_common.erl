@@ -35,7 +35,7 @@ do_open(FilePathName, Mode, UserName) ->
 %%                     io:format("call_meta_open:"),
                     case Mode of 
                         write ->
-                            {error,"please use mode append"};
+                            {error,msg,"please use mode append"};
                         read ->
                             do_read_open(RealPath,UserName);
                         append ->
@@ -79,20 +79,25 @@ do_delete(FilePathName, _UserName)->
             %% acl.            
             case call_meta_delete(list,ResList) of
                 {ok,_}->
-                    meta_db:do_delete_filemeta_byID(meta_db:get_id(FilePathName));
+                    meta_db:do_delete_filemeta_byID(meta_db:get_id(FilePathName)),
+                    ok;
                 {error,_}->
-                    {error,"sub file delete fail"}
+                    error_logger:info_msg(",sub file delete fail"),
+                    {error,ebusy}
+            		
             end;
         DeleteFile->
             FileID = meta_db:get_id(FilePathName),
             case check_process_byID(FileID) of
                 {ok,_}->
-                     meta_db:do_delete_filemeta_byID(FileID);
+                     meta_db:do_delete_filemeta_byID(FileID),
+                     ok;
                 {error,_}->
-                    {error,FilePathName}
+                    {error,ebusy}
             end;
         true ->
-            {error, "file does not exist or you are not authorized to do this operation"}
+            error_logger:info_msg("file does not exist or you are not authorized to do this operation"),            
+            {error,ebusy}
     end
 .
 
