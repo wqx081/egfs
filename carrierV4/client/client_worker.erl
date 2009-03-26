@@ -65,7 +65,7 @@ handle_call({write, Bytes}, _From, FileContext) ->
 			{ok, NewFileContext} = append_data(FileContext, Bytes),	
 			{reply, ok, NewFileContext};
 		_Any ->
-			{reply, {error, "write open mode error"}, FileContext}
+			{reply, {error, eacces}, FileContext}
 	end;
 
 handle_call({append, Bytes}, _From, FileContext) ->
@@ -75,7 +75,7 @@ handle_call({append, Bytes}, _From, FileContext) ->
 			{ok, NewFileContext} = append_data(FileContext, Bytes),	
 			{reply, ok, NewFileContext};
 		_Any ->
-			{reply, {error, "append open mode error"}, FileContext}
+			{reply, {error,  eacces}, FileContext}
 	end;
 
 handle_call({read, Number}, _From, FileContext) ->
@@ -189,7 +189,7 @@ handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=app
 	
 handle_call({close}, _From, FileContext) when FileContext#filecontext.mode=:=read ->
 	%error_logger:info_msg("[~p, ~p]: close ~p ~n", [?MODULE, ?LINE, FileContext#filecontext.filename]),	
-	#filecontext{	metaworkerpid= MetaWorkerPid,
+	#filecontext{	metaworkerpid= _MetaWorkerPid,
 					dataworkerpid= DataWorkerPid} = FileContext,
 	case DataWorkerPid =:= undefined of
 		true ->
@@ -297,7 +297,7 @@ do_position(FileContext, Location) ->
 					{ok, NewFC}
 			end;
     	false ->
-			{error, "set wrong location"}
+			{error,  einval}
 	end.
 
 do_read(FileContext, Number) ->
@@ -310,7 +310,7 @@ do_read(FileContext, Number) ->
 		    		read_data(FileContext, Number)
 			end;			
 		_Any ->
-			{error, "read open mode error"}
+			{error,  eaccess}
 	end.
 	
 read_data(FileContext, Number) ->
