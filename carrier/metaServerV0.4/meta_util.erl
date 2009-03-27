@@ -51,7 +51,7 @@ idToAtom(Bin,Mode)->
         _ ->
             ModePreFix = $?    
     end,    
-    ModeList = lists:append(ModePreFix,List),
+    ModeList = lists:append([ModePreFix],List),
     list_to_atom(ModeList).
 
 generate_processname(Filename,Mode)->

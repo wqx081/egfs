@@ -64,7 +64,9 @@
 
 %% config record
 %% procname={RegName, Node()}; host=IP; health={TimeStamp, HealthDegree}
--record(hostinfo,{procname,host,freespace,totalspace,health}).
+
+-record(hostinfo,{hostname, freespace, totalspace, status}).
+
 -record(config,{
     access = [{tcp,{{127,0,0,1},51206,512,128}}],
     datafile = "xbtdata",

@@ -2,16 +2,22 @@
 %% Created: 2008-12-22
 %% Description: TODO: Add description to util
 -module(util).
--compile(export_all).
+
+
+
 
 %%
 %% Include files
 %%
-
+-compile(export_all).
 %%
 %% Exported Functions
 %%
--export([for/3]).
+%%-export([for/3]).
+
+
+test()->
+    fun acl:start/0.
 
 %%
 %% API Functions

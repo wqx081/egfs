@@ -12,17 +12,28 @@ compile: ${MODS:%=%.beam} subdirs
 ## run an application from the makefile
 
 ms:compile
-	cd metaserver; make ms
+	cd metaserver; make ms 
 
 ds:compile
-	cd dataserver; make ds
+	cd dataserver; make ds 
 
 cl1:compile
-	cd client; make cl1
+	cd client; make cl1 
 cl2:compile
-	cd client; make cl2
+	cd client; make cl2 
 cl3:compile
-	cd client; make cl3
+	cd client; make cl3 
+
+#gnibre use in MinWG
+wms:compile
+	cd metaserver; make wms &
+
+wds:compile
+	cd dataserver; make wds &
+
+wcl:compile
+	cd client;	make wcl &
+
 
 # the subdirs target compiles any code in 
 # sub-directories

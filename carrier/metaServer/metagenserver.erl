@@ -70,7 +70,7 @@ handle_call({registerchunk, FileID, ChunkID, ChunkUsedSize, NodeList},
     Reply = do_register_chunk(FileID, ChunkID, ChunkUsedSize, NodeList),
     {reply, Reply, State};
 
-handle_call({locatechunk, FileID, ChunkIndex}, _From, State) ->
+handle_call({locatechunk, FileID, ChunkIndex}, {From,_}, State) ->
     io:format("inside handle_call_locatechunk,FileID:~p,ChunkIndex:~p~n",[FileID,ChunkIndex]),
     Reply = do_get_chunk(FileID, ChunkIndex),
     {reply, Reply, State};
