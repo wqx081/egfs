@@ -127,7 +127,7 @@ call_meta_do_delete(File)->
 
 %% checking.
 call_meta_check(list,[]) ->    
-    {ok,"no file conflict"};
+    ok;
 
 call_meta_check(list,File)->   %% return ok || ThatFileID    
     [HFile|T] = File,
