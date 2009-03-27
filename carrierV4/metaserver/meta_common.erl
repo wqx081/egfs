@@ -204,8 +204,8 @@ move_a_file(Fullsrc,FileName,ParentDir,Opt)->
                             name = FileName
                          },
             meta_db:write_to_db(NewFileMeta);
-        Any->
-            {error,"..."}
+        _Any->
+            {error,"unexpected opt"}
     end.
     
 
@@ -263,8 +263,8 @@ move_a_dir(Fullsrc,FileName,ParentDir,Opt) ->
                             name = FileName      
                          },    
                     meta_db:write_to_db(NewFileMeta);  %%
-                Any->
-                    {error,"..."}
+                _Any->
+                    error_logger:info_msg("unexpected option")
             end,                    
             ResList = meta_db:get_direct_sub_files(SrcFile#filemeta.id),		%%ResList = {}{}...{}{}    , {} = {tag,id,name}            
             move_file_crowd(ResList,FileName),
@@ -346,7 +346,7 @@ do_copy(FullSrc, FullDst, _UserName)->
     end.
 
 
-do_move(FullSrc, FullDst, UserName)->
+do_move(FullSrc, FullDst, _UserName)->
 	error_logger:info_msg("[~p, ~p]: ~n,In Do_Move, src: ~p, dst: ~p~n",[?MODULE, ?LINE,FullSrc, FullDst]),
     error_logger:info_msg("In Do_Move, src: ~p, dst: ~p~n",[FullSrc, FullDst]),
     CheckResult = check_op_type(FullSrc, FullDst),
@@ -362,7 +362,7 @@ do_move(FullSrc, FullDst, UserName)->
             {ok,single_file_move};
         
         {ok,caseRegularToNull,ParentDir} ->
-            move_a_file(FullSrc,FullDst,ParentDir),
+            move_a_file(FullSrc,FullDst,ParentDir,[]),
             {ok,single_file_move};
         
         {ok,caseDirectoryToDirectory,NewDir}->
@@ -495,7 +495,7 @@ do_mkdir(PathName, _UserName)->
     case string:right(PathName,1)=:="/" of
         true->
             {error,"illegal PathName . (end with a slash)"};
-        Other->
+        _Other->
             error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
             case meta_db:get_tag(PathName) of
                 null ->
