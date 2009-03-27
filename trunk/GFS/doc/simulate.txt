@@ -13,3 +13,16 @@ CHUNK_RECORD_SIZE = 96 bit = 12 Bytes
 
 implement:
 
+ms*1
+cs*CHUNKSERVER_NUMBER 
+
+traditional:  chunkserver*n report his chunkIDList to metaserver
+bloom_filter_flow: metaserver send bloom_filter bitmap to all dataserver one by one
+
+
+v0:
+timer:sleep(1),sleep for 1 millisecond, erlang take about 16millisecond before it returns, fail
+
+v1:
+two nodes, counter.
+ 

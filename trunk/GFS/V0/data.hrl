@@ -16,7 +16,7 @@
 -define(CHUNK_CAPACITY,64).   %% MBytes  ,math:pow(2,6)
 -define(TOTAL_CHUNK_RECORD_NUMBER,?TOTAL_DATA_SIZE/?CHUNK_CAPACITY). %% 2^25 =  33554432
 -define(CHUNKSERVER_CAPACITY,1048576).   %% MBytes ,math:pow(2,20)
--define(CHUNKSERVER_NUMBER,2048).  %% math:pow(2,11)
+-define(CHUNKSERVER_NUMBER,2048).  %% math:pow(2,11) = 2048.0
 -define(CHUNK_RECORD_SIZE,96). %%Bits
 
 
@@ -27,3 +27,6 @@
 
 %% bloom filter
 -define(BLOOM_RECORD_SIZE,9.6).
+
+
+%%calculate

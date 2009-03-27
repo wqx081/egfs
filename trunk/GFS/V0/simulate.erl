@@ -18,11 +18,24 @@
 %%
 
 run()->
-%%     io:format("current time:~p.~n",[now()]),
+    
+    B001 = lib_bloom:new(?TOTAL_CHUNK_RECORD_NUMBER,0.01),
+    Bloom_bits =element(2,B001),
+    TransferTime = Bloom_bits/?BANDWIDTH/1024/1024*1000,	%%millisecond
+    RoundTransferTime = round(TransferTime),
+    io:format("transfer time:~p.~n",[RoundTransferTime]),
+    
+    %%
+    
     {_,BS,BM} = now(),
-    _Res = chunk_server(2048),    
-%%     io:format("~p~n",[Res]),
-%%     timer:sleep(1000),    
+    self()!{BS,BM},
+    chunk_server(1,RoundTransferTime,self()),     
+    receive 
+        {job_ok,ID}->
+            io:format("last chunk ~p ok. job finish.~n",[ID])
+    after 50000 ->
+            io:format("time out~n")    
+    end,
     {_,ES,EM} = now(),
     io:format("---------------------------------------------~n"),
     io:format("job begin time, second:~p , microsecond ~p ~n",[BS,BM]),
@@ -41,27 +54,35 @@ run()->
 %%
 
 
-
-
 %%chunkserver transfer data to next chunk after latency of ?LATENCY , 
 %% @spec chunck_server(ID) -> ()  when  1<= ID < 2048, calc and start next node.
 
-chunk_server(ID) when ID < ?CHUNKSERVER_NUMBER ->
-    timer:apply_after(?LATENCY,simulate,chunk_server,[ID+1]),
-%%     Time = ?TOTAL_CHUNK_RECORD_NUMBER*?BLOOM_RECORD_SIZE/?BANDWIDTH/1000000,
-%%     timer:sleep(round(Time-?LATENCY)),
-    {server_ok,ID};
+chunk_server(ID,T,P) when ID < ?CHUNKSERVER_NUMBER ->
+    timer:sleep(1), %%data receive latency.    
+    _Pid = spawn(simulate,data_process,[ID,T]),
+%%     chunk_server(ID+1,T,P);
+     _Pid2 = spawn(simulate,chunk_server,[ID+1,T,P]);    
 
-chunk_server(ID) ->
-    Time = ?TOTAL_CHUNK_RECORD_NUMBER*?BLOOM_RECORD_SIZE/?BANDWIDTH/1000000*1000,    
-%%     io:format("Time =  ~p~n",[Time]),
-    timer:sleep(round(Time)),
-%%     io:format("current time:~p.~n",[now()]),
-    {job_ok,ID}.
+chunk_server(ID,T,P) ->
+    timer:sleep(?LATENCY), %%data receive latency.    
+    data_process(ID,T),
+%%     receive 
+%%         {BS,BM}->
+%%             io:format("last chunk ~p ok. job finish.~n",[ID]);
+%%         Any ->
+%%             io:format("a?  ~p.~n",[Any])    
+%%     after 0 ->
+%%             io:format("time out~n")    
+%%     end,
+    
+    P!{job_ok,ID}.
                    
 
-do_transfer(ID,TimeNeed) ->
-    timer:sleep(TimeNeed),
+data_process(ID,_TimeNeed) ->
+%%	data_transfer,     
+%%     timer:sleep(TimeNeed),    
+%%	calculate
+%%  bloom_filter_check    
     {job,ID,ok}.
     
     
@@ -70,7 +91,21 @@ do_transfer(ID,TimeNeed) ->
 
 
 %%test
+
 test()->
+  	
+    statistics(wall_clock),    
+    
+    for(1,1000,fun(I)->one_milisecond_function(I) end),
+    
+    {_,Time} = statistics(wall_clock),    
+    io:format("time,we want 1000: ~p.~n",[Time]).
+    
+%%     timer:sleep(1),%%15millisecond,
+
+    
+
+test3()->
     io:format("current time:~p~n",[now()]),
     timer:apply_after(5000, simulate, test2, []),
 	timer:sleep(2000),
@@ -82,4 +117,9 @@ test2()->
     io:format("current time:~p~n",[now()]).
     
 
+for(Max, Max, F) -> [F(Max)];
+for(I, Max, F)   -> [F(I)|for(I+1, Max, F)].
 
+one_milisecond_function(N)->
+    for(1,2900,fun(I)->I*I end).
+    

@@ -355,6 +355,8 @@ call_meta_new() ->
     {ok, FileID}.
 
 
+
+
 call_meta_delete(FileID)->
     do_delete_filemeta(FileID).
 
@@ -365,6 +367,18 @@ call_meta_copy(_FileID) ->
     
     {ok, <<1:64>>}
 .
+
+call_meta_check(list,[]) ->
+    {ok,"no file conflict"};
+call_meta_check(list,FileIDList)->   %% return ok || ThatFileID
+    io:format("aaa,~p~n",[FileIDList]),
+    [FileID|T] = FileIDList,
+    case call_meta_check(FileID) of
+        {ok,_}->
+            call_meta_check(list,T);
+        {error,_}->
+            {error,FileID}
+    end.
 
 call_meta_check(FileID)->
     WA = meta_util:idToAtom(FileID,w),

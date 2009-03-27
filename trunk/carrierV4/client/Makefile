@@ -7,6 +7,7 @@
 HOSTNAME = $(shell hostname)
 
 ERL = erl -boot start_sasl -config system -setcookie carrier 
+WERL = werl -boot start_sasl -config system -setcookie carrier
 
 all: compile
 
@@ -23,6 +24,11 @@ cl2:compile
 
 cl3:compile
 	${ERL} -pa ../lib -sname  ${HOSTNAME}client3 -s client_app start -s crypto start
+	
+wcl:compile
+	${WERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start -s crypto start
+	
+	
 
 # remove all the code
 

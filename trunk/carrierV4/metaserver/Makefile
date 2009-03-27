@@ -7,6 +7,7 @@
 HOSTNAME = $(shell hostname)
 
 ERL = erl -boot start_sasl -config system -setcookie carrier 
+WERL = erl -boot start_sasl -config system -setcookie carrier
 
 all: compile
 
@@ -17,6 +18,9 @@ compile: ${MODS:%=%.beam}
 
 ms:compile
 	${ERL} -pa ../lib -sname  ${HOSTNAME}ms -s app_meta_server start -s crypto start
+	
+wms:compile
+	${WERL} -pa ../lib -sname  ${HOSTNAME}ms -s app_meta_server start -s crypto start
 	
 # remove all the code
 
