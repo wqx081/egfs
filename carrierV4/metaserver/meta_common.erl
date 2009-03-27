@@ -66,8 +66,9 @@ do_open(FilePathName, Mode, UserName) ->
     end
 .
 
-do_delete(FilePathName, _UserName)->
-    error_logger:info_msg("[~p, ~p]: do_delete ~p~n", [?MODULE, ?LINE,{FilePathName}]),
+do_delete(FilePathNameIn, _UserName)->
+    error_logger:info_msg("[~p, ~p]: do_delete ~p~n", [?MODULE, ?LINE,{FilePathNameIn}]),
+    FilePathName = lib_common:get_rid_of_last_slash(FilePathNameIn),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
     DeleteDir = ((meta_db:get_tag(FilePathName)=:=directory) and get_acl()),
     %%gen_server:call(?ACL_SERVER, {delete_folder, FilePathName, _UserName})
@@ -181,7 +182,7 @@ copy_a_file(Fullsrc,FileName,ParentDir)->
 %%                          },
 %%	check before write.     
     case check_process_byName(FileName) of
-        {ok,_}->
+        ok->
             meta_db:write_to_db(NewFileMeta),            
             {ok,"copy finished"};
         {error,Msg} ->
@@ -429,7 +430,7 @@ check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag,ParentDir) ->
                     case meta_db:select_all_from_filemeta_byName(Newdir) of
                         []->
                             {ok,caseDirectoryToDirectory,Newdir};
-                        Exist->
+                        _Exist->
                             {error,"target directory Exist"}
                     end;                
                 null->			%% dont keep base name of src directory file:       src /a/b   dst /c/notexist  res: create dir notexist , put files under /a/b to /c/notexist
@@ -487,9 +488,12 @@ check_op_type(SrcFullPathIn, DstFullPathIn) ->
     end.
 
 
-do_list(FilePathName,_UserName)->
-    error_logger:info_msg("[~p, ~p]: do_list~p~n", [?MODULE, ?LINE,{FilePathName}]),
+do_list(FilePathNameIn,_UserName)->
+    error_logger:info_msg("[~p, ~p]: do_list~p~n", [?MODULE, ?LINE,{FilePathNameIn}]),
     %    gen_server:call(?ACL_SERVER, {read, filename:dirname(FilePathName), _UserName})
+    
+    FilePathName = lib_common:get_rid_of_last_slash(FilePathNameIn),
+    
     case get_acl() and (meta_db:get_tag(FilePathName)=:=directory) of
         true ->
             ParentDirID = meta_db:get_id(FilePathName),
@@ -565,7 +569,7 @@ check_process_byName(FileName) ->
         undefined->
             case whereis(RA) of
                 undefined->
-                    {ok,FileName};
+                    ok;
                 _->
                     {error,"someone reading this file."}
             end;
