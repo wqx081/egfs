@@ -463,8 +463,7 @@ add_new_dir(ID,DirName,ParentID) ->
                 mnesia:write(Row)
         end,
     mnesia:transaction(F),
-    {ok,"created a new Dir"}
-.
+    ok.
 
 
 
