@@ -133,13 +133,13 @@ call_meta_check(list,[]) ->
 
 call_meta_check(list,File)->   %% return ok || ThatFileID    
     [HFile|T] = File,
-    {_Tag,FileID,_FileName} = HFile,    
+    {_Tag,_FileID,FileName} = HFile,    
     error_logger:info_msg("call_meta_CHAECK,CHECK File: ,~p~n",[HFile]),
-    case check_process_byID(FileID) of
-        {ok,_}->
+    case check_process_byName(FileName) of
+        ok->
             call_meta_check(list,T);
         {error,_}->
-            {error,FileID}
+            {error,FileName}
     end.
 
 
@@ -563,13 +563,19 @@ check_process_byID(FileID)->
 check_process_byName(FileName) ->
     WA = lib_common:generate_processname(FileName,write),
     RA = lib_common:generate_processname(FileName,read),
+    AA = lib_common:generate_processname(FileName,append),
 %%     error_logger:info_msg("Write processname: ~p~n",[WA]),
 %%     error_logger:info_msg("Read processname: ~p~n",[RA]),
     case whereis(WA) of
         undefined->
             case whereis(RA) of
                 undefined->
-                    ok;
+                    case whereis(AA) of
+                        undefined->
+                            ok;
+                        _->
+                            {error,"someone appending this file."}
+                    end;     
                 _->
                     {error,"someone reading this file."}
             end;
