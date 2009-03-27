@@ -115,7 +115,7 @@ call_meta_do_delete(list,[]) ->
 call_meta_do_delete(list,FileList)->   %% return ok || ThatFileID    
     [FileHead|T] = FileList,    
     case call_meta_do_delete(FileHead) of        
-        {ok,_}->
+        {atomic,ok}->
             call_meta_do_delete(list,T);
         {aborted,Reason}->
             {error,Reason}
@@ -123,7 +123,7 @@ call_meta_do_delete(list,FileList)->   %% return ok || ThatFileID
 call_meta_do_delete(File)->
     error_logger:info_msg("deleting file: ~p~n",[File]),
     {_Tag,FileID,_FileName} = File, 
-    meta_db:do_delete_filemeta_byID(FileID).
+    meta_db:do_delete_filemeta_byID(FileID).   %% %return {atomic,ok|Val.} .  | {aborted, Reason}
 
 %% checking.
 call_meta_check(list,[]) ->    
@@ -327,18 +327,23 @@ do_copy(FullSrc, FullDst, _UserName)->
     error_logger:info_msg("check op type res: ~p~n",[CheckResult]),
     case CheckResult of
         {ok,caseRegularToRegular,ParentDir} ->
+            error_logger:info_msg("[~p, ~p]: op case : caseRegularToRegular ",[?MODULE,?LINE]),
             copy_a_file(FullSrc,FullDst,ParentDir);
         
         {ok,caseRegularToDirectory,NewFileName}->
+            error_logger:info_msg("[~p, ~p]: op case :  caseRegularToDirectory",[?MODULE,?LINE]),
             copy_a_file(FullSrc,NewFileName,FullDst);
          
         {ok,caseRegularToNull,ParentDir} ->
+            error_logger:info_msg("[~p, ~p]: op case :  caseRegularToNull",[?MODULE,?LINE]),
             copy_a_file(FullSrc,FullDst,ParentDir);
         
         {ok,caseDirectoryToDirectory,NewDir}->
+            error_logger:info_msg("[~p, ~p]: op case :  caseDirectoryToDirectory",[?MODULE,?LINE]),
             copy_a_dir(FullSrc,NewDir,FullDst);
         
         {ok,caseDirectoryToNull,ParentDirName}->
+            error_logger:info_msg("[~p, ~p]: op case :  caseDirectoryToNull",[?MODULE,?LINE]),
             copy_a_dir(FullSrc,FullDst,ParentDirName);
         
         {error,Msg}->
@@ -355,33 +360,39 @@ do_move(FullSrc, FullDst, _UserName)->
     %% acl as copy.   if can write , just gen new file first, then think about delete
     case CheckResult of
         {ok,caseRegularToRegular,ParentDir} ->
+            error_logger:info_msg("[~p, ~p]: op case :  caseRegularToRegular",[?MODULE,?LINE]),
             move_a_file(FullSrc,FullDst,ParentDir,[]),            
             {ok,single_file_move};
         
         {ok,caseRegularToDirectory,NewFileName}->
+            error_logger:info_msg("[~p, ~p]: op case :  caseRegularToDirectory",[?MODULE,?LINE]),
             move_a_file(FullSrc,NewFileName,FullDst,[]),            
             {ok,single_file_move};
         
         {ok,caseRegularToNull,ParentDir} ->
+            error_logger:info_msg("[~p, ~p]: op case :  caseRegularToNull",[?MODULE,?LINE]),
             move_a_file(FullSrc,FullDst,ParentDir,[]),
             {ok,single_file_move};
         
         {ok,caseDirectoryToDirectory,NewDir}->
+            error_logger:info_msg("[~p, ~p]: op case :  caseDirectoryToDirectory",[?MODULE,?LINE]),
             move_a_dir(FullSrc,NewDir,FullDst,[]),            
             {ok,dir_move}; 
 
         {ok,caseDirectoryToNull,ParentDirName}->
+            error_logger:info_msg("[~p, ~p]: op case : caseDirectoryToNull ",[?MODULE,?LINE]),
             move_a_dir(FullSrc,FullDst,ParentDirName,[]),           
             {ok,dir_move}; 
 
         {error,Msg}->
+            error_logger:info_msg("[~p, ~p]: op case :  ",[?MODULE,?LINE]),
             error_logger:info_msg("move fail: "++Msg++"~n"),            
             {error,Msg}             
     end.
 
 
 
-check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
+check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag,ParentDir) ->
 	case SrcTag of
         regular->		%% file to xxx
             case DesTag of
@@ -389,8 +400,7 @@ check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
                     %%TODO : we shall remind user of this case , maybe some warning before delete
                     %% 1: delete old one
                     do_delete(DstFullPath,[]),
-                    %% 2: write new one
-                    ParentDir = filename:dirname(DstFullPath),
+                    %% 2: write new one                    
                     {ok,caseRegularToRegular,ParentDir};                
                 directory->
                     NewFileName = filename:join(DstFullPath,filename:basename(SrcFullPath)),
@@ -407,8 +417,7 @@ check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
                                     {error,"delete destination file fail , copy/move suspend"}
                             end
                     end;                    
-                null->
-                    ParentDir = filename:dirname(DstFullPath),
+                null->                    
 					{ok,caseRegularToNull,ParentDir}
             end;        
         directory->		%% dir to xxx
@@ -421,16 +430,16 @@ check_op_type(SrcFullPath,SrcTag,DstFullPath,DesTag) ->
                         []->
                             {ok,caseDirectoryToDirectory,Newdir};
                         Exist->
-                            {error,"target directory Exist",Exist}
+                            {error,"target directory Exist"}
                     end;                
                 null->			%% dont keep base name of src directory file:       src /a/b   dst /c/notexist  res: create dir notexist , put files under /a/b to /c/notexist
-                    %%1  mkdir
-                    case do_mkdir(DstFullPath,[]) of
-                        {ok,_}->
-                            %%2 get parent dir
-                            ParentDirName = filename:dirname(DstFullPath),		%%dst = / , parent =/
-                            {ok,caseDirectoryToNull,ParentDirName};
-                        {error,_}->
+                    
+                    case meta_db:get_tag(DstFullPath) of
+                        %% dst exist?
+                        null ->
+                            %TODO: acl?
+                            {ok,caseDirectoryToNull,ParentDir};                                
+                        _Any ->
                             {error,"create target dir fail, copy/move suspend "}
                     end
             end
@@ -474,7 +483,7 @@ check_op_type(SrcFullPathIn, DstFullPathIn) ->
 			{error,"src = dst"};
         true
           ->
-            check_op_type(SrcFullPath,SrcTag,DstFullPath,DstTag)
+            check_op_type(SrcFullPath,SrcTag,DstFullPath,DstTag,ParentDir)
     end.
 
 
@@ -497,7 +506,7 @@ do_mkdir(PathName, _UserName)->
         true->
             {error,"illegal PathName . (end with a slash)"};
         _Other->
-            error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),
+            error_logger:info_msg("[~p, ~p]: do_mkdir ~p~n", [?MODULE, ?LINE,{PathName}]),
             case meta_db:get_tag(PathName) of
                 null ->
                     ParentDirName = filename:dirname(PathName),
