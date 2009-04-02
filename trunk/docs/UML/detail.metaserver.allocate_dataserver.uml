@@ -1,0 +1,20 @@
+
+data_server->meta_hosts:gen_server:call({global, global_hostserver},allocate_dataserver)
+
+activate meta_hosts
+
+note over meta_hosts
+        meta_hosts is a gen_server,	it starts when meta_server was started,
+        this function make response to register reguest from dataserver,	
+end note  
+
+meta_hosts->meta_db : call meta_db:select_random_one_from_hostinfo()
+activate meta_db
+
+meta_db->meta_hosts: one random host item:SelectedHOst
+
+deactivate meta_db
+
+meta_hosts->data_server: {ok, SelectedHost}
+
+deactivate meta_hosts

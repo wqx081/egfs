@@ -1,0 +1,38 @@
+loop every 24hours
+
+
+meta_server->meta_monitor: call meta_monitor:check_replica(N) every 24hours
+
+note over meta_monitor
+%% meta_monitor:check_replica(N)
+%% check replica and notify dataserver to make replicas at the same time,if need 
+%% @spec check_replica(N)-> {ok,"MSG"} || {error,"MSG"}
+%% N-> number of replica needed ,(include himself)
+%% function process:
+%% 1 check chunkmapping table , check every item, 
+%% 2 if host number in field chuncklocations < N, notify dataserver
+%%   else , check next item
+end note  
+
+
+meta_monitor-->data_server: gen_server:cast(selected_host,{replica,chunkid,dstnode})
+activate data_server
+
+data_server->dstnode(another data_server): connect dstnode(another data_server) , make replica of that chunkid
+
+deactivate data_server
+note over data_server
+details in detail.data_server
+end note
+
+
+activate dstnode(another data_server)
+
+dstnode(another data_server) -> meta_server : gen_server:call(meta_server,{registerchunk,chunkid,host})
+
+
+
+deactivate dstnode(another data_server)
+
+
+end

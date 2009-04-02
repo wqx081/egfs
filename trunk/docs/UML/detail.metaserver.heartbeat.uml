@@ -1,0 +1,42 @@
+detail.metaserver.heartbeat.uml
+
+data_server->meta_hosts:gen_server:call({global, global_hostserver},heartbeat)
+
+activate meta_hosts
+
+note over meta_hosts
+        meta_hosts is a gen_server,	it starts when meta_server was started,
+        this function make response to register reguest from dataserver,	
+end note  
+
+meta_hosts->meta_db : call meta_db:update_heartbeat(Hosts,State)
+
+activate meta_db
+
+alt host exist in meta_server:mnesia_table_hostinfo
+
+meta_db->meta_hosts: ok
+
+meta_hosts->data_server: ok
+
+
+else host don't exist in meta_server:mnesia_table_hostinfo
+
+meta_db->meta_hosts: needreport
+
+deactivate meta_db
+
+meta_hosts->data_server: needreport
+
+deactivate meta_hosts
+
+activate data_server
+
+data_server->data_server:  gen_server:cast({global,global_metaserver},{bootreport}) \n see details in detail.metaserver.bootreport
+
+
+deactivate data_server
+
+end
+
+

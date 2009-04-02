@@ -1,0 +1,8 @@
+note over meta_hosts
+        meta_hosts starts when meta_server was started,
+        this function checks state of hosts
+        (in mnesia database,table:hostinfo,field:life)
+end note  
+loop every 5 seconds
+meta_hosts->meta_monitor: call meta_monitor:updateheartbeat() every 5 seconds
+end
