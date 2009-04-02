@@ -1,0 +1,17 @@
+detail.metaserver.list.uml
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{list,Dir)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_list(Dir)
+
+deactivate meta_server
+
+meta_common->meta_db: meta_db:get_order_direct_sub_files(Dir)
+
+meta_db->meta_common: result FileList
+
+meta_common->meta_server: result FileList
+
+meta_server->data_server: result FileList

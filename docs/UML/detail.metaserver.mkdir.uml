@@ -1,0 +1,17 @@
+detail.metaserver.mkdir.uml
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{mkdir,Dir)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_mkdir(Dir)
+
+deactivate meta_server
+
+meta_common->meta_db: meta_db:add_new_dir(Dir)
+
+meta_db->meta_common: {ok||error}
+
+meta_common->meta_server: {ok||error}
+
+meta_server->data_server: {ok||error}
