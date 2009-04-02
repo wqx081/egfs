@@ -1,0 +1,72 @@
+detail.metaserver.delete
+
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{delete,FileName)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_delete(FileName)
+
+deactivate meta_server
+
+activate meta_common
+
+alt No file with name : FileName
+
+
+activate meta_server
+
+meta_common->meta_server:{error,enoent}
+
+deactivate meta_common
+
+meta_server->data_server:{error,enoent}
+
+deactivate meta_server
+
+
+
+else FileName is a regular file
+
+activate meta_server
+
+activate meta_common
+
+meta_common->meta_common:get FileID from database by FileName
+
+meta_common->meta_db: call meta_db:do_delete_filemeta_byID(FileID)
+
+meta_db->meta_common: delete result {ok||error}
+
+meta_common->meta_server: delete result {ok||error}
+
+deactivate meta_common
+
+meta_server->data_server: delete result {ok||error}
+
+deactivate meta_server
+
+else FileName is a dir file
+
+
+activate meta_server
+
+activate meta_common
+
+meta_common->meta_common:get SubList of all sub files from database by FileName,\ncall_meta_delete(list,SubList) to delete all files
+
+meta_common->meta_common:delete directory FileName
+
+meta_common->meta_server: delete result {ok||error}
+
+deactivate meta_common
+
+meta_server->data_server: delete result {ok||error}
+
+deactivate meta_server
+
+
+
+
+
+end

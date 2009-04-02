@@ -1,0 +1,84 @@
+detail.metaserver.open.uml
+
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{open,FileName,Mode)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_open(FileName,Mode)
+
+deactivate meta_server
+
+
+
+alt Mode = read , function do_read_open called
+
+activate meta_common
+
+alt Read_Worker of that FileName Exist
+
+meta_common->Worker:gen_server:call(Worker, {joinNewReader})
+
+activate Worker
+
+Worker->meta_common:FileMeta(record of table filemeta)
+deactivate Worker
+
+meta_common->data_server: FileMeta infos and pid of this Worker
+
+else Read_Worker of that FileName don't Exist
+
+
+meta_common->meta_common:get FileMeta from database by FileName,\ncreate a Read_Worker of that FileName
+
+meta_common->data_server: FileMeta infos and pid of this Worker
+
+deactivate meta_common
+
+end
+
+
+else Mode = write , function do_write_open called
+
+activate meta_common
+
+alt Write_Worker of that FileName Exist
+
+meta_common->data_server: {error,"other client is writing the same file."}
+
+else Write_Worker of that FileName don't Exist
+
+meta_common->meta_common:create a Write_Worker of that FileName,\ngenerate a uuid for this new file
+
+meta_common->data_server: pid of that Worker and generated FileID
+
+deactivate meta_common
+
+end
+
+
+
+else Mode = append
+
+activate meta_common
+
+alt Append_Worker of that FileName Exist
+
+meta_common->data_server: {error,"other client is appending the same file."}
+
+else Append_Worker of that FileName don't Exist
+
+meta_common->meta_common:create a Append_Worker of that FileName,\nget FileMeta from database by FileName
+
+meta_common->data_server: pid of that Worker and FileMeta infos including chunklocations (mode append fix all the replicas )
+
+deactivate meta_common
+
+end
+
+
+
+end
+
+
+

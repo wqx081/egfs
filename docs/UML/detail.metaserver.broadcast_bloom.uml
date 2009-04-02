@@ -1,0 +1,34 @@
+
+loop every 24hours
+
+
+meta_server->meta_monitor: call meta_monitor:broadcast_bloom() every 24hours
+
+note over meta_monitor
+%% broadcast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
+%% broadcast_bloom function process:
+%% 1 make bloomInit
+%% 2 add element chunkids
+%% 3 broadcast to dataserver
+%% supplementary specification:
+%% it's not a real broadcast, 
+%% metaserver transfer bloom result to first(any selected) dataserver, 
+%% this dataserver spread result to other dataservers on by on like a chain
+end note  
+meta_monitor->meta_monitor: get bloom result using lib_bloom
+
+meta_monitor-->data_server: lib_chan:connect(dataworker,{garbagecheck,Otherdataserver})
+activate data_server
+
+data_server->restdataserver: details in detail.data_server.garbagecheck
+deactivate data_server
+
+activate restdataserver
+
+restdataserver --> restdataserver: chain broadcast
+
+
+deactivate restdataserver 
+
+
+end
