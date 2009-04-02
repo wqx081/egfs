@@ -1,0 +1,43 @@
+detail.metaserver.move.uml
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{move,Src,Dst)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_move(Src,Dst)
+
+deactivate meta_server
+
+activate meta_common
+
+meta_common->meta_common: call meta_common:check_op_type(Src,Dst),\nget result : CheckResult
+
+deactivate meta_common
+
+alt CheckResult = caseRegularToRegular
+else CheckResult = caseRegularToDirectory
+else CheckResult = caseRegularToNull
+activate meta_common
+meta_common->meta_common:call functioon meta_common:move_a_file(...)
+
+meta_common->meta_server: move result {ok||error}
+deactivate meta_common
+meta_server->data_server: move result {ok||error}
+
+
+else CheckResult = caseDirectoryToDirectory
+
+else CheckResult = caseDirectoryToNull
+activate meta_common
+meta_common->meta_common:call functioon meta_common:move_a_dir(...)
+meta_common->meta_server: move result {ok||error}
+deactivate meta_common
+meta_server->data_server: move result {ok||error}
+
+else CheckResult = error
+
+meta_common->meta_server: error
+
+meta_server->data_server: error
+
+end
