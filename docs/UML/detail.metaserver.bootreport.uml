@@ -1,0 +1,10 @@
+detail.metaserver.bootreport.uml
+
+data_server-->meta_server:gen_server:cast({global, global_metaserver},{bootreport,HostName, ChunkList})
+
+activate meta_server
+
+meta_server->meta_db:call function  meta_db:do_register_dataserver(HostName,ChunkList)
+meta_db->meta_server: {ok||error}
+
+deactivate meta_server
