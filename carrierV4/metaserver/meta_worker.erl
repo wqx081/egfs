@@ -158,7 +158,7 @@ do_get_chunk(FileID, ChunkIdx)->
                     {error, "chunkindex is larger than chunklist size"};
                 true ->
                     ChunkID = lists:nth(ChunkIdx+1, ChunkList),
-                    case select_hosts_from_chunkmapping_id(ChunkID) of
+                    case meta_db:select_hosts_from_chunkmapping_id(ChunkID) of
                         [] -> 
                             {error, "chunk does not exist"};
                         [ChunkLocations] ->
