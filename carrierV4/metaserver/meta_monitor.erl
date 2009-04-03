@@ -42,8 +42,11 @@ hello() ->
 
 %%%%%%%%%%%%%==================================================================================================
 %% heartbeat
+%%  meta_hosts starts when meta_server was started,
+%%         this function checks state of hosts
+%%         (in database table hostinfo)
 
-decrease() ->
+updateheartbeat() ->
 %%     io:format("in decrease function .~n"),
     Life_minus =
         fun(Hostinfo,Acc)->					%%Acc must return, to be the args of next function
@@ -81,12 +84,15 @@ decrease() ->
 %%%%%%%%%%%%%==================================================================================================
 %%  replica.
 
-
-%% check replica and notify dataserver to make replica,if need 
+%% meta_monitor:check_replica(N)
+%% check replica and notify dataserver to make replicas at the same time,if need 
 %% @spec check_replica(N)-> {ok,"MSG"} || {error,"MSG"}
 %% N-> number of replica needed ,(include himself)
+%% function process:
+%% 1 check chunkmapping table , check every item, 
+%% 2 if host number in field chuncklocations < N, notify dataserver
+%%   else , check next item
 
-%% 1 check chunkmapping table , find  
 check_replica(N)->
     error_logger:info_msg("in func check_replica,_replica num:~p~n",[N]),
     case meta_db:select_all_from_Table(hostinfo) of
@@ -162,7 +168,7 @@ notify_dataserver(OptionHosts,Need,ID,SrcNode)->
 %% broadcast filemeta table 
 %%
 %%
-%% broad cast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
+%% broadcast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
 %% broadcast() ->
 %%     Mappings = select_all_from_Table(chunkmapping),
 %%     MappingsNum = length(Mappings),
@@ -197,30 +203,30 @@ notify_dataserver(OptionHosts,Need,ID,SrcNode)->
 %%  2 , deleted filemeta record, chunkid still @chunkmapping    , delete from chunkmapping
 %%  3 ,  
 %% 
-do_find_orphanchunk()->
-    % Get all chunks of chunkmapping table
-    GetAllChunkIdList = 
-        fun(ChunkMapping,Acm)->
-                case ChunkMapping#chunkmapping.chunklocations of
-                    []->
-                        mnesia:delete_object(ChunkMapping),
-                        %%TODO, delete filemeta record , or make a flag.
-                        Acm;
-                    _ ->
-                        [ChunkMapping#chunkmapping.chunkid | Acm]
-                end
-        end,
-    DogetAllChunkIdList = fun() -> mnesia:foldl(GetAllChunkIdList, [], chunkmapping) end,
-    {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
-    
-    % filter out used chunks according to filemeta table
-	GetUsedChunkIdListInFilemeta =
-        fun(FileMeta, Acc) ->                
-                Acc--FileMeta#filemeta.chunklist                
-        end,        
-    DogetUsedChunkIdListInFilemeta = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemeta, AllChunkIdList, filemeta) end,
-    {atomic, ChunkNotInFilemeta} = mnesia:transaction(DogetUsedChunkIdListInFilemeta),
-    
+%% do_find_orphanchunk()->
+%%     % Get all chunks of chunkmapping table
+%%     GetAllChunkIdList = 
+%%         fun(ChunkMapping,Acm)->
+%%                 case ChunkMapping#chunkmapping.chunklocations of
+%%                     []->
+%%                         mnesia:delete_object(ChunkMapping),
+%%                         %%TODO, delete filemeta record , or make a flag.
+%%                         Acm;
+%%                     _ ->
+%%                         [ChunkMapping#chunkmapping.chunkid | Acm]
+%%                 end
+%%         end,
+%%     DogetAllChunkIdList = fun() -> mnesia:foldl(GetAllChunkIdList, [], chunkmapping) end,
+%%     {atomic, AllChunkIdList} = mnesia:transaction(DogetAllChunkIdList),
+%%     
+%%     % filter out used chunks according to filemeta table
+%% 	GetUsedChunkIdListInFilemeta =
+%%         fun(FileMeta, Acc) ->                
+%%                 Acc--FileMeta#filemeta.chunklist                
+%%         end,        
+%%     DogetUsedChunkIdListInFilemeta = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemeta, AllChunkIdList, filemeta) end,
+%%     {atomic, ChunkNotInFilemeta} = mnesia:transaction(DogetUsedChunkIdListInFilemeta),
+%%     
     
     % filter out used chunks according to filemeta_s table
 %% 	GetUsedChunkIdListInFilemetaS =
@@ -229,21 +235,27 @@ do_find_orphanchunk()->
 %%         end,        
 %%     DogetUsedChunkIdListInFilemetaS = fun() -> mnesia:foldl(GetUsedChunkIdListInFilemetaS, ChunkNotInFilemeta, filemeta_s) end,
 %%     {atomic, OrphanChunk} = mnesia:transaction(DogetUsedChunkIdListInFilemetaS),
-    
-    GetOrphanPair = 
-        fun(X) ->
-                NodeIpList = meta_db:select_nodeip_from_chunkmapping(X),
-                [meta_db:write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList], %%TODO, delete orphan table after debug
-                meta_db:delete_from_db({chunkmapping,X})
-        end,
-    [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
+%%     
+%%     GetOrphanPair = 
+%%         fun(X) ->
+%%                 NodeIpList = meta_db:select_nodeip_from_chunkmapping(X),
+%%                 [meta_db:write_to_db({orphanchunk,X,Y}) || Y<-NodeIpList], %%TODO, delete orphan table after debug
+%%                 meta_db:delete_from_db({chunkmapping,X})
+%%         end,
+%%     [GetOrphanPair(X)||X<-ChunkNotInFilemeta].
 
 
 %%=========================================================================================================
-%% broadcast_bloom
+%% broadcast bloomfilter of filemeta info , for data servers to delete their abandon chunkids.
+%% broadcast_bloom function process:
 %% 1 make bloomInit
 %% 2 add element chunkids
-%% 3 broadcast
+%% 3 broadcast to dataserver
+%% supplementary specification:
+%% it's not a real broadcast, 
+%% metaserver transfer bloom result to first(any selected) dataserver, 
+%% this dataserver spread result to other dataservers on by on like a chain 
+
 broadcast_bloom()->
     ChunkNumber = length(meta_db:select_all_from_Table(chunkmapping)),
 %%     BloomInit = lib_bloom:new(ChunkNumber,0.01),

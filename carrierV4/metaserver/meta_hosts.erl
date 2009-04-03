@@ -25,7 +25,7 @@ start_link() ->
 %%====================================================================
 init([]) ->
 	process_flag(trap_exit,false),
-    {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,decrease,[]), % check host health every 5 second
+    {ok,_Tref} = timer:apply_interval((?HOSTLIFE_AUTO_DECREASE_INTERVAL),meta_monitor,updateheartbeat,[]), % check host health every 5 second
     {ok, []}.
 
 handle_call({register_dataserver, HostName,Nodename, FreeSpace, TotalSpace, Status}, {From, _}, State) ->

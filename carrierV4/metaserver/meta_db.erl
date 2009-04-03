@@ -255,12 +255,14 @@ select_fileid_from_filemeta(FileName) ->
 %%                                    X#filemeta_s.filename =:= FileName                                   
 %%                                    ])).   %result [L]
 
-select_nodeip_from_chunkmapping(ChunkID) ->
-    LOG = #metalog{logtime = calendar:local_time(),logfunc="select_nodeip_from_chunkmapping",logarg=[ChunkID]},
-    logF(LOG),
-    do(qlc:q([X#chunkmapping.chunklocations || X <- mnesia:table(chunkmapping),
-                                   X#chunkmapping.chunkid =:= ChunkID
-             ])).   %result [L]
+
+%%TODO: delete it
+%% select_nodeip_from_chunkmapping(ChunkID) ->
+%%     LOG = #metalog{logtime = calendar:local_time(),logfunc="select_nodeip_from_chunkmapping",logarg=[ChunkID]},
+%%     logF(LOG),
+%%     do(qlc:q([X#chunkmapping.chunklocations || X <- mnesia:table(chunkmapping),
+%%                                    X#chunkmapping.chunkid =:= ChunkID
+%%              ])).   %result [L]
 
 
 select_item_from_chunkmapping_id(ChunkID) ->    
@@ -357,9 +359,9 @@ do_register_dataserver(HostName,ChunkList)->
                 Guard = lists:member(ChunkID,Acc),                
                 if Guard =:= true ->
 %%                        Acc = ChunkList--[ChunkID],
-                       error_logger:info_msg("Old :~p~n",[ChunkMapping#chunkmapping.chunklocations]),
+%%                        error_logger:info_msg("Old :~p~n",[ChunkMapping#chunkmapping.chunklocations]),
                        ChunkLocations =lists:delete(HostName,ChunkMapping#chunkmapping.chunklocations)++[HostName], %%better solution
-                       error_logger:info_msg("chunklocations: ~p~n,",[ChunkLocations]),
+%%                        error_logger:info_msg("chunklocations: ~p~n,",[ChunkLocations]),
                        ok = mnesia:write(
                               ChunkMapping#chunkmapping{chunklocations = ChunkLocations}),
                        Acc--[ChunkID];
@@ -437,7 +439,7 @@ append_a_file_record(FileRecord,ChunkMappingRecords) ->
 
 %% add record hostinfo to table hostinfo, no chunkmapping table change .
 %% when meta_host , gen_server_call, register_dataserver
-add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,From) ->
+add_hostinfo_item(HostName,NodeName, FreeSpace, TotalSpace, Status,_From) ->
 %%     io:format("in side add_hostiofo_item.~n"),
 	Row = #hostinfo{hostname=HostName, nodename = NodeName ,freespace=FreeSpace, totalspace=TotalSpace, status=Status,life=?HOST_INIT_LIFE},
 %% 	io:format("From : ~p~n",[From]),
