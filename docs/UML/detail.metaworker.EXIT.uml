@@ -1,0 +1,29 @@
+detail.metaworker.EXIT.uml
+
+
+
+note over meta_worker
+%% gen_server : meta_worker's State is a record of metaWorkerState
+%%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients}).
+%% when a worker of mod "read" was created, clients is initialized to 0
+%% when handle_info({'EXIT'}) received, one of the client link to this Read Worker\nis terminated (either client disconnect or client shutdown)
+%% clients-- , if clients = 0 , Worker shutdown
+end note 
+
+data_worker->meta_worker: handle_info({'EXIT', _Pid, Why}, State)\nNewState.clients = State.clients-1
+activate meta_worker
+
+
+opt NewState.clients = 0
+
+meta_worker->meta_worker:no reader connect to Worker , shutdown this worker
+
+else NewState.clients >0
+
+meta_worker->meta_worker:one reader client exit
+
+end
+
+
+
+deactivate meta_worker

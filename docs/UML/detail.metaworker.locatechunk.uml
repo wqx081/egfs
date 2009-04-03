@@ -1,0 +1,15 @@
+detail.metaworker.locatechunk.uml
+
+data_server->meta_worker:gen_server:call(MetaWorkerPid, {locatechunk,FileID, ChunkIndex})
+
+activate meta_worker
+
+meta_worker->meta_db: do_get_chunk(FileID, ChunkIndex)
+activate meta_db
+meta_db->meta_db: 1. lookup table filemeta, get chunklist of that file by FileID \n2. get wanted Chunkid in chunklist by ChunkIndex \n3. lookup table chunkmapping , get Chunklocations by Chunkid
+
+meta_db->meta_worker:{ok,Chunkid,Chunklocations}||{error,MSG}
+deactivate meta_db
+meta_worker->data_server:{ok,Chunkid,Chunklocations}||{error,MSG}
+
+deactivate meta_worker
