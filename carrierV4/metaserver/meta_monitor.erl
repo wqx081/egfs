@@ -258,8 +258,8 @@ notify_dataserver(OptionHosts,Need,ID,SrcNode)->
 
 broadcast_bloom()->
     ChunkNumber = length(meta_db:select_all_from_Table(chunkmapping)),
-%%     BloomInit = lib_bloom:new(ChunkNumber,0.01),
-    BloomInit = lib_bloom:new(32*32*32*32,0.01),    
+    BloomInit = lib_bloom:new(ChunkNumber,0.01),
+%%     BloomInit = lib_bloom:new(32*32*32*32,0.01),    
     ChunkIDList = meta_db:select_chunkid_from_chunkmapping(),    
     
     BloomRes = bloom_add_list(BloomInit,ChunkIDList),    
