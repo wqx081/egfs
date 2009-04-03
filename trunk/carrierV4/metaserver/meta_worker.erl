@@ -10,8 +10,7 @@
 -include("../include/header.hrl").
 
 -import(meta_db,[
-                  select_all_from_filemeta/1,
-                  select_nodeip_from_chunkmapping/1
+                  select_all_from_filemeta/1                  
                 ]).
 
 
@@ -58,6 +57,8 @@ handle_call({seekchunk, ChunkID}, {_From, _}, State) ->
 	[Reply] = meta_db:select_hosts_from_chunkmapping_id(ChunkID),   %% select result = [{},{}]
 	{reply, Reply, State};
 	
+
+%% when a worker of mod "read" was created, clients is initialized to 0
 handle_call({joinNewReader}, {_From, _}, State) ->     
 %% 	error_logger:info_msg("~~~~ in getfileinfo~~~~n"),    
     NewState = State#metaWorkerState{clients=State#metaWorkerState.clients+1},
@@ -157,7 +158,7 @@ do_get_chunk(FileID, ChunkIdx)->
                     {error, "chunkindex is larger than chunklist size"};
                 true ->
                     ChunkID = lists:nth(ChunkIdx+1, ChunkList),
-                    case select_nodeip_from_chunkmapping(ChunkID) of
+                    case select_hosts_from_chunkmapping_id(ChunkID) of
                         [] -> 
                             {error, "chunk does not exist"};
                         [ChunkLocations] ->

@@ -109,7 +109,7 @@ call_meta_delete(list,FileIDList) ->
             {error,eacces}
     end.
 
-
+%% TODO: delete inefficient
 %% really, do_delete,
 call_meta_do_delete(list,[]) ->    
     ok;
@@ -688,8 +688,7 @@ do_dataserver_bootreport(HostRecord, ChunkList)->
 
 %%
 do_register_replica(ChunkID,Host) ->
-    error_logger:info_msg("[~p, ~p]:do_register_replica ~p~n", [?MODULE, ?LINE,{ChunkID,Host}]),
-    error_logger:info_msg("in do_register_replica,~p,~p~n",[ChunkID,Host]),
+    error_logger:info_msg("[~p, ~p]:do_register_replica ~p~n", [?MODULE, ?LINE,{ChunkID,Host}]),    
     case meta_db:select_item_from_chunkmapping_id(ChunkID) of
         []->            
             meta_db:write_to_db(#chunkmapping{chunkid = ChunkID,chunklocations = [Host]});
@@ -718,6 +717,9 @@ do_register_replica(ChunkID,Host) ->
 do_debug(Arg) ->
     error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),    
     case Arg of
+        
+        ver ->
+            "ver.alphal.03.27.0",
         wait ->
             io:format("111 ,~n"),
             timer:sleep(2000),

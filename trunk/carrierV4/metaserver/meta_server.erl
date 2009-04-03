@@ -124,10 +124,10 @@ handle_call({registerchunk,ChunkID,Host},{_From, _}, State ) ->
     {reply,Reply,State};
 
 
-handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
-%%     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
-	Reply = meta_common:do_collect_orphanchunk(HostRegName),
-    {reply, Reply, State};
+%% handle_call({getorphanchunk, HostRegName},{_From,_},State) ->
+%% %%     io:format("inside handle_call_getorphanchunk,HostRegName:~p~n",[HostRegName]),
+%% 	Reply = meta_common:do_collect_orphanchunk(HostRegName),
+%%     {reply, Reply, State};
 
 handle_call({getfileinfo,FileName,_UserName}, {_From, _}, State) -> 
 %%  error_logger:info_msg("getfileinfo _ ,File: ~p, User: ~n",[FileName,_UserName]),    
