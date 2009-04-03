@@ -259,12 +259,10 @@ notify_dataserver(OptionHosts,Need,ID,SrcNode)->
 broadcast_bloom()->
     ChunkNumber = length(meta_db:select_all_from_Table(chunkmapping)),
 %%     BloomInit = lib_bloom:new(ChunkNumber,0.01),
-    BloomInit = lib_bloom:new(32*32*32*32,0.01),
-    error_logger:info_msg("1~n"),
+    BloomInit = lib_bloom:new(32*32*32*32,0.01),    
     ChunkIDList = meta_db:select_chunkid_from_chunkmapping(),    
-    error_logger:info_msg("111~n"),
-    BloomRes = bloom_add_list(BloomInit,ChunkIDList),
-    error_logger:info_msg("x~n"),
+    
+    BloomRes = bloom_add_list(BloomInit,ChunkIDList),    
 %%     error_logger:info_msg("before Cast,~nbloom Res: _~p~n",[BloomRes]),
     do_broadcast(BloomRes).
     
@@ -276,9 +274,7 @@ do_broadcast(BloomRes)->
     error_logger:info_msg("data Server:~p~n,HostsListLeft: ~p~n",[H,T]),
     case lib_chan:connect(H,?DATA_PORT,dataworker,?PASSWORD,{garbagecheck, T}) of
         {ok, DataWorkerPid}->
-            error_logger:info_msg("2~n"),
-            BinaryBloom = term_to_binary(BloomRes),
-            error_logger:info_msg("3~n"),
+            BinaryBloom = term_to_binary(BloomRes),            
 %%             error_logger:info_msg("BinaryBloom,size: ~p~n",[size(BinaryBloom)]),
             loop_write_bf(DataWorkerPid,BinaryBloom);
         Any->
