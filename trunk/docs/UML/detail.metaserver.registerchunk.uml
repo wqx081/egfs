@@ -1,0 +1,19 @@
+detail.metaserver.registerchunk.uml
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{registerchunk,ChunkId,Host)
+
+activate meta_server
+
+meta_server->meta_common : call meta_common:do_register_replica(ChunkId,Host)
+
+deactivate meta_server
+
+
+
+meta_common->meta_db: add Host to database.chunkmapping.chunklocations
+
+meta_db->meta_common: {ok||error}
+
+meta_common->meta_server: {ok||error}
+
+meta_server->data_server: {ok||error}

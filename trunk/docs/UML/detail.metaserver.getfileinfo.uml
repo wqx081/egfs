@@ -1,0 +1,13 @@
+detail.metaserver.getfileinfo.uml
+
+data_server->meta_server:gen_server:call({global, global_metaserver},{getfileinfo,FileName)
+
+activate meta_server
+
+meta_server->meta_db:call function  meta_db:select_all_from_filemeta_byName(FileName)
+
+meta_db->meta_server: FileMeta
+
+meta_server->data_server: FileMeta
+
+deactivate meta_server
