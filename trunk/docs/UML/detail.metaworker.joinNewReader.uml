@@ -1,0 +1,20 @@
+detail.metaworker.joinNewReader.uml
+
+data_server->meta_worker:gen_server:call(MetaWorkerPid, {joinNewReader})
+
+activate meta_worker
+
+note over meta_worker
+%% gen_server : meta_worker's State is a record of metaWorkerState
+%%-record(metaWorkerState,{filemeta=#filemeta{},mod,clients}).
+%%-record(filemeta,{id,name,chunklist,parent,size,type,access,atime,mtime,ctime,mode,links,inode,uid,gid})
+%% when a worker of mod "read" was created, clients is initialized to 0
+end note 
+
+
+meta_worker->meta_worker: fix meta_worker's state, State.clients+1
+
+meta_worker->data_server:State.filemeta
+
+
+deactivate meta_worker

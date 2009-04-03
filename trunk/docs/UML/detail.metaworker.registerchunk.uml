@@ -1,0 +1,41 @@
+detail.metaworker.registerchunk.uml
+
+
+data_server->meta_worker:gen_server:call(MetaWorkerPid, {registerchunk, FileRecord, ChunkMappingRecords})
+
+activate meta_worker
+
+alt gen_server:meta_worker's state.mode = write
+
+meta_worker->meta_db:call function  meta_db:add_a_file_record(registerchunk, FileRecord, ChunkMappingRecords)
+
+activate meta_db
+
+meta_db->meta_db:add a filemeta record
+
+meta_db->meta_worker: {ok||error}
+
+deactivate meta_db
+
+meta_worker->data_server:{ok||error}
+
+else gen_server:meta_worker's state.mode = append
+
+meta_worker->meta_db:call function  meta_db:append_a_file_record(registerchunk, FileRecord, ChunkMappingRecords)
+
+activate meta_db
+
+meta_db->meta_db:fix filemeta record of that file,\n add new chunkid and location info to table chunkmapping
+
+meta_db->meta_worker: {ok||error}
+
+deactivate meta_db
+
+meta_worker->data_server:{ok||error}
+
+else gen_server:meta_worker's state.mode = read
+
+meta_worker->data_server: error
+
+end
+

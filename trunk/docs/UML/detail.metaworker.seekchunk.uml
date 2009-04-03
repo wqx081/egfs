@@ -1,0 +1,13 @@
+detail.metaworker.seekchunk.uml
+
+data_server->meta_worker:gen_server:call(MetaWorkerPid, {seekchunk, ChunkID})
+
+activate meta_worker
+
+meta_worker->meta_db: call function meta_db:select_hosts_from_chunkmapping_id(ChunkID)
+
+meta_db->meta_worker:[Chunklocations]
+
+meta_worker->data_server:Chunklocations
+
+deactivate meta_worker
