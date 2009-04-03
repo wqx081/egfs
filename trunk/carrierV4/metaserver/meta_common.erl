@@ -716,10 +716,9 @@ do_register_replica(ChunkID,Host) ->
 %% 
 do_debug(Arg) ->
     error_logger:info_msg("[~p, ~p]: ~p~n", [?MODULE, ?LINE,{}]),    
-    case Arg of
-        
+    case Arg of        
         ver ->
-            "ver.alphal.03.27.0",
+            "ver.alphal.03.27.0";
         wait ->
             io:format("111 ,~n"),
             timer:sleep(2000),
