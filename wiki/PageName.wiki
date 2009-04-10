@@ -8,13 +8,39 @@
      * 然后在上面架上我们的corsair系统;
      * 借助于corsair的大量用户进行测试，同时推广egfs的应用。<br/>
 
-而[http://code.google.com/p/fuserl/ fuserl]
+而[http://code.google.com/p/fuserl/ fuserl]已经实现了fuse的erlang driver, 我们就在fuserl的基础上，编写fuse相应的erlang回调函数，<br/>就可以实现将egfs挂载到本地. 本文档主要描述如何用egfs提供的接口实现这些回调函数。
    </p>
 
 
-= Details =
+= Implementation Details =
+<p>
+模块fusefs实现了所需的回调函数，回调函数统一在efs.erl文件中定义；在efs中，有一个重要的全局变量*State#egfsrv*,它有三个成员：
+    * a. inode: type＝gb_trees, 动态存储(inode, Path)值对；
+    * b. names: type = gb_trees, 动态存储(Path, inode)值对, 与inodes的内容一一对应；
+    * c. pids: type = ets, 动态存储(FileHandle, WorkerPid)值对。<br/>
+下面对efs中实现的回调函数的原型、所要完成的功能、返回值及实现细节进行说明。
+</p>
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+<p>
+  # getattr/4, 根据文件的inode获得文件的attributes
+ <div>
+   * 定义
+   @spec
+     {{{ 
+   getattr (Ctx::#fuse_ctx{}, Inode::integer (), Cont::continuation (), State) ->
+         { getattr_async_reply (), NewState } | { noreply, NewState } 
+   getattr_async_reply () = #fuse_reply_attr{} | #fuse_reply_err{}
+     }}}
+   @doc
+     Get the file attributes associated with an inode.  If noreply is used,
+     eventually {@link fuserlsrv:reply/2. fuserlsrv:reply/2} should be called with Cont
+     as first argument and the second argument of type getattr_async_reply ().
+   @end
+   * 实现细节
+    只使用到了Inode和State两个参数；<br/>
+    根据Inode, 查询State#inodes, 得到Path;<br/>
+    根据Path, 调用egfs:read_file_info得到文件的相应属性，并转换为fuse所需的格式；<br/>
+    正常返回值是{ #fuse_reply_attr{}, NewState};<br/>
+    异常返回值是{ #fuse_reply_err{], State}.<br/>
+ </div>
+</p>
