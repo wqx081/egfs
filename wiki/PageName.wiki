@@ -1,0 +1,15 @@
+#summary One-sentence summary of this page.
+
+= Introduction =
+
+   我们的分布式存储系统－－egfs做好了，但是如何方便地应用它，同时对它进行实际测试？
+我们采用的方案是：用fuse把egfs挂载到本地，然后在上面架上我们的corsair系统，借助
+corsair的大量用户进行测试，同时推广egfs的应用。
+
+
+= Details =
+
+Add your content here.  Format your content with:
+  * Text in *bold* or _italic_
+  * Headings, paragraphs, and lists
+  * Automatic links to other wiki pages
