@@ -1,4 +1,5 @@
 #summary One-sentence summary of this page.
+fusefs
 
 = Introduction =
 
@@ -371,7 +372,5 @@
    </div>
 </p>
 
-<p>
-*备注*<br/>
+*备注*
 @spec等英文部分是从fuserl.erl中摘录的，各函数中#fuse_*等数据结构在fuserl.hrl中定义.
-</p>
