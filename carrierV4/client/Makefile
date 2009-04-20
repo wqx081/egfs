@@ -28,6 +28,15 @@ cl3:compile
 wcl:compile
 	${WERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start -s crypto start
 	
+wcl1:compile
+	${WERL} -pa ../lib -sname  ${HOSTNAME}client2 -s client_app start -s crypto start
+
+wcl2:compile
+	${WERL} -pa ../lib -sname  ${HOSTNAME}client3 -s client_app start -s crypto start
+
+wcl3:compile
+	${WERL} -pa ../lib -sname  ${HOSTNAME}client4 -s client_app start -s crypto start
+
 	
 
 # remove all the code
