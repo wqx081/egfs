@@ -19,10 +19,10 @@ compile: ${MODS:%=%.beam}
 ## run an application from the makefile
 
 ms:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}ms -s app_meta_server start -s crypto start
+	${ERL} -pa ../lib -sname  ${HOSTNAME}ms -s crypto start -s app_meta_server start 
 	
 wms:compile
-	${WERL} -pa ../lib -sname  ${HOSTNAME}ms -s app_meta_server start -s crypto start
+	${WERL} -pa ../lib -sname  ${HOSTNAME}ms -s crypto start -s app_meta_server start 
 	
 # remove all the code
 
