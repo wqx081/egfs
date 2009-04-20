@@ -34,6 +34,15 @@ wds:compile
 wcl:compile
 	cd client;	make wcl &
 
+wcl1:compile
+	cd client;	make wcl1 &
+
+wcl2:compile
+	cd client;	make wcl2 &
+	
+wcl3:compile
+	cd client;	make wcl3 &
+
 
 # the subdirs target compiles any code in 
 # sub-directories
