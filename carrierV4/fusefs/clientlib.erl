@@ -15,8 +15,8 @@
 	  copy/2,
 	  chmod/4]).
 
-%% -define(CLIENT_SERVER, {client_server, flyclient1@fly}).
--define(CLIENT_SERVER, {client_server, ltclient1@lt}).
+-define(CLIENT_SERVER, {client_server, flyclient1@fly}).
+%%-define(CLIENT_SERVER, {client_server, ltclient1@lt}).
 
 min(A, B) ->
     if 
@@ -31,7 +31,7 @@ rm_slash(Path) ->
 
 %%--------------------------------------------------------------------------------
 %% Function: open(string(),Mode) -> {ok, ClientWorkerPid} | {error, Reason} 
-%% 			 Mode = r | w 
+%% 			 Mode = read | write | append
 %% Description: open a file according to the filename and open mode
 %%--------------------------------------------------------------------------------
 open(FileName, Mode) ->
@@ -122,7 +122,7 @@ mkdir(Dir) ->
     UserName = any,
     CDir = rm_slash(Dir),
     case gen_server:call(?CLIENT_SERVER, {mkdir, CDir, UserName}) of
-	{ok, _} ->
+	ok ->
 	    ok;
 	{error, _} ->
 	    {error, enoent}
@@ -138,7 +138,7 @@ deldir(Dir) ->
     UserName = any,
     CDir = rm_slash(Dir),
     case gen_server:call(?CLIENT_SERVER, {delete, CDir, UserName}) of
-	{ok, _} ->
+	ok ->
 	    ok;
 	{error, Reason} ->
 	    {error, Reason}
@@ -160,7 +160,7 @@ chmod(FileName, UserName, UserType, CtrlACL) ->
 %% --------------------------------------------------------------------	
 pread(WorkerPid, Offset, Size) ->
     Len = min(Size, ?STRIP_SIZE),
-    case gen_server:call(WorkerPid, {read, Len}) of
+    case gen_server:call(WorkerPid, {pread, Offset, Len}) of
 	{ok, Data} ->
 	    loop_read([Data | []], WorkerPid, Offset + Len, Size - Len);
 	eof ->
@@ -171,7 +171,7 @@ pread(WorkerPid, Offset, Size) ->
 
 loop_read(List, WorkerPid, Begin, Size) when Size > 0 ->
     Len = min(Size, ?STRIP_SIZE),
-    case gen_server:call(WorkerPid, {read, Len}) of
+    case gen_server:call(WorkerPid, {pread, Begin, Len}) of
 	{ok, Part} ->
 	    NewList= [Part | List],
 	    loop_read(NewList, WorkerPid, Begin + Len, Size - Len);
