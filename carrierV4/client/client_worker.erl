@@ -21,38 +21,38 @@ init([FileName, Mode, UserName]) ->
 	%error_logger:info_msg("[~p, ~p]: client worker ~p starting~n", [?MODULE, ?LINE, self()]),	
 	case gen_server:call(?META_SERVER, {open, FileName, Mode, UserName}) of
 	    {ok, FileID, FileSize, ChunkList, MetaWorkerPid} ->
-			% set the correct position of FileContext 	
-			NewFC = case Mode of
-					  	read ->
-							#filecontext{	fileid = FileID, 
-											filename = FileName, 
-				                 			filesize = FileSize,
-											offset = 0,
-											chunklist= ChunkList,
-											mode = Mode,
-											metaworkerpid = MetaWorkerPid};
-						write ->
-							#filecontext{	fileid = FileID, 
-											filename = FileName, 
-				                 			filesize = FileSize,
-											offset = FileSize,
-											chunklist= ChunkList,
-											mode = Mode,
-											metaworkerpid = MetaWorkerPid};
-						append ->
-							#filecontext{	fileid = FileID, 
-											filename = FileName, 
-				                 			filesize = FileSize,
-											offset = FileSize,
-											chunkid= ChunkList,
-											mode = Mode,
-											metaworkerpid = MetaWorkerPid}							
-					  end,		
+		% set the correct position of FileContext 	
+		NewFC = case Mode of
+		 	read ->
+				#filecontext{	fileid = FileID, 
+						filename = FileName, 
+		               			filesize = FileSize,
+						offset = 0,
+						chunklist= ChunkList,
+						mode = Mode,
+						metaworkerpid = MetaWorkerPid};
+			write ->
+				#filecontext{	fileid = FileID, 
+						filename = FileName, 
+				                filesize = FileSize,
+						offset = FileSize,
+						chunklist= ChunkList,
+						mode = Mode,
+						metaworkerpid = MetaWorkerPid};
+			append ->
+				#filecontext{	fileid = FileID, 
+						filename = FileName, 
+		               			filesize = FileSize,
+						offset = FileSize,
+						chunkid= ChunkList,
+						mode = Mode,
+						metaworkerpid = MetaWorkerPid}							
+		  end,		
 			% construct the FileContext based on the FileRecord and MetaWorkerPid
 			link(MetaWorkerPid),
 			{ok, NewFC};
-		{error, Why} ->
-			{stop, Why}
+	    {error, Why} ->
+			{error, Why}
 	end.	
 
 handle_call({write, Bytes}, _From, FileContext) ->
