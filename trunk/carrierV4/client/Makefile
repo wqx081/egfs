@@ -6,7 +6,7 @@
 
 HOSTNAME = $(shell hostname)
 
-ERL = erl -boot start_sasl -config system -setcookie carrier 
+ERL = nohup erl -noshell -boot start_sasl -config system -setcookie carrier 
 WERL = werl -boot start_sasl -config system -setcookie carrier
 
 all: compile
@@ -17,7 +17,7 @@ compile: ${MODS:%=%.beam}
 ## run an application from the makefile
 
 cl1:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start -s crypto start
+	${ERL} -pa ../lib -sname  ${HOSTNAME}client1 -s client_app start -s crypto start &
 	
 cl2:compile
 	${ERL} -pa ../lib -sname  ${HOSTNAME}client2 -s client_app start -s crypto start
