@@ -57,6 +57,25 @@ gen_bin(R1, R2, R3, R4, FileSize) ->
 %% --------------------------------------------------------------------
 %% test function
 %% --------------------------------------------------------------------
+test_car() ->
+	statistics(wall_clock),
+	testw({"/car.avi", 0,0}),
+	{_,Time}=statistics(wall_clock),
+	error_logger:info_msg("[~p, ~p]: Write Process Total Time= ~p microseconds~n", [?MODULE, ?LINE, Time]).
+test_readcar() ->
+	statistics(wall_clock),
+	TargetFile = "./outfiles"++"/car.avi",
+	case gen_server:call(client_server,{open,"/car.avi", read, any}) of
+		{ok, ClientWorkerPid}   ->
+			{ok,Hdl}=file:open(TargetFile, [binary,raw,write]),
+			read_loop(ClientWorkerPid,Hdl),
+			gen_server:call(ClientWorkerPid,{close});
+		{error, Why} ->
+			io:format("Error:~p~n",[Why]),
+			exit(normal)
+	end,
+	{_,Time}=statistics(wall_clock),
+	error_logger:info_msg("[~p, ~p]: Read Process Total Time= ~p microseconds~n", [?MODULE, ?LINE, Time]).
 test_write_all() ->
 	statistics(wall_clock),
 	{ok, FileData}= file:consult(?FILELIST),
