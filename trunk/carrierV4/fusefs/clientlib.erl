@@ -15,15 +15,15 @@
 	  copy/2,
 	  chmod/4]).
 
--define(CLIENT_SERVER, {client_server, flyclient1@fly}).
-%%-define(CLIENT_SERVER, {client_server, ltclient1@lt}).
+%%-define(CLIENT_SERVER, {client_server, flyclient1@fly}).
+-define(CLIENT_SERVER, {client_server, ltclient1@lt}).
 
 min(A, B) ->
     if 
-	A > B ->
-	    B;
-	true  ->
-	    A
+		A > B ->
+	    	B;
+		true  ->
+	    	A
     end.
 
 rm_slash(Path) ->
@@ -37,10 +37,10 @@ rm_slash(Path) ->
 open(FileName, Mode) ->
     UserName = any,
     case gen_server:call(?CLIENT_SERVER, {open, FileName, Mode, UserName}) of
-	{error, _Reason} ->
-	    {error, _Reason};
-	{ok, WorkerPid} ->
-	    {ok, WorkerPid}
+		{error, _Reason} ->
+	    	{error, _Reason};
+		{ok, WorkerPid} ->
+	    	{ok, WorkerPid}
     end.
 
 
@@ -61,12 +61,12 @@ delete(FileName)->
     UserName = any,
     CFName = rm_slash(FileName),
     case gen_server:call(?CLIENT_SERVER, {delete, CFName, UserName}) of
-	{ok, _} ->
-	    ok;
-	{error, enoent} ->
-		ok;
-	{error, Reason} ->
-	    {error, Reason}
+		ok ->
+	    	ok;
+		{error, enoent} ->
+			ok;
+		{error, Reason} ->
+	    	{error, Reason}
     end.
 
 %% --------------------------------------------------------------------
@@ -78,31 +78,31 @@ read_file_info(FileName) ->
     UserName = any,
     CFName = rm_slash(FileName),
     case gen_server:call(?CLIENT_SERVER, {getfileinfo, CFName, UserName}) of
-	[] ->
-	    {error, enoent};
-	[error, _] ->
-	    {error, enoent};
-	[H|_] ->
-	    {ok, H}
+		[] ->
+	    	{error, enoent};
+		[error, _] ->
+	    	{error, enoent};
+		[H|_] ->
+	    	{ok, H}
     end.
 	    
 	
 %% --------------------------------------------------------------------
 %% Function: listdir/1 ->  {ok, filename_list} | {error, Reason} 
 %% Description: list dir
-%% Returns: ok | {error, Reason}
+%% Returns: {ok, FileList} | {error, Reason}
 %% --------------------------------------------------------------------	
 listdir(Dir) ->
     UserName = any,
     CDir = rm_slash(Dir),
     case gen_server:call(?CLIENT_SERVER, {list, CDir, UserName}) of
-	{error, _R} ->
-	    {error, enoent};
-	[] ->
-	    {ok, []};
-	[H|T] ->
-	    Namelist = parse_names([H|T], []),
-	    {ok, Namelist} 
+		{error, _R} ->
+	    	{error, enoent};
+		[] ->
+	    	{ok, []};
+		[H|T] ->
+	    	Namelist = parse_names([H|T], []),
+	    	{ok, Namelist} 
     end.
 	
 parse_names([], Names) ->
@@ -138,10 +138,10 @@ deldir(Dir) ->
     UserName = any,
     CDir = rm_slash(Dir),
     case gen_server:call(?CLIENT_SERVER, {delete, CDir, UserName}) of
-	ok ->
-	    ok;
-	{error, Reason} ->
-	    {error, Reason}
+		ok ->
+	    	ok;
+		{error, Reason} ->
+	    	{error, Reason}
     end.
 
 
@@ -161,12 +161,12 @@ chmod(FileName, UserName, UserType, CtrlACL) ->
 pread(WorkerPid, Offset, Size) ->
     Len = min(Size, ?STRIP_SIZE),
     case gen_server:call(WorkerPid, {pread, Offset, Len}) of
-	{ok, Data} ->
-	    loop_read([Data | []], WorkerPid, Offset + Len, Size - Len);
-	eof ->
-		eof;
-	{error, Reason} ->
-	    {error, Reason}
+		{ok, Data} ->
+	    	loop_read([Data | []], WorkerPid, Offset + Len, Size - Len);
+		eof ->
+			eof;
+		{error, Reason} ->
+	    	{error, Reason}
     end.
 
 loop_read(List, WorkerPid, Begin, Size) when Size > 0 ->
@@ -192,7 +192,12 @@ loop_read(List, _, _, _) ->
 %% Description: write Data begin at Offset 
 %% --------------------------------------------------------------------
 pwrite(WorkerPid, _Offset, Data) ->
-   gen_server:call(WorkerPid, {write, Data}). 
+   case gen_server:call(WorkerPid, {write, Data}) of
+   		ok ->
+			ok;
+		{error, Reason} ->
+			{error, Reason}
+	end.
 
 %% --------------------------------------------------------------------
 %% Function: move/2 ->  ok | {error, Reason} 
@@ -203,7 +208,15 @@ move(Src, Dst) ->
     UserName = any,
     CSrc = rm_slash(Src),
     CDst = rm_slash(Dst),
-    gen_server:call(?CLIENT_SERVER, {move, CSrc, CDst, UserName}).
+    case gen_server:call(?CLIENT_SERVER, {move, CSrc, CDst, UserName}) of
+		{ok, _} ->
+			ok;
+		ok ->
+			ok;
+		{error, Reason} ->
+			{error, Reason}
+	end.
+
 
 %% --------------------------------------------------------------------
 %% Function: copy/2 ->  ok | {error, Reason} 
@@ -214,4 +227,12 @@ copy(Src, Dst) ->
     UserName = any,
     CSrc = rm_slash(Src),
     CDst = rm_slash(Dst),
-    gen_server:call(?CLIENT_SERVER, {copy, CSrc, CDst, UserName}).
+    case gen_server:call(?CLIENT_SERVER, {copy, CSrc, CDst, UserName}) of 
+		{ok, _} ->
+			ok;
+		ok ->
+			ok;
+		{error, Reason} ->
+			{error, Reason}
+	end.
+
