@@ -16,7 +16,7 @@ compile: ${MODS:%=%.beam}
 ## run an application from the makefile
 
 fs:compile
-	${ERL} -pa ../lib -sname  ${HOSTNAME}fusefs -s crypto start 
+	${ERL} -pa ../lib -sname  ${HOSTNAME}fusefs -s ping_server ping -s crypto start 
 	
 # remove all the code
 
