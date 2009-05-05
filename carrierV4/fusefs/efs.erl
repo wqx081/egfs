@@ -1,5 +1,6 @@
 -module(efs).
--export([start_link/2, start_link/3, run/0]).
+-export([run/0, run/1]).
+-export([start_link/2, start_link/3]).
 -export([x_read/7, x_write/7]).
 %-behaviour(fuserl).
 -export([ code_change/3,
@@ -31,8 +32,11 @@
 run() ->
     start_link(true, "test").
 
+run(Dir) ->
+	start_link(true, Dir).
+
 start_link(LinkedIn, Dir) ->
-    start_link(LinkedIn, Dir, "").
+    start_link(LinkedIn, Dir, "allow_other").
 
 start_link(LinkedIn, Dir, MountOpts) ->
     fuserlsrv:start_link(?MODULE, LinkedIn, MountOpts, Dir, [], []).
@@ -47,10 +51,12 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 handle_info(_Msg, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 
--define (ROOTATTR, #stat{ st_ino = 1,
-                          st_mode = ?S_IFDIR bor 8#0555,
-			  st_size = 4096,
-			  st_nlink = 2}).
+-define (ROOTATTR, #stat{ 	st_ino = 1,
+                          	st_mode = ?S_IFDIR bor 8#0777,
+		  					st_uid = 0,
+		  					st_gid = 0,
+			  				st_size = 4096,
+			  				st_nlink = 3}).
 
 getattr(_, 1, _, State) ->
     {#fuse_reply_attr{ attr = ?ROOTATTR, attr_timeout_ms = 1000}, State};
@@ -81,11 +87,11 @@ my_get_attr({Parent, Name}, State) ->
     {ok, FileInfo} = clientlib:read_file_info(LocalName),
     case FileInfo#filemeta.type of
 	directory ->
-	    Mode = ?S_IFDIR bor 8#0555,
+	    Mode = ?S_IFDIR bor 8#0777,
 	    Size = 4096,
 	    Nlink = 2;
 	_ ->
-	    Mode = ?S_IFREG bor 8#0644,
+	    Mode = ?S_IFREG bor 8#0777,
 	    Size = FileInfo#filemeta.size,
 	    Nlink = 1
     end,
@@ -96,8 +102,10 @@ my_get_attr({Parent, Name}, State) ->
 	          st_atime = datetime_to_seconds(FileInfo#filemeta.atime),
 	          st_mtime = datetime_to_seconds(FileInfo#filemeta.mtime),
 	          st_ctime = datetime_to_seconds(FileInfo#filemeta.ctime),
-		  st_uid = FileInfo#filemeta.uid,
-		  st_gid = FileInfo#filemeta.gid,
+			  %%st_uid = FileInfo#filemeta.uid,
+		      %%st_gid = FileInfo#filemeta.gid,
+			  st_uid = 0,
+		      st_gid = 0,
 	          st_nlink = Nlink},
     {Attr, NewState}.
 
