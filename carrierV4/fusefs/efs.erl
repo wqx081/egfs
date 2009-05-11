@@ -51,10 +51,15 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 handle_info(_Msg, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 
+-define (MODE_DIR, 8#0755).
+-define (MODE_REG, 8#0644).
+-define (UID, 0).
+-define (GID, 0).
+
 -define (ROOTATTR, #stat{ 	st_ino = 1,
-                          	st_mode = ?S_IFDIR bor 8#0777,
-		  					st_uid = 0,
-		  					st_gid = 0,
+                          	st_mode = ?S_IFDIR bor ?MODE_DIR,
+		  					st_uid = ?UID,
+		  					st_gid = ?GID,
 			  				st_size = 4096,
 			  				st_nlink = 3}).
 
@@ -87,26 +92,26 @@ my_get_attr({Parent, Name}, State) ->
     {ok, FileInfo} = clientlib:read_file_info(LocalName),
     case FileInfo#filemeta.type of
 	directory ->
-	    Mode = ?S_IFDIR bor 8#0777,
+	    Mode = ?S_IFDIR bor ?MODE_DIR,
 	    Size = 4096,
 	    Nlink = 2;
 	_ ->
-	    Mode = ?S_IFREG bor 8#0777,
+	    Mode = ?S_IFREG bor ?MODE_REG,
 	    Size = FileInfo#filemeta.size,
 	    Nlink = 1
     end,
 
     Attr = #stat{ st_ino = Ino, 
-		  st_size = Size, 
+		  		  st_size = Size, 
                   st_mode = Mode,
-	          st_atime = datetime_to_seconds(FileInfo#filemeta.atime),
-	          st_mtime = datetime_to_seconds(FileInfo#filemeta.mtime),
-	          st_ctime = datetime_to_seconds(FileInfo#filemeta.ctime),
-			  %%st_uid = FileInfo#filemeta.uid,
-		      %%st_gid = FileInfo#filemeta.gid,
-			  st_uid = 0,
-		      st_gid = 0,
-	          st_nlink = Nlink},
+	              st_atime = datetime_to_seconds(FileInfo#filemeta.atime),
+	              st_mtime = datetime_to_seconds(FileInfo#filemeta.mtime),
+	              st_ctime = datetime_to_seconds(FileInfo#filemeta.ctime),
+			      %%st_uid = FileInfo#filemeta.uid,
+		          %%st_gid = FileInfo#filemeta.gid,
+			      st_uid = ?UID,
+		          st_gid = ?GID,
+	              st_nlink = Nlink},
     {Attr, NewState}.
 
 make_inode(GFName, State) ->
