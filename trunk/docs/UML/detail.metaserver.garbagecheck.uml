@@ -1,0 +1,33 @@
+loop every 24hours
+
+
+meta_monitor@meta_server->meta_monitor@meta_server:broadcast_bloom()
+
+note over meta_monitor@meta_server
+make bloom result of database table "filemeta" ,
+choose a random dataserver
+end note  
+
+
+meta_monitor@meta_server-->data_server1: connect(garbagecheck,OtherdsList)
+activate data_server1
+
+data_server1-->data_server2:connect(garbagecheck,OtherdsList)
+
+activate data_server2
+
+deactivate data_server1
+
+data_server2 --> otherdataservers:connect(garbagecheck,OtherdsList)
+
+activate otherdataservers
+deactivate data_server2
+otherdataservers--> otherdataservers:check garbage within a chain
+
+
+
+
+deactivate otherdataservers
+
+
+end
