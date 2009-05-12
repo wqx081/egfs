@@ -6,17 +6,33 @@ metaserver-> metaworker: request received
 alt read
 activate metaworker
 metaworker->metaworker:start read process
+alt ok
 metaworker->client:at your service
+else fail
+metaworker->metaserver:collide ,fail 
+metaserver->client: fail
+
+end
 deactivate metaworker
 else write
 activate metaworker
 metaworker->metaworker:start write process
+alt ok
 metaworker->client:at your service
+else fail
+metaworker->metaserver:collide ,fail 
+metaserver->client: fail
+end
 deactivate metaworker
 else append
 activate metaworker
 metaworker->metaworker:start append process
+alt ok
 metaworker->client:at your service
-
+else fail
+metaworker->metaserver:collide ,fail 
+metaserver->client: fail
+deactivate metaserver
+end
 deactivate metaworker
 end
