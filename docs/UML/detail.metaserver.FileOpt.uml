@@ -1,0 +1,22 @@
+client->metaserver:read/write/append
+activate metaserver
+
+
+metaserver-> metaworker: request received 
+alt read
+activate metaworker
+metaworker->metaworker:start read process
+metaworker->client:at your service
+deactivate metaworker
+else write
+activate metaworker
+metaworker->metaworker:start write process
+metaworker->client:at your service
+deactivate metaworker
+else append
+activate metaworker
+metaworker->metaworker:start append process
+metaworker->client:at your service
+
+deactivate metaworker
+end
